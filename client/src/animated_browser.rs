@@ -1230,6 +1230,7 @@ impl AnimatedScene {
                 &mut prepared,
                 applied.unwrap_or(QualitySnapshot {
                     requested: QualityMode::High,
+                    applied_mode: QualityMode::High,
                     high_quality: true,
                     quality_blend: 1.,
                     quality_scale,

@@ -1,11 +1,11 @@
 //! World attachment policy, independent of projection, input and GPU allocation.
-use crate::settings::WorldResolution;
+use crate::settings::{AntiAliasing, WorldResolution};
 
 /// Maximum supported world or overlay attachment axis.
 pub const MAX_EXTENT: u32 = 8192;
-/// Existing hard attachment guard, independent of sampled image residency.
+/// Base attachment guard; Auto also charges the selected world sample count.
 pub const ATTACHMENT_BYTES: u64 = 128 * 1024 * 1024;
-/// Opt-in Native keeps MSAA4 only within this persistent-target allowance.
+/// Auto Native keeps MSAA4 only within this persistent-target allowance.
 /// At larger outputs single-sample native coverage preserves full physical resolution.
 /// This is a memory policy, not a frame-time promise; see docs/world-resolution.md.
 pub const NATIVE_MSAA_BYTES: u64 = 64 * 1024 * 1024;
@@ -16,7 +16,7 @@ pub fn validate_target(
     samples: u32,
     max_dimension: u32,
 ) -> Result<(), &'static str> {
-    if !matches!(samples, 1 | 4)
+    if !matches!(samples, 1 | 2 | 4)
         || extent.contains(&0)
         || extent.iter().any(|n| *n > MAX_EXTENT || *n > max_dimension)
     {
@@ -26,6 +26,25 @@ pub fn validate_target(
         return Err("Render attachment budget");
     }
     Ok(())
+}
+
+/// Explicit MSAA charges the bounded base area, honoring supported sample counts.
+/// Auto retains the historical selected-sample guard. See docs/settings.md.
+pub fn validate_world_target(
+    extent: [u32; 2],
+    samples: u32,
+    max_dimension: u32,
+    aa: AntiAliasing,
+) -> Result<(), &'static str> {
+    if !matches!(samples, 1 | 2 | 4) {
+        return Err("World attachment extent/sample limit");
+    }
+    let charged_samples = if matches!(aa, AntiAliasing::X2 | AntiAliasing::X4) {
+        1
+    } else {
+        samples
+    };
+    validate_target(extent, charged_samples, max_dimension)
 }
 
 /// One immutable presentation decision, independent of model/frame preparation.
@@ -41,6 +60,8 @@ pub struct WorldTargetPlan {
     pub samples: u32,
     /// Native cannot fit even at sample count one.
     pub native_unavailable: bool,
+    /// An explicit AA request had to use a lower supported/within-budget count.
+    pub aa_fallback: bool,
 }
 impl WorldTargetPlan {
     /// Select attachments without mutating the requested preference.
@@ -54,21 +75,35 @@ impl WorldTargetPlan {
         if projection.contains(&0) || physical.contains(&0) {
             return Err("Zero world/presentation extent");
         }
-        if !matches!(samples, 1 | 4) {
+        if !matches!(samples, 1 | 2 | 4) {
             return Err("World attachment extent/sample limit");
         }
-        // Native's physical pixels already improve edge coverage. Avoid a large
-        // persistent MSAA target instead of silently returning to a soft backing.
-        // Original retains its exact sample count and allocation behavior.
-        let native_samples = if u64::from(physical[0]) * u64::from(physical[1])
-            > NATIVE_MSAA_BYTES / (4 * u64::from(samples))
-        {
-            1
-        } else {
-            samples
-        };
+        Self::with_anti_aliasing(
+            requested,
+            projection,
+            physical,
+            samples,
+            max_dimension,
+            AntiAliasing::Auto,
+            &[1, samples],
+        )
+    }
+    /// Explicit requests honor format support within the bounded base extent.
+    #[allow(clippy::too_many_arguments)]
+    pub fn with_anti_aliasing(
+        requested: WorldResolution,
+        projection: [u32; 2],
+        physical: [u32; 2],
+        auto_samples: u32,
+        max_dimension: u32,
+        aa: AntiAliasing,
+        supported: &[u32],
+    ) -> Result<Self, &'static str> {
+        if projection.contains(&0) || physical.contains(&0) || !matches!(auto_samples, 1 | 2 | 4) {
+            return Err("World attachment extent/sample limit");
+        }
         let native_unavailable = requested == WorldResolution::Native
-            && validate_target(physical, native_samples, max_dimension).is_err();
+            && validate_target(physical, 1, max_dimension).is_err();
         let effective = if requested == WorldResolution::Native && !native_unavailable {
             WorldResolution::Native
         } else {
@@ -79,23 +114,51 @@ impl WorldTargetPlan {
         } else {
             projection
         };
-        let samples = if effective == WorldResolution::Native {
-            native_samples
+        let auto_samples = if supported.contains(&auto_samples) {
+            auto_samples
         } else {
-            samples
+            1
         };
+        let desired = match aa {
+            AntiAliasing::Auto => {
+                if effective == WorldResolution::Native
+                    && u64::from(physical[0]) * u64::from(physical[1])
+                        > NATIVE_MSAA_BYTES / (4 * u64::from(auto_samples))
+                {
+                    1
+                } else {
+                    auto_samples
+                }
+            }
+            AntiAliasing::Off => 1,
+            AntiAliasing::X2 => 2,
+            AntiAliasing::X4 => 4,
+        };
+        if aa == AntiAliasing::Auto {
+            validate_target(attachment, desired, max_dimension)?;
+        }
+        let samples = [4, 2, 1]
+            .into_iter()
+            .find(|s| {
+                *s <= desired
+                    && supported.contains(s)
+                    && validate_world_target(attachment, *s, max_dimension, aa).is_ok()
+            })
+            .ok_or("No supported world attachment")?;
+        let aa_fallback = aa != AntiAliasing::Auto && samples != desired;
         let blit = effective == WorldResolution::Original && projection != physical;
         // Preserve Original's existing scaled-backing guard.
         if blit && projection.iter().any(|n| *n > 1500) {
             return Err("Desktop backing limit");
         }
-        validate_target(attachment, samples, max_dimension)?;
+        validate_world_target(attachment, samples, max_dimension, aa)?;
         Ok(Self {
             effective,
             attachment,
             blit,
             samples,
             native_unavailable,
+            aa_fallback,
         })
     }
     /// Persistent multisample target bytes, excluding driver padding.
@@ -124,6 +187,63 @@ mod tests {
     use super::*;
     use WorldResolution::{Native, Original};
     #[test]
+    fn explicit_aa_honors_format_support_and_falls_back_without_changing_auto() {
+        let plan = |mode, physical, aa, supported: &[u32], limit| {
+            WorldTargetPlan::with_anti_aliasing(
+                mode,
+                [1500, 845],
+                physical,
+                4,
+                limit,
+                aa,
+                supported,
+            )
+            .unwrap()
+        };
+        for mode in [Original, Native] {
+            for aa in [AntiAliasing::Off, AntiAliasing::X2, AntiAliasing::X4] {
+                let p = plan(mode, [3840, 2160], aa, &[1, 2, 4], 8192);
+                assert_eq!(
+                    p.samples,
+                    match aa {
+                        AntiAliasing::Off => 1,
+                        AntiAliasing::X2 => 2,
+                        _ => 4,
+                    }
+                );
+                assert!(!p.aa_fallback);
+            }
+        }
+        assert_eq!(
+            plan(Native, [3840, 2160], AntiAliasing::Auto, &[1, 2, 4], 8192).samples,
+            1
+        );
+        assert_eq!(
+            plan(Native, [1920, 1080], AntiAliasing::Auto, &[1, 2], 8192).samples,
+            1
+        );
+        let p = plan(Native, [3840, 2160], AntiAliasing::X2, &[1, 4], 8192);
+        assert_eq!(p.samples, 1);
+        assert!(p.aa_fallback);
+        let p = plan(Native, [3840, 2160], AntiAliasing::X4, &[1, 2], 8192);
+        assert_eq!(p.samples, 2);
+        assert!(p.aa_fallback);
+        let p = plan(Native, [4096, 2160], AntiAliasing::X4, &[1, 2, 4], 8192);
+        assert_eq!(p.samples, 4);
+        assert!(!p.aa_fallback);
+        assert!(p.msaa_bytes() > ATTACHMENT_BYTES);
+        let p = plan(Native, [3840, 2160], AntiAliasing::X4, &[1, 2, 4], 2048);
+        assert!(p.native_unavailable);
+        assert_eq!(p.effective, Original);
+        assert_eq!(p.samples, 4);
+        for physical in [[2048, 2048], [2048, 2049], [1920, 1080], [3840, 2160]] {
+            assert_eq!(
+                plan(Native, physical, AntiAliasing::Auto, &[1, 2, 4], 8192),
+                WorldTargetPlan::new(Native, [1500, 845], physical, 4, 8192).unwrap()
+            );
+        }
+    }
+    #[test]
     fn native_msaa_budget_is_inclusive_and_fallback_keeps_original_samples() {
         let plan = |mode, extent, samples, limit| {
             WorldTargetPlan::new(mode, [1500, 845], extent, samples, limit).unwrap()
@@ -137,7 +257,12 @@ mod tests {
         assert_eq!(unsupported.msaa_bytes(), 1500 * 845 * 16);
         assert!(plan(Native, [u32::MAX, u32::MAX], 4, 8192).native_unavailable);
         assert!(plan(Native, [8192, 4097], 4, 8192).native_unavailable);
-        assert!(WorldTargetPlan::new(Native, [1500, 845], [3840, 2160], 2, 8192).is_err());
+        assert_eq!(
+            WorldTargetPlan::new(Native, [1500, 845], [3840, 2160], 2, 8192)
+                .unwrap()
+                .samples,
+            2
+        );
     }
     #[test]
     fn original_guard_and_native_direct_path_use_distinct_extents() {
@@ -200,7 +325,7 @@ mod tests {
             ([64, 0], 4, 8192),
             ([8193, 1], 1, 16384),
             ([4096, 1], 1, 2048),
-            ([64, 64], 2, 8192),
+            ([64, 64], 3, 8192),
         ] {
             assert!(validate_target(extent, samples, limit).is_err());
         }

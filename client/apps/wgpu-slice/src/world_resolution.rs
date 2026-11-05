@@ -1,7 +1,9 @@
 //! Attachment policy only. Never changes Frame extent, projection or input.
 use crate::Result;
 use slither_client::settings::WorldResolution;
-pub use slither_client::world_resolution::{ATTACHMENT_BYTES, WorldTargetPlan, validate_target};
+pub use slither_client::world_resolution::{
+    ATTACHMENT_BYTES, WorldTargetPlan, validate_target, validate_world_target,
+};
 
 /// Native host window/input boundary, carrying the requested presentation mode.
 /// Projection and CSS pointer dimensions remain independent of that request.

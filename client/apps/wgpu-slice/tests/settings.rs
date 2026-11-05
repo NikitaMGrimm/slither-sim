@@ -3,7 +3,7 @@
 use slither_client::{
     login_controls::{CHANGE_SKIN, NICKNAME, PLAY, SERVER, SETTINGS},
     menu_preferences::MenuQuality as Q,
-    settings::{DONE, QUALITY, RESOLUTION},
+    settings::{AA_CHOICES, AntiAliasing, DONE, GraphicsQuality, QUALITY_CHOICES, RESOLUTION},
     start_page::StartMenuIntent,
 };
 use slither_wgpu_slice::{
@@ -13,6 +13,14 @@ use winit::{
     event::ElementState,
     keyboard::{Key, KeyCode, NamedKey, PhysicalKey},
 };
+
+const QUALITY: slither_client::menu_controls::ControlId = QUALITY_CHOICES[1].0;
+const AUTO: slither_client::menu_controls::ControlId = QUALITY_CHOICES[0].0;
+// Existing activation/capture regressions start on the unselected Low radio.
+fn open_settings(login: &mut NativeLogin) {
+    login.open_settings(true);
+    login.focus(QUALITY);
+}
 
 fn key(login: &mut NativeLogin, named: NamedKey) -> bool {
     login
@@ -40,6 +48,59 @@ fn settled() -> NativeLogin {
         login.step(now as f64, true, false).unwrap();
     }
     login
+}
+
+#[test]
+fn graphics_radios_select_explicit_values_wrap_focus_and_fit_owner_sizes() {
+    let mut login = settled();
+    login.open_settings(true);
+    assert_eq!(login.settings_ui.focused(), Some(AUTO));
+    for (id, graphics) in QUALITY_CHOICES {
+        login.focus(id);
+        key(&mut login, NamedKey::Space);
+        assert_eq!(login.state.settings.preferences().graphics, graphics);
+        key(&mut login, NamedKey::Space);
+        assert_eq!(login.state.settings.preferences().graphics, graphics);
+    }
+    for (id, aa) in AA_CHOICES {
+        login.focus(id);
+        key(&mut login, NamedKey::Enter);
+        assert_eq!(login.state.settings.preferences().anti_aliasing, aa);
+    }
+    login.state.settings.effective_samples(1);
+    assert_eq!(
+        login.state.settings.preferences().anti_aliasing,
+        AntiAliasing::X4
+    );
+    assert_eq!(
+        login.state.settings.preferences().graphics,
+        GraphicsQuality::High
+    );
+    for (physical, dpr) in [([1920, 1080], 1.), ([3840, 2160], 1.), ([3840, 2160], 2.)] {
+        login.focus(AUTO);
+        for _ in 0..3 {
+            login.prepare_host(physical, dpr, true, None).unwrap();
+        }
+        assert!(
+            login
+                .settings_ui
+                .controls
+                .iter()
+                .all(|(_, rect, _)| rect.is_positive())
+        );
+        assert!(
+            login
+                .settings_ui
+                .controls
+                .iter()
+                .all(|(_, rect, _)| login.settings_ui.panel_rect.contains_rect(*rect))
+        );
+        let order = slither_wgpu_slice::settings_egui::control_order();
+        for id in order.into_iter().skip(1).chain([AUTO]) {
+            key(&mut login, NamedKey::Tab);
+            assert_eq!(login.settings_ui.focused(), Some(id));
+        }
+    }
 }
 fn point(
     login: &NativeLogin,
@@ -86,7 +147,7 @@ fn entry_order_modality_escape_done_and_play_snapshot() {
             .contains(&slither_client::menu_input::HostEditEffect::ReleasePointerBoost)
     );
     assert!(login.state.settings.visible());
-    assert_eq!(login.settings_ui.focused(), Some(QUALITY));
+    assert_eq!(login.settings_ui.focused(), Some(AUTO));
     assert_eq!(login.input.state.focus(), None);
     assert!(login.blocks_gameplay());
     login.open_studio();
@@ -98,12 +159,21 @@ fn entry_order_modality_escape_done_and_play_snapshot() {
     assert_eq!(login.state.view(true).quality, Q::Low);
     assert!(login.step(9616., true, false).unwrap().0.is_empty());
     assert!(!login.state.view(true).spinner_visible);
-    assert!(key(&mut login, NamedKey::Tab));
-    assert_eq!(login.settings_ui.focused(), Some(RESOLUTION));
-    assert!(key(&mut login, NamedKey::Tab));
-    assert_eq!(login.settings_ui.focused(), Some(DONE));
-    assert!(key(&mut login, NamedKey::Tab));
-    assert_eq!(login.settings_ui.focused(), Some(QUALITY));
+    for id in [
+        QUALITY_CHOICES[2].0,
+        QUALITY_CHOICES[3].0,
+        RESOLUTION,
+        AA_CHOICES[0].0,
+        AA_CHOICES[1].0,
+        AA_CHOICES[2].0,
+        AA_CHOICES[3].0,
+        DONE,
+        AUTO,
+        QUALITY,
+    ] {
+        assert!(key(&mut login, NamedKey::Tab));
+        assert_eq!(login.settings_ui.focused(), Some(id));
+    }
     assert!(key(&mut login, NamedKey::Escape));
     assert!(!login.state.settings.is_open());
     login.step(9846., true, false).unwrap();
@@ -120,7 +190,7 @@ fn entry_order_modality_escape_done_and_play_snapshot() {
     assert_eq!(login.picker.policy.selection.official_id(), Some(7));
     login.focus(PLAY);
     key(&mut login, NamedKey::Enter);
-    login.open_settings(true);
+    open_settings(&mut login);
     assert!(!login.state.settings.visible());
     assert_eq!(
         login.step(9862., true, false).unwrap().0,
@@ -136,7 +206,7 @@ fn entry_order_modality_escape_done_and_play_snapshot() {
 #[test]
 fn pointer_blur_resize_and_mutually_exclusive_entry() {
     let mut login = settled();
-    login.open_settings(true);
+    open_settings(&mut login);
     login.prepare([960, 540], true, None).unwrap();
     let p = point(&login, QUALITY, [960., 540.]);
     login.pointer(p, Some(true), true);
@@ -167,11 +237,11 @@ fn pointer_blur_resize_and_mutually_exclusive_entry() {
     assert_eq!(login.state.view(true).quality, Q::Low);
     login.close_settings();
     login.open_studio();
-    login.open_settings(true);
+    open_settings(&mut login);
     assert!(!login.state.settings.visible());
     let mut login = settled();
     login.picker.open();
-    login.open_settings(true);
+    open_settings(&mut login);
     assert!(!login.state.settings.visible());
 }
 
@@ -199,7 +269,7 @@ fn native_storage_bounded_read_no_startup_write_atomic_replace_and_later_retry()
     let temp = Temp::new();
     let path = temp.0.join("settings.txt");
     let storage = SettingsStorage::at(Some(temp.0.clone()));
-    assert_eq!(storage.restore().quality, Q::High);
+    assert_eq!(storage.restore().quality(), Q::High);
     assert!(!path.exists());
     for (bytes, quality) in [
         (b"1:0".as_slice(), Q::Low),
@@ -209,27 +279,33 @@ fn native_storage_bounded_read_no_startup_write_atomic_replace_and_later_retry()
         (&[255; 65], Q::High),
     ] {
         std::fs::write(&path, bytes).unwrap();
-        assert_eq!(storage.restore().quality, quality);
+        assert_eq!(storage.restore().quality(), quality);
         assert_eq!(std::fs::read(&path).unwrap(), bytes);
     }
     std::fs::write(&path, "1:1").unwrap();
     storage.save("1:0").unwrap();
-    assert_eq!(std::fs::read_to_string(&path).unwrap(), "2:0:original");
+    assert_eq!(
+        std::fs::read_to_string(&path).unwrap(),
+        "3:low:original:auto"
+    );
     assert_eq!(std::fs::read_dir(&temp.0).unwrap().count(), 1);
     storage.save("2:0:native").unwrap();
     assert_eq!(
         storage.restore().resolution,
         slither_client::settings::WorldResolution::Native
     );
-    assert_eq!(storage.restore().quality, Q::Low);
-    assert_eq!(std::fs::read_to_string(&path).unwrap(), "2:0:native");
+    assert_eq!(storage.restore().quality(), Q::Low);
+    assert_eq!(std::fs::read_to_string(&path).unwrap(), "3:low:native:auto");
     std::fs::remove_file(&path).unwrap();
     std::fs::create_dir(&path).unwrap();
-    assert_eq!(storage.restore().quality, Q::High);
+    assert_eq!(storage.restore().quality(), Q::High);
     std::fs::remove_dir(&path).unwrap();
     std::fs::write(&path, "1:0").unwrap();
     storage.save("1:1").unwrap();
-    assert_eq!(std::fs::read_to_string(&path).unwrap(), "2:1:original");
+    assert_eq!(
+        std::fs::read_to_string(&path).unwrap(),
+        "3:auto:original:auto"
+    );
     storage.save("1:0").unwrap();
     let mut login = settled();
     login.restore_settings(SettingsStorage::at(Some(temp.0.clone())));
@@ -250,7 +326,10 @@ fn native_storage_bounded_read_no_startup_write_atomic_replace_and_later_retry()
                 }
             ))
     );
-    assert_eq!(std::fs::read_to_string(&path).unwrap(), "2:0:original");
+    assert_eq!(
+        std::fs::read_to_string(&path).unwrap(),
+        "3:low:original:auto"
+    );
 }
 
 #[test]
@@ -261,7 +340,7 @@ fn failed_replace_keeps_old_data_and_memory_and_does_not_retry_each_frame() {
     login.restore_settings(SettingsStorage::at(Some(temp.0.clone())));
     std::fs::create_dir(&path).unwrap();
     std::fs::write(path.join("old"), "keep").unwrap();
-    login.open_settings(true);
+    open_settings(&mut login);
     key(&mut login, NamedKey::Space);
     login.step(9616., true, false).unwrap();
     assert_eq!(login.state.view(true).quality, Q::Low);
@@ -272,9 +351,13 @@ fn failed_replace_keeps_old_data_and_memory_and_does_not_retry_each_frame() {
     std::fs::remove_dir(&path).unwrap();
     login.step(9632., true, false).unwrap();
     assert!(!path.exists());
+    login.focus(AUTO);
     key(&mut login, NamedKey::Space);
     login.step(9648., true, false).unwrap();
-    assert_eq!(std::fs::read_to_string(&path).unwrap(), "2:1:original");
+    assert_eq!(
+        std::fs::read_to_string(&path).unwrap(),
+        "3:auto:original:auto"
+    );
 }
 
 #[cfg(windows)]
@@ -294,10 +377,13 @@ fn startup_read_failure_does_not_block_later_explicit_save() {
     assert_eq!(login.state.view(true).quality, Q::High);
     drop(lock);
     assert_eq!(std::fs::read_to_string(&path).unwrap(), "1:1");
-    login.open_settings(true);
+    open_settings(&mut login);
     key(&mut login, NamedKey::Space);
     login.step(9616., true, false).unwrap();
-    assert_eq!(std::fs::read_to_string(&path).unwrap(), "2:0:original");
+    assert_eq!(
+        std::fs::read_to_string(&path).unwrap(),
+        "3:low:original:auto"
+    );
 }
 
 #[test]
@@ -309,7 +395,7 @@ fn egui_layout_focus_keyboard_reachability_and_retained_login() {
         .iter()
         .map(|r| r.image.pixels.clone())
         .collect::<Vec<_>>();
-    login.open_settings(true);
+    open_settings(&mut login);
     login.step(9900., true, false).unwrap();
     login.state.settings.activate(login.state.settings.intent(
         RESOLUTION,
@@ -335,18 +421,24 @@ fn egui_layout_focus_keyboard_reachability_and_retained_login() {
                 login.settings_ui.panel_rect
             );
             let controls = &login.settings_ui.controls;
-            assert_eq!(controls.len(), 3);
+            assert_eq!(controls.len(), 10);
             assert!(controls.iter().filter(|(_, _, focused)| *focused).count() <= 1);
             for (i, (_, rect, _)) in controls.iter().enumerate() {
-                assert!(login.settings_ui.panel_rect.contains_rect(*rect));
+                if rect.is_positive() {
+                    assert!(login.settings_ui.panel_rect.contains_rect(*rect));
+                }
                 assert!(
                     controls[i + 1..]
                         .iter()
-                        .all(|(_, other, _)| !rect.intersects(*other))
+                        .all(|(_, other, _)| !rect.is_positive()
+                            || !other.is_positive()
+                            || !rect.intersects(*other))
                 );
             }
             login.focus(QUALITY);
-            for id in [RESOLUTION, DONE, QUALITY] {
+            let mut order = slither_wgpu_slice::settings_egui::control_order().to_vec();
+            order.rotate_left(2);
+            for id in order {
                 key(&mut login, NamedKey::Tab);
                 for _ in 0..2 {
                     login
@@ -390,7 +482,7 @@ fn egui_layout_focus_keyboard_reachability_and_retained_login() {
 #[test]
 fn fade_reverses_continuously_and_return_keeps_modal_input_until_finished() {
     let mut login = settled();
-    login.open_settings(true);
+    open_settings(&mut login);
     assert_eq!(login.state.settings.alpha(), 0.);
     login.step(9715., true, false).unwrap();
     let alpha = login.state.settings.alpha();
@@ -406,7 +498,7 @@ fn fade_reverses_continuously_and_return_keeps_modal_input_until_finished() {
 #[test]
 fn native_settings_uses_the_shared_picker_fade_durations() {
     let mut login = settled();
-    login.open_settings(true);
+    open_settings(&mut login);
     for now in (9616..=10_000).step_by(16) {
         login.step(now as f64, true, false).unwrap();
     }
@@ -423,7 +515,7 @@ fn native_settings_uses_the_shared_picker_fade_durations() {
 #[test]
 fn egui_shift_tab_repeats_and_previous_mount_pointer_release() {
     let mut login = settled();
-    login.open_settings(true);
+    open_settings(&mut login);
     login.step(9900., true, false).unwrap();
     login.prepare([960, 540], true, None).unwrap();
     let key = |key, repeat, modifiers| egui::Event::Key {
@@ -433,6 +525,7 @@ fn egui_shift_tab_repeats_and_previous_mount_pointer_release() {
         repeat,
         modifiers,
     };
+    login.focus(AUTO);
     login.settings_input(egui::RawInput {
         events: vec![key(egui::Key::Tab, false, egui::Modifiers::SHIFT)],
         ..Default::default()
@@ -443,18 +536,18 @@ fn egui_shift_tab_repeats_and_previous_mount_pointer_release() {
         events: vec![key(egui::Key::Space, false, egui::Modifiers::NONE)],
         ..Default::default()
     });
-    assert_eq!(login.state.settings.preferences().quality, Q::Low);
+    assert_eq!(login.state.settings.preferences().quality(), Q::Low);
     login.settings_input(egui::RawInput {
         events: vec![key(egui::Key::Space, true, egui::Modifiers::NONE)],
         ..Default::default()
     });
-    assert_eq!(login.state.settings.preferences().quality, Q::Low);
+    assert_eq!(login.state.settings.preferences().quality(), Q::Low);
     let pos = point(&login, RESOLUTION, [960., 540.]);
     login.pointer(pos, Some(true), true);
     login.close_settings();
     login.step(9916., true, false).unwrap();
     login.step(9932., true, false).unwrap();
-    login.open_settings(true);
+    open_settings(&mut login);
     login.pointer(pos, Some(false), true);
     assert_eq!(
         login.state.settings.preferences().resolution,
@@ -465,7 +558,7 @@ fn egui_shift_tab_repeats_and_previous_mount_pointer_release() {
 #[test]
 fn backdrop_closes_on_matching_release_and_retains_the_return_fade() {
     let mut login = settled();
-    login.open_settings(true);
+    open_settings(&mut login);
     for now in (9616..=10_000).step_by(16) {
         login.step(now as f64, true, false).unwrap();
     }
@@ -483,7 +576,7 @@ fn another_button_cannot_hand_a_primary_press_to_a_settings_control() {
     use egui::PointerButton::{Middle, Primary, Secondary};
     for other in [Secondary, Middle] {
         let mut login = settled();
-        login.open_settings(true);
+        open_settings(&mut login);
         for now in (9616..=10_000).step_by(16) {
             login.step(now as f64, true, false).unwrap();
         }
@@ -523,7 +616,7 @@ fn a_scroll_that_moves_a_held_toggle_retires_its_press() {
     for wheels in [&[-2.][..], &[-10., 10.][..]] {
         let mut login = settled();
         login.prepare(SMALL, true, None).unwrap();
-        login.open_settings(true);
+        open_settings(&mut login);
         let mut now = 9616;
         while now <= 10_000 {
             login.step(f64::from(now), true, false).unwrap();
@@ -576,13 +669,13 @@ fn nickname_composition_blocks_settings_entry() {
         })],
         ..Default::default()
     });
-    login.open_settings(true);
+    open_settings(&mut login);
     assert!(!login.state.settings.visible());
     login.settings_input(egui::RawInput {
         events: vec![egui::Event::Ime(egui::ImeEvent::Commit(String::new()))],
         ..Default::default()
     });
-    login.open_settings(true);
+    open_settings(&mut login);
     assert!(login.state.settings.visible());
     assert_eq!(login.input.state.focus(), None);
 }
@@ -591,14 +684,16 @@ fn nickname_composition_blocks_settings_entry() {
 fn reopening_a_short_panel_reveals_its_initial_keyboard_control() {
     let mut login = settled();
     login.prepare([640, 360], true, None).unwrap();
-    login.open_settings(true);
-    key(&mut login, NamedKey::Tab);
+    open_settings(&mut login);
+    for _ in 0..3 {
+        key(&mut login, NamedKey::Tab);
+    }
     for _ in 0..2 {
         login.prepare([640, 360], true, None).unwrap();
     }
     assert_eq!(login.settings_ui.focused(), Some(RESOLUTION));
     login.close_settings();
-    login.open_settings(true);
+    open_settings(&mut login);
     assert_eq!(login.settings_ui.focused(), Some(QUALITY));
     assert!(
         login
@@ -615,7 +710,7 @@ fn reopening_a_short_panel_reveals_its_initial_keyboard_control() {
 #[test]
 fn fractional_dpi_preserves_the_physical_viewport() {
     let mut login = settled();
-    login.open_settings(true);
+    open_settings(&mut login);
     for (extent, dpr) in [([453, 945], 1.75), ([951, 1200], 1.1)] {
         login.prepare_host(extent, dpr, true, None).unwrap();
         let logical = login
@@ -651,25 +746,26 @@ fn adapter_key(login: &mut NativeLogin, key: egui::Key, pressed: bool, shift: bo
 fn adapter_format_repeated_down_does_not_repeat_activation_or_traversal() {
     for key in [egui::Key::Space, egui::Key::Enter] {
         let mut login = settled();
-        login.open_settings(true);
+        open_settings(&mut login);
         adapter_key(&mut login, key, true, false);
-        assert_eq!(login.state.settings.preferences().quality, Q::Low);
+        assert_eq!(login.state.settings.preferences().quality(), Q::Low);
         for _ in 0..10 {
             adapter_key(&mut login, key, true, false);
         }
-        assert_eq!(login.state.settings.preferences().quality, Q::Low);
+        assert_eq!(login.state.settings.preferences().quality(), Q::Low);
         adapter_key(&mut login, key, false, false);
+        login.focus(AUTO);
         adapter_key(&mut login, key, true, false);
-        assert_eq!(login.state.settings.preferences().quality, Q::High);
+        assert_eq!(login.state.settings.preferences().quality(), Q::High);
     }
     let mut login = settled();
-    login.open_settings(true);
+    open_settings(&mut login);
     adapter_key(&mut login, egui::Key::Tab, true, false);
-    assert_eq!(login.settings_ui.focused(), Some(RESOLUTION));
+    assert_eq!(login.settings_ui.focused(), Some(QUALITY_CHOICES[2].0));
     for _ in 0..10 {
         adapter_key(&mut login, egui::Key::Tab, true, false);
     }
-    assert_eq!(login.settings_ui.focused(), Some(RESOLUTION));
+    assert_eq!(login.settings_ui.focused(), Some(QUALITY_CHOICES[2].0));
     adapter_key(&mut login, egui::Key::Tab, false, false);
     adapter_key(&mut login, egui::Key::Tab, true, true);
     assert_eq!(login.settings_ui.focused(), Some(QUALITY));
@@ -684,11 +780,11 @@ fn native_synthetic_refocus_press_does_not_activate_or_traverse_on_repeat() {
         (NamedKey::Tab, egui::Key::Tab),
     ] {
         let mut login = settled();
-        login.open_settings(true);
+        open_settings(&mut login);
         let native = Key::Named(native);
         login.egui.window.key(&native, ElementState::Pressed);
         adapter_key(&mut login, key, true, false);
-        let quality = login.state.settings.preferences().quality;
+        let quality = login.state.settings.preferences().quality();
 
         login.egui.window.observe(&WindowEvent::Focused(false), 1.);
         login.settings_input(egui::RawInput {
@@ -722,17 +818,20 @@ fn native_synthetic_refocus_press_does_not_activate_or_traverse_on_repeat() {
         for _ in 0..10 {
             login.egui.window.key(&native, ElementState::Pressed);
             adapter_key(&mut login, key, true, false);
-            assert_eq!(login.state.settings.preferences().quality, quality);
+            assert_eq!(login.state.settings.preferences().quality(), quality);
             assert_eq!(login.settings_ui.focused(), focus);
         }
         login.egui.window.key(&native, ElementState::Released);
         adapter_key(&mut login, key, false, false);
+        if key != egui::Key::Tab {
+            login.focus(AUTO);
+        }
         login.egui.window.key(&native, ElementState::Pressed);
         adapter_key(&mut login, key, true, false);
         if key == egui::Key::Tab {
             assert_ne!(login.settings_ui.focused(), focus);
         } else {
-            assert_ne!(login.state.settings.preferences().quality, quality);
+            assert_ne!(login.state.settings.preferences().quality(), quality);
         }
     }
 }
@@ -751,7 +850,7 @@ fn wheel(delta: f32) -> egui::Event {
 fn wheel_bursts_wait_for_one_redraw_without_changing_focus_or_preferences() {
     let mut login = settled();
     login.prepare([640, 360], true, None).unwrap();
-    login.open_settings(true);
+    open_settings(&mut login);
     login.step(10_000., true, false).unwrap();
     login.prepare([640, 360], true, None).unwrap();
     let context = login.egui.context().unwrap().clone();
@@ -773,7 +872,7 @@ fn wheel_bursts_wait_for_one_redraw_without_changing_focus_or_preferences() {
     let passes = context.cumulative_pass_nr();
     let before = offset();
     let focus = login.settings_ui.focused();
-    let quality = login.state.settings.preferences().quality;
+    let quality = login.state.settings.preferences().quality();
     for _ in 0..1000 {
         login.settings_input(egui::RawInput {
             events: vec![wheel(-0.5)],
@@ -787,7 +886,7 @@ fn wheel_bursts_wait_for_one_redraw_without_changing_focus_or_preferences() {
     assert_eq!(context.cumulative_pass_nr(), passes + 1);
     assert!(offset() > before);
     assert_eq!(login.settings_ui.focused(), focus);
-    assert_eq!(login.state.settings.preferences().quality, quality);
+    assert_eq!(login.state.settings.preferences().quality(), quality);
 }
 
 #[test]
@@ -796,7 +895,7 @@ fn wheel_and_click_keep_callback_and_raw_batch_order() {
         for wheel_first in [false, true] {
             let mut login = settled();
             login.prepare([640, 360], true, None).unwrap();
-            login.open_settings(true);
+            open_settings(&mut login);
             login.step(10_000., true, false).unwrap();
             login.prepare([640, 360], true, None).unwrap();
             let context = login.egui.context().unwrap().clone();
@@ -837,7 +936,7 @@ fn wheel_and_click_keep_callback_and_raw_batch_order() {
                     });
                 }
             }
-            assert_eq!(login.state.settings.preferences().quality, Q::Low);
+            assert_eq!(login.state.settings.preferences().quality(), Q::Low);
             assert_eq!(login.settings_ui.focused(), Some(QUALITY));
             assert_eq!(
                 login.state.settings.preferences().resolution,
@@ -851,7 +950,7 @@ fn wheel_and_click_keep_callback_and_raw_batch_order() {
             }
             login.prepare([640, 360], true, None).unwrap();
             assert!(offset() > before);
-            assert_eq!(login.state.settings.preferences().quality, Q::Low);
+            assert_eq!(login.state.settings.preferences().quality(), Q::Low);
         }
     }
 }
@@ -859,7 +958,7 @@ fn wheel_and_click_keep_callback_and_raw_batch_order() {
 #[test]
 fn ime_preedit_waits_for_redraw_and_commit_keeps_its_boundary() {
     let mut login = settled();
-    login.open_settings(true);
+    open_settings(&mut login);
     let context = login.egui.context().unwrap().clone();
     for event in [
         egui::ImeEvent::Preedit {
@@ -877,21 +976,27 @@ fn ime_preedit_waits_for_redraw_and_commit_keeps_its_boundary() {
         assert_eq!(context.cumulative_pass_nr(), passes + u64::from(!preedit));
     }
     assert!(login.state.settings.is_open());
-    assert_eq!(login.state.settings.preferences().quality, Q::High);
+    assert_eq!(login.state.settings.preferences().quality(), Q::High);
 }
 
 #[test]
 fn genuine_adapter_callbacks_preserve_activation_order_before_redraw() {
     let mut login = settled();
-    login.open_settings(true);
+    open_settings(&mut login);
     // No step/prepare/redraw between these genuine egui-winit-format callbacks.
-    for key in [egui::Key::Space, egui::Key::Tab, egui::Key::Space] {
+    for key in [
+        egui::Key::Space,
+        egui::Key::Tab,
+        egui::Key::Tab,
+        egui::Key::Tab,
+        egui::Key::Space,
+    ] {
         adapter_key(&mut login, key, true, false);
         adapter_key(&mut login, key, false, false);
     }
     login.prepare([960, 540], true, None).unwrap();
     assert_eq!(login.settings_ui.focused(), Some(RESOLUTION));
-    assert_eq!(login.state.settings.preferences().quality, Q::Low);
+    assert_eq!(login.state.settings.preferences().quality(), Q::Low);
     assert_eq!(
         login.state.settings.preferences().resolution,
         slither_client::settings::WorldResolution::Native
@@ -911,7 +1016,7 @@ fn genuine_adapter_callbacks_preserve_activation_order_before_redraw() {
 #[test]
 fn motion_callbacks_wait_for_one_redraw_pass() {
     let mut login = settled();
-    login.open_settings(true);
+    open_settings(&mut login);
     let passes = || login.egui.context().unwrap().cumulative_pass_nr();
     let before = passes();
     for x in 0..100 {
@@ -943,7 +1048,7 @@ fn scrollbar_drag_applies_queued_motion_before_release_without_redraw() {
     for bundled in [false, true] {
         let mut login = settled();
         login.prepare([640, 360], true, None).unwrap();
-        login.open_settings(true);
+        open_settings(&mut login);
         login.step(10_000., true, false).unwrap();
         login.prepare([640, 360], true, None).unwrap();
         let context = login.egui.context().unwrap().clone();
@@ -1005,15 +1110,15 @@ fn held_opener_and_blur_do_not_create_activation_in_the_next_owner() {
         .egui
         .window
         .key(&Key::Named(NamedKey::Enter), ElementState::Pressed);
-    login.open_settings(true);
+    open_settings(&mut login);
     assert!(login.egui.initialized());
     for _ in 0..3 {
         adapter_key(&mut login, egui::Key::Enter, true, false);
     }
-    assert_eq!(login.state.settings.preferences().quality, Q::High);
+    assert_eq!(login.state.settings.preferences().quality(), Q::High);
     adapter_key(&mut login, egui::Key::Enter, false, false);
     adapter_key(&mut login, egui::Key::Enter, true, false);
-    assert_eq!(login.state.settings.preferences().quality, Q::Low);
+    assert_eq!(login.state.settings.preferences().quality(), Q::Low);
     login.settings_input(egui::RawInput {
         events: vec![egui::Event::WindowFocused(false)],
         ..Default::default()
@@ -1022,9 +1127,9 @@ fn held_opener_and_blur_do_not_create_activation_in_the_next_owner() {
         events: vec![egui::Event::WindowFocused(true)],
         ..Default::default()
     });
-    login.focus(QUALITY);
+    login.focus(AUTO);
     adapter_key(&mut login, egui::Key::Enter, true, false);
-    assert_eq!(login.state.settings.preferences().quality, Q::High);
+    assert_eq!(login.state.settings.preferences().quality(), Q::High);
 }
 
 #[test]

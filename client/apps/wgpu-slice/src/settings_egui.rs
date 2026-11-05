@@ -3,7 +3,6 @@ use crate::egui_theme as theme;
 use egui::{Id, Rect, Sense, Vec2, pos2};
 use slither_client::{
     menu_controls::{Activation, ControlId},
-    menu_preferences::MenuQuality,
     settings::{self, SettingsState, WorldResolution},
 };
 
@@ -28,8 +27,24 @@ impl Default for SettingsUi {
 pub fn widget_id(id: ControlId) -> Id {
     Id::unique(("settings", id.0))
 }
-pub fn focus_order() -> [Id; 3] {
-    [settings::QUALITY, settings::RESOLUTION, settings::DONE].map(widget_id)
+pub fn control_order() -> [ControlId; 10] {
+    let q = settings::QUALITY_CHOICES.map(|(id, _)| id);
+    let a = settings::AA_CHOICES.map(|(id, _)| id);
+    [
+        q[0],
+        q[1],
+        q[2],
+        q[3],
+        settings::RESOLUTION,
+        a[0],
+        a[1],
+        a[2],
+        a[3],
+        settings::DONE,
+    ]
+}
+pub fn focus_order() -> [Id; 10] {
+    control_order().map(widget_id)
 }
 impl SettingsUi {
     pub fn request_focus(&mut self, control: ControlId) {
@@ -88,45 +103,132 @@ impl SettingsUi {
                         .animated(false)
                         .max_height((area.y - 238.).max(24.))
                         .show(ui, |ui| {
-                            for (id, title, caption, checked, help) in [
-                                (
-                                    settings::QUALITY,
-                                    "Quality",
-                                    "High quality",
-                                    state.preferences().quality == MenuQuality::High,
-                                    "Off: Low. High adapts to load. Next game.",
-                                ),
-                                (
-                                    settings::RESOLUTION,
-                                    "World resolution",
-                                    "Native/sharp",
-                                    state.preferences().resolution == WorldResolution::Native,
-                                    "Sharper world; higher GPU use. Same view area.",
-                                ),
-                            ] {
-                                let response = theme::checkbox_row(
+                            ui.label(egui::RichText::new("Graphics").strong().size(20.));
+                            ui.label("Graphics quality");
+                            let preferences = state.preferences();
+                            let columns = if ui.available_width() < 280. { 1 } else { 2 };
+                            let choice_width =
+                                (ui.available_width() - 8. * (columns - 1) as f32) / columns as f32;
+                            egui::Grid::new("graphics-presets")
+                                .num_columns(columns)
+                                .spacing(egui::vec2(8., 0.))
+                                .show(ui, |ui| {
+                                    let width = choice_width;
+                                    for (index, (id, preset)) in
+                                        settings::QUALITY_CHOICES.into_iter().enumerate()
+                                    {
+                                        let response = theme::radio_choice(
+                                            ui,
+                                            widget_id(id),
+                                            preset.label(),
+                                            preferences.graphics == preset,
+                                            width,
+                                        );
+                                        if self.request_focus == Some(id) {
+                                            response.request_focus();
+                                        }
+                                        if response.has_focus() && reveal {
+                                            response.scroll_to_me(Some(egui::Align::Center));
+                                        }
+                                        self.controls.push((
+                                            id,
+                                            response.rect.intersect(ui.clip_rect()),
+                                            response.has_focus(),
+                                        ));
+                                        toggle_held |= response.is_pointer_button_down_on();
+                                        if crate::egui_panel::owned_click(&response) {
+                                            actions.push((id, Some(true)));
+                                        }
+                                        if (index + 1) % columns == 0 {
+                                            ui.end_row();
+                                        }
+                                    }
+                                });
+                            theme::help(ui, "Auto adapts to load. Presets apply next game.");
+                            ui.add_space(theme::ROW_GAP);
+                            let id = settings::RESOLUTION;
+                            let checked = preferences.resolution == WorldResolution::Native;
+                            let response = theme::checkbox_row(
+                                ui,
+                                widget_id(id),
+                                "World resolution",
+                                "Native/sharp",
+                                checked,
+                                "Sharper world; higher GPU use. Same view area.",
+                            );
+                            if self.request_focus == Some(id) {
+                                response.request_focus();
+                            }
+                            if response.has_focus() && reveal {
+                                response.scroll_to_me(Some(egui::Align::Center));
+                            }
+                            self.controls.push((
+                                id,
+                                response.rect.intersect(ui.clip_rect()),
+                                response.has_focus(),
+                            ));
+                            toggle_held |= response.is_pointer_button_down_on();
+                            if crate::egui_panel::owned_click(&response) {
+                                actions.push((id, Some(!checked)));
+                            }
+                            ui.label("Anti-aliasing");
+                            egui::Grid::new("graphics-aa")
+                                .num_columns(columns)
+                                .spacing(egui::vec2(8., 0.))
+                                .show(ui, |ui| {
+                                    let width = choice_width;
+                                    for (index, (id, aa)) in
+                                        settings::AA_CHOICES.into_iter().enumerate()
+                                    {
+                                        let response = theme::radio_choice(
+                                            ui,
+                                            widget_id(id),
+                                            aa.label(),
+                                            preferences.anti_aliasing == aa,
+                                            width,
+                                        );
+                                        if self.request_focus == Some(id) {
+                                            response.request_focus();
+                                        }
+                                        if response.has_focus() && reveal {
+                                            response.scroll_to_me(Some(egui::Align::Center));
+                                        }
+                                        self.controls.push((
+                                            id,
+                                            response.rect.intersect(ui.clip_rect()),
+                                            response.has_focus(),
+                                        ));
+                                        toggle_held |= response.is_pointer_button_down_on();
+                                        if crate::egui_panel::owned_click(&response) {
+                                            actions.push((id, Some(true)));
+                                        }
+                                        if (index + 1) % columns == 0 {
+                                            ui.end_row();
+                                        }
+                                    }
+                                });
+                            let desired = match preferences.anti_aliasing {
+                                settings::AntiAliasing::X2 => 2,
+                                settings::AntiAliasing::X4 => 4,
+                                _ => state.world_samples(),
+                            };
+                            if desired != state.world_samples() {
+                                theme::help(
                                     ui,
-                                    widget_id(id),
-                                    title,
-                                    caption,
-                                    checked,
-                                    help,
+                                    &format!(
+                                        "{}× unavailable here; using {}×.",
+                                        desired,
+                                        state.world_samples()
+                                    ),
                                 );
-                                if self.request_focus == Some(id) {
-                                    response.request_focus();
-                                }
-                                if response.has_focus() && reveal {
-                                    response.scroll_to_me(Some(egui::Align::Center));
-                                }
-                                self.controls.push((
-                                    id,
-                                    response.rect.intersect(ui.clip_rect()),
-                                    response.has_focus(),
-                                ));
-                                toggle_held |= response.is_pointer_button_down_on();
-                                if crate::egui_panel::owned_click(&response) {
-                                    actions.push((id, Some(!checked)));
-                                }
+                            } else {
+                                theme::help(
+                                    ui,
+                                    &format!(
+                                        "Effective: {}×. Auto keeps the 64 MiB policy.",
+                                        state.world_samples()
+                                    ),
+                                );
                             }
                             if state.native_unavailable() {
                                 theme::help(ui, "Native unavailable at this size");

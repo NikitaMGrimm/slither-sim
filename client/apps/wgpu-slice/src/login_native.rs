@@ -546,9 +546,9 @@ impl NativeLogin {
             self.refresh_egui();
             self.egui.begin_screen();
             self.settings_ui
-                .request_focus(slither_client::settings::QUALITY);
+                .request_focus(slither_client::settings::QUALITY_CHOICES[0].0);
             self.egui.focus(crate::settings_egui::widget_id(
-                slither_client::settings::QUALITY,
+                slither_client::settings::QUALITY_CHOICES[0].0,
             ));
             self.settings_frame();
             self.settings_frame();

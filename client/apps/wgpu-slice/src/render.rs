@@ -1096,21 +1096,25 @@ fn prepare_composed(
         client.food_bounds(),
         user_zoom,
     );
-    let mut retained_food =
-        if !pressure && quality.high_quality && quality.blend == 1. && draws.is_empty() {
-            bank.food_batch_cache.prepare(
-                client.foods(),
-                view,
-                client.food_bounds(),
-                &bank.assets,
-                &bank.food_outline,
-                &mut bank.food_asset_index,
-                user_zoom,
-                MAX_FOOD_PAINT_COMMANDS.min(MAX_DRAWS - draws.len()),
-            )?
-        } else {
-            None
-        };
+    let mut retained_food = if !pressure
+        && applied.applied_mode != QualityMode::Medium
+        && quality.high_quality
+        && quality.blend == 1.
+        && draws.is_empty()
+    {
+        bank.food_batch_cache.prepare(
+            client.foods(),
+            view,
+            client.food_bounds(),
+            &bank.assets,
+            &bank.food_outline,
+            &mut bank.food_asset_index,
+            user_zoom,
+            MAX_FOOD_PAINT_COMMANDS.min(MAX_DRAWS - draws.len()),
+        )?
+    } else {
+        None
+    };
     if let Some(batch) = &mut retained_food {
         batch.physical_pixels_per_unit = physical_pixels_per_unit;
     }
@@ -1141,7 +1145,14 @@ fn prepare_composed(
             FoodPaintInput {
                 foods: &foods,
                 view,
-                quality,
+                quality: if applied.applied_mode == QualityMode::Medium {
+                    BodyPaintQuality {
+                        high_quality: false,
+                        blend: 0.,
+                    }
+                } else {
+                    quality
+                },
                 bounds: client.food_bounds(),
                 assets: &bank.assets,
                 target_handle: None,
@@ -1335,6 +1346,24 @@ fn prepare_composed(
                     29. * m.scale * view.zoom * body_pixels_per_unit,
                     user_zoom,
                 );
+                if applied.applied_mode == QualityMode::Low {
+                    // Complete visits first: filtering must not alter the antenna/death cursor.
+                    // Low removes the legacy shadow cost as well as High-only effects.
+                    let keep = |c: &BodyImageCommand| {
+                        !matches!(
+                            c.pass,
+                            BodyPaintPass::BodyShadow
+                                | BodyPaintPass::NearHeadShadow
+                                | BodyPaintPass::TailShadow
+                                | BodyPaintPass::OuterBoost
+                        )
+                    };
+                    body.antenna_barrier = body.commands[..body.antenna_barrier]
+                        .iter()
+                        .filter(|c| keep(c))
+                        .count();
+                    body.commands.retain(keep);
+                }
                 body
             };
             for command in &body.commands {
@@ -1366,12 +1395,15 @@ fn prepare_composed(
             zoom: view.zoom,
             death_progress: m.death_progress,
         };
-        let accessory = prepared_snake.accessory.and_then(|geometry| {
-            bank.cosmetics
-                .as_ref()
-                .and_then(|c| c.accessory(snake.own))
-                .map(|r| (geometry, r.asset))
-        });
+        let accessory = prepared_snake
+            .accessory
+            .filter(|_| !(applied.applied_mode == QualityMode::Low && continuous_zoom))
+            .and_then(|geometry| {
+                bank.cosmetics
+                    .as_ref()
+                    .and_then(|c| c.accessory(snake.own))
+                    .map(|r| (geometry, r.asset))
+            });
         if !pressure
             || snake.own
             || draws.len()
@@ -1400,7 +1432,9 @@ fn prepare_composed(
             if snake.own {
                 own_antenna_index = Some(antennas.len());
             }
-            if pressure && !snake.own {
+            if (pressure && !snake.own)
+                || (applied.applied_mode == QualityMode::Low && continuous_zoom)
+            {
                 // Keep the bulb and its core state/RNG cadence; omit expensive
                 // round-join tessellation only for pressured rival decoration.
                 antenna.strokes.clear();

@@ -452,7 +452,7 @@ mod desktop {
                     ""
                 },
                 self.game.hud_text().replace('\n', " | "),
-                self.host.renderer.sample_count
+                self.host.renderer.effective_sample_count
             );
             if self.title != title {
                 self.window.set_title(&title);
@@ -494,6 +494,13 @@ mod desktop {
                 requested: self.login.state.settings.preferences().resolution,
             };
             let extent = window.viewport(&mut self.game)?;
+            self.host.renderer.anti_aliasing =
+                self.login.state.settings.preferences().anti_aliasing;
+            let plan = self
+                .host
+                .renderer
+                .world_plan(window.requested, extent, physical)?;
+            self.login.state.settings.effective_samples(plan.samples);
             if !self.host.prepare_present()? {
                 if self.host.is_occluded() {
                     self.surface_occluded = true;
@@ -515,22 +522,14 @@ mod desktop {
             self.edit_effects(effects);
             self.champion_submission()?;
             for intent in intents {
-                if let slither_client::start_page::StartMenuIntent::Play { nickname, quality } =
-                    intent
-                {
+                if let slither_client::start_page::StartMenuIntent::Play { nickname, .. } = intent {
                     self.nickname = nickname;
                     self.login.begin_play_attempt(&mut self.game)?;
                     self.play_appearance = self.login.studio.state.committed().selection();
                     self.game
                         .set_committed_cosmetic(self.login.studio.state.committed().cosmetic)?;
-                    self.game.set_requested_quality(match quality {
-                        slither_client::menu_preferences::MenuQuality::High => {
-                            slither_client::presentation::QualityMode::High
-                        }
-                        slither_client::menu_preferences::MenuQuality::Low => {
-                            slither_client::presentation::QualityMode::Low
-                        }
-                    });
+                    self.game
+                        .set_requested_quality(self.login.state.play_graphics().mode());
                     if !self.can_play() {
                         continue;
                     }
@@ -899,7 +898,7 @@ mod desktop {
             let host = pollster::block_on(SurfaceHost::new(&i, surface, [s.width, s.height]))?;
             println!(
                 "Actual adapter {:?}; MSAA{}; no game session until explicit Play",
-                host.renderer.adapter_info, host.renderer.sample_count
+                host.renderer.adapter_info, host.renderer.effective_sample_count
             );
             let mut storage = slither_wgpu_slice::menu_storage::MenuStorage::native();
             let mut restored = storage.restore();

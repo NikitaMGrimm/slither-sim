@@ -274,7 +274,7 @@ impl LocalGameplay {
         match &self.host {
             GameplaySurface::Gpu(host) => format!(
                 "{:?}; MSAA{}",
-                host.renderer.adapter_info, host.renderer.sample_count
+                host.renderer.adapter_info, host.renderer.effective_sample_count
             ),
             #[cfg(feature = "feel-trace")]
             GameplaySurface::Cpu => "offline CPU presentation sink".into(),

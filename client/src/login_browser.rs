@@ -46,6 +46,25 @@ impl LoginMenu {
         }
         .into()
     }
+    /// Parsed desktop preset retained by the browser's existing controls.
+    pub fn graphics_quality(&self) -> String {
+        self.state
+            .settings
+            .preferences()
+            .graphics
+            .label()
+            .to_ascii_lowercase()
+    }
+    /// Parsed AA request; browser UI remains the existing quality control.
+    pub fn anti_aliasing(&self) -> String {
+        match self.state.settings.preferences().anti_aliasing {
+            crate::settings::AntiAliasing::Auto => "auto",
+            crate::settings::AntiAliasing::Off => "off",
+            crate::settings::AntiAliasing::X2 => "2",
+            crate::settings::AntiAliasing::X4 => "4",
+        }
+        .into()
+    }
     /// Start an animated login with the supported locale and stored quality.
     #[wasm_bindgen(constructor)]
     pub fn new(locale: &str, quality: &str) -> Self {

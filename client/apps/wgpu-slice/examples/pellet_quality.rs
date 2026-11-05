@@ -83,6 +83,7 @@ async fn run(output: &Path) -> Result<()> {
                 } else {
                     QualityMode::High
                 };
+                quality.applied_mode = quality.requested;
                 quality.high_quality = !low;
                 quality.quality_blend = if low { 0. } else { 1. };
                 quality.quality_scale = if low { 1.7 } else { 1. };

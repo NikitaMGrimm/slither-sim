@@ -4,14 +4,14 @@ The native Settings screen defaults to Original; Native/sharp is an opt-in
 attachment policy. Keep this toggle rather than making Auto the default: probing
 or upgrading raster coverage can add work on weak iGPUs, and one synthetic
 workload cannot guarantee spare frame budget in gameplay. Original keeps the
-exact 1080p default. Native now bounds its persistent MSAA allocation: use the
+exact 1080p default. With anti-aliasing Auto, Native bounds its persistent MSAA allocation: use the
 renderer-supported sample count while the MSAA4 target fits **64 MiB**, otherwise
 use single-sample physical coverage. This keeps 1080p/1440p Native at MSAA4 and
 4K Native at sample count one, without a large world-owned attachment. The
 64 MiB allowance is an authored memory policy, not a fitted FPS threshold.
 No timing probe, automatic mode switching or texture upload occurs on resize;
 the attachment decision is stable at a fixed size and cannot oscillate with load.
-Settings storage and the existing Native/sharp control remain unchanged.
+Explicit 2×/4× settings honor format support within the base-area/dimension bounds; see [settings](settings.md). The Native/sharp projection policy is unchanged.
 
 The policy changes raster coverage and presentation, not game geometry or input.
 `LocalGame::window_viewport` still computes projection
@@ -38,8 +38,9 @@ boundary or the Original backing/blit decision. `PresentationReport` includes
 their retained/transient bytes and actual pass counts.
 
 Preflight uses actual negotiated texture limits, MAX_EXTENT (8192) and the
-unchanged 128 MiB hard attachment guard, applied to attachment pixels and the
-selected sample count. Native availability includes its sample-count-one path;
+128 MiB base-attachment guard. Auto retains its selected-sample charge; explicit
+2×/4× world targets charge the base area and can therefore use up to 256/512 MiB.
+Explicit AA falls back visibly only for an unsupported count. Native availability includes its sample-count-one path;
 4096×2160 no longer falls back merely because MSAA4 exceeds the guard.
 Unsupported Native requests keep Original effective without altering preferences;
 resize preflights again. Zero-sized surfaces suspend. Host/device loss still stops

@@ -7,6 +7,7 @@ archive integrity establishes neither scientific rules nor product adoption.
 
 | Topic | Study | Scope and decision |
 | --- | --- | --- |
+| Client graphics | [Graphics presets and world AA](client-performance/2026-11-05-graphics-settings/REPORT.md) | Opt-in presets and format-aware 1/2/4-sample settings; exact authored default controls, qualified RTX DX12 repeatability, interleaved RTX/AMD cost matrix and CPU tradeoffs. |
 | Client performance | [Pellet rectangle endpoints](client-performance/2026-11-05-pellet-endpoints/REPORT.md) | Reuse axis endpoints within each projection; exact authored 4K images/census and matched CPU preparation measurements, retaining rejected geometry-cache pilots and cold-spike limits. |
 | Client presentation | [Continuous wheel-zoom detail](client-performance/2026-11-04-continuous-zoom/REPORT.md) | Owner-approved area floors and detail fades; factor-one image controls, finite authored pop probes, far-view release cost and complete-or-reject budgeting. |
 | Client performance | [Retained pellets through wheel zoom](client-performance/2026-11-03-retained-pellet-zoom/REPORT.md) | Share exact zoom/LOD inputs with compact food batches; current-main RTX/Vulkan 4K pairs, AMD guardrails and image controls. Whole-map input omits art under existing LOD; high-refresh p95 remains over budget. |

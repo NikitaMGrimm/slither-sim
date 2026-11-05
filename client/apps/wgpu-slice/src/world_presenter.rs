@@ -55,13 +55,7 @@ impl WorldPresenter {
             renderer.validate_frame(overlay)?;
             crate::world_resolution::validate_target(physical, 1, crate::frame::MAX_EXTENT)?;
         }
-        let plan = WorldTargetPlan::new(
-            requested,
-            frame.extent,
-            physical,
-            renderer.sample_count,
-            renderer.device.limits().max_texture_dimension_2d,
-        )?;
+        let plan = renderer.world_plan(requested, frame.extent, physical)?;
         let old_backing = self.backing_extent();
         let old_msaa = renderer.multisample_extent();
         let layer_extents = |r: &Renderer| {
@@ -157,6 +151,7 @@ impl WorldPresenter {
             self.backing = None;
         }
         self.effective = plan.effective;
+        renderer.effective_sample_count = plan.samples;
         let target_bytes = layer_bytes
             + renderer.multisample_extent().map_or(0, |(e, s)| {
                 u64::from(e[0]) * u64::from(e[1]) * 4 * u64::from(s)

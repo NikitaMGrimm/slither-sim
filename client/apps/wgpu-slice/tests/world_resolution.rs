@@ -14,6 +14,94 @@ use slither_wgpu_slice::{
 #[cfg(windows)]
 #[test]
 #[ignore = "explicit finite offscreen GPU check"]
+fn explicit_aa_switches_world_and_pellet_pipelines_and_reports_actual_samples() {
+    use slither_client::settings::AntiAliasing;
+    let mut seen = std::collections::BTreeSet::new();
+    for adapter in pollster::block_on(instance().enumerate_adapters(wgpu::Backends::DX12)) {
+        let info = adapter.get_info();
+        if info.device_type == wgpu::DeviceType::Cpu || !seen.insert((info.vendor, info.device)) {
+            continue;
+        }
+        let mut r = pollster::block_on(Renderer::from_adapter(
+            adapter,
+            wgpu::TextureFormat::Rgba8Unorm,
+        ))
+        .unwrap();
+        let scope = r.device.push_error_scope(wgpu::ErrorFilter::Validation);
+        let mut presenter = WorldPresenter::new(&r);
+        let mut game = tape::playing();
+        let physical = [1920, 1080];
+        let extent = game.window_viewport(physical, 1.).unwrap();
+        game.begin_redraw(300., extent, 1.).unwrap();
+        tape::effects(&mut game);
+        let p = game.take_frame().unwrap();
+        r.sync_resources(&p.resources).unwrap();
+        let target = offscreen::target(&r, physical);
+        let view = target.create_view(&Default::default());
+        for mode in [Native, Original] {
+            for aa in [
+                AntiAliasing::X4,
+                AntiAliasing::X2,
+                AntiAliasing::Off,
+                AntiAliasing::Auto,
+                AntiAliasing::X4,
+            ] {
+                r.anti_aliasing = aa;
+                let expected = r.world_plan(mode, extent, physical).unwrap();
+                let report = presenter
+                    .render(&mut r, &p.frame, None, &view, physical, mode)
+                    .unwrap();
+                assert_eq!(report.plan, expected);
+                assert!(r.supported_samples.contains(&report.plan.samples));
+                assert_eq!(r.effective_sample_count, report.plan.samples);
+                assert_eq!(
+                    r.multisample_extent().map(|(_, n)| n),
+                    (report.plan.samples > 1).then_some(report.plan.samples)
+                );
+                assert!(
+                    offscreen::pixels(&r, &target)
+                        .unwrap()
+                        .as_chunks::<4>()
+                        .0
+                        .iter()
+                        .all(|p| p[3] == 255)
+                );
+            }
+        }
+        // Supported explicit AA must not merely move Auto's memory cliff.
+        let large = [4096, 2160];
+        let target = offscreen::target(&r, large);
+        let view = target.create_view(&Default::default());
+        let canonical = p.frame.canonical().unwrap();
+        for (aa, frame) in [
+            (AntiAliasing::X4, &p.frame),
+            (AntiAliasing::Auto, &canonical),
+            (AntiAliasing::X4, &canonical),
+        ] {
+            r.anti_aliasing = aa;
+            let report = presenter
+                .render(&mut r, frame, None, &view, large, Native)
+                .unwrap();
+            if aa == AntiAliasing::X4 && r.supported_samples.contains(&4) {
+                assert_eq!(report.plan.samples, 4);
+                assert!(
+                    report.plan.msaa_bytes() > slither_client::world_resolution::ATTACHMENT_BYTES
+                );
+            }
+            if aa == AntiAliasing::Auto {
+                assert_eq!(report.plan.samples, 1);
+            }
+            assert_eq!(r.effective_sample_count, report.plan.samples);
+            offscreen::pixels(&r, &target).unwrap();
+        }
+        assert!(pollster::block_on(scope.pop()).is_none());
+    }
+    assert!(!seen.is_empty(), "hardware adapter required");
+}
+
+#[cfg(windows)]
+#[test]
+#[ignore = "explicit finite offscreen GPU check"]
 fn production_window_modes_preserve_generated_frames_vertices_and_input_packets() {
     use slither_wgpu_slice::world_resolution::WorldWindow;
     let mut renderer = pollster::block_on(Renderer::new(

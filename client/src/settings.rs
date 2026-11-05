@@ -3,8 +3,6 @@ use crate::{menu_controls::*, menu_preferences::MenuQuality};
 
 /// Bound host reads before parsing, including unknown future records.
 pub const MAX_SETTINGS_BYTES: usize = 64;
-/// Quality toggle within the settings panel.
-pub const QUALITY: ControlId = ControlId(2);
 /// Requested world attachment resolution, independent of Quality.
 pub const RESOLUTION: ControlId = ControlId(5);
 /// Close without reverting the immediately applied preference.
@@ -23,19 +21,133 @@ pub enum WorldResolution {
     Native,
 }
 
+/// One selectable graphics policy. Auto preserves the historical High path.
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub enum GraphicsQuality {
+    /// Preserve the historical automatic policy exactly.
+    #[default]
+    Auto,
+    /// Minimize effect and geometry costs.
+    Low,
+    /// Reduced glow and intermediate body detail.
+    Medium,
+    /// Full detail without adaptive degradation.
+    High,
+}
+impl GraphicsQuality {
+    /// User-facing option name.
+    pub fn label(self) -> &'static str {
+        match self {
+            Self::Auto => "Auto",
+            Self::Low => "Low",
+            Self::Medium => "Medium",
+            Self::High => "High",
+        }
+    }
+    /// Shared runtime policy frozen when Play is requested.
+    pub fn mode(self) -> crate::presentation::QualityMode {
+        use crate::presentation::QualityMode;
+        match self {
+            Self::Auto => QualityMode::High,
+            Self::Low => QualityMode::Low,
+            Self::Medium => QualityMode::Medium,
+            Self::High => QualityMode::FixedHigh,
+        }
+    }
+}
+/// Requested world AA; Auto retains the historical 64 MiB Native policy.
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub enum AntiAliasing {
+    /// Preserve the historical automatic policy exactly.
+    #[default]
+    Auto,
+    /// Single-sample world attachments.
+    Off,
+    /// Request two samples, falling back visibly when unavailable.
+    X2,
+    /// Request four samples, falling back visibly when unavailable.
+    X4,
+}
+/// Preset radios in visual and keyboard order.
+pub const QUALITY_CHOICES: [(ControlId, GraphicsQuality); 4] = [
+    (ControlId(40), GraphicsQuality::Auto),
+    (ControlId(41), GraphicsQuality::Low),
+    (ControlId(42), GraphicsQuality::Medium),
+    (ControlId(43), GraphicsQuality::High),
+];
+/// AA radios in visual and keyboard order.
+pub const AA_CHOICES: [(ControlId, AntiAliasing); 4] = [
+    (ControlId(44), AntiAliasing::Auto),
+    (ControlId(45), AntiAliasing::Off),
+    (ControlId(46), AntiAliasing::X2),
+    (ControlId(47), AntiAliasing::X4),
+];
+impl AntiAliasing {
+    /// User-facing option name.
+    pub fn label(self) -> &'static str {
+        match self {
+            Self::Auto => "Auto",
+            Self::Off => "Off",
+            Self::X2 => "2×",
+            Self::X4 => "4×",
+        }
+    }
+}
+
 /// Requested settings, never the renderer's adaptive runtime state.
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub struct SettingsPreferences {
-    /// Existing next-Play quality mode.
-    pub quality: MenuQuality,
+    /// Selected graphics preset.
+    pub graphics: GraphicsQuality,
+    /// Requested world anti-aliasing.
+    pub anti_aliasing: AntiAliasing,
     /// Requested attachment policy. Unsupported sizes keep this preference.
     pub resolution: WorldResolution,
 }
 impl SettingsPreferences {
-    /// Strict v2 record, or v1 migrated with Original; no startup repair writes.
+    /// Legacy browser/menu projection; the preset remains the single authority.
+    pub fn quality(self) -> MenuQuality {
+        if self.graphics == GraphicsQuality::Low {
+            MenuQuality::Low
+        } else {
+            MenuQuality::High
+        }
+    }
+    /// Strict v3, or in-memory migration from v2/v1; no startup writes.
     pub fn parse(record: &str) -> Option<Self> {
         if record.len() > MAX_SETTINGS_BYTES {
             return None;
+        }
+        let mut fields = record.split(':');
+        let version = fields.next()?;
+        if version == "3" {
+            let graphics = match fields.next()? {
+                "auto" => GraphicsQuality::Auto,
+                "low" => GraphicsQuality::Low,
+                "medium" => GraphicsQuality::Medium,
+                "high" => GraphicsQuality::High,
+                _ => return None,
+            };
+            let resolution = match fields.next()? {
+                "original" => WorldResolution::Original,
+                "native" => WorldResolution::Native,
+                _ => return None,
+            };
+            let anti_aliasing = match fields.next()? {
+                "auto" => AntiAliasing::Auto,
+                "off" => AntiAliasing::Off,
+                "2" => AntiAliasing::X2,
+                "4" => AntiAliasing::X4,
+                _ => return None,
+            };
+            if fields.next().is_some() {
+                return None;
+            }
+            return Some(Self {
+                graphics,
+                resolution,
+                anti_aliasing,
+            });
         }
         let (quality, resolution) = match record {
             "1:0" | "2:0:original" => (MenuQuality::Low, WorldResolution::Original),
@@ -45,25 +157,91 @@ impl SettingsPreferences {
             _ => return None,
         };
         Some(Self {
-            quality,
+            graphics: if quality == MenuQuality::Low {
+                GraphicsQuality::Low
+            } else {
+                GraphicsQuality::Auto
+            },
             resolution,
+            ..Self::default()
         })
     }
-    /// No startup writes; invalid/missing records use the exact legacy mapping.
+    /// Restore valid records or the exact legacy quality mapping without writes.
     pub fn restore(record: Option<&str>, legacy: Option<&str>) -> Self {
-        record.and_then(Self::parse).unwrap_or(Self {
-            quality: MenuQuality::restore(legacy),
-            resolution: WorldResolution::Original,
+        record.and_then(Self::parse).unwrap_or_else(|| {
+            let quality = MenuQuality::restore(legacy);
+            Self {
+                graphics: if quality == MenuQuality::Low {
+                    GraphicsQuality::Low
+                } else {
+                    GraphicsQuality::Auto
+                },
+                ..Self::default()
+            }
         })
     }
-    /// Canonical ASCII record, independent of the appearance schema.
+    /// Canonical bounded ASCII; no allocation or storage work on startup.
     pub fn serialize(self) -> &'static str {
-        match (self.quality, self.resolution) {
-            (MenuQuality::High, WorldResolution::Original) => "2:1:original",
-            (MenuQuality::Low, WorldResolution::Original) => "2:0:original",
-            (MenuQuality::High, WorldResolution::Native) => "2:1:native",
-            (MenuQuality::Low, WorldResolution::Native) => "2:0:native",
-        }
+        const RECORDS: [[[&str; 4]; 2]; 4] = [
+            [
+                [
+                    "3:auto:original:auto",
+                    "3:auto:original:off",
+                    "3:auto:original:2",
+                    "3:auto:original:4",
+                ],
+                [
+                    "3:auto:native:auto",
+                    "3:auto:native:off",
+                    "3:auto:native:2",
+                    "3:auto:native:4",
+                ],
+            ],
+            [
+                [
+                    "3:low:original:auto",
+                    "3:low:original:off",
+                    "3:low:original:2",
+                    "3:low:original:4",
+                ],
+                [
+                    "3:low:native:auto",
+                    "3:low:native:off",
+                    "3:low:native:2",
+                    "3:low:native:4",
+                ],
+            ],
+            [
+                [
+                    "3:medium:original:auto",
+                    "3:medium:original:off",
+                    "3:medium:original:2",
+                    "3:medium:original:4",
+                ],
+                [
+                    "3:medium:native:auto",
+                    "3:medium:native:off",
+                    "3:medium:native:2",
+                    "3:medium:native:4",
+                ],
+            ],
+            [
+                [
+                    "3:high:original:auto",
+                    "3:high:original:off",
+                    "3:high:original:2",
+                    "3:high:original:4",
+                ],
+                [
+                    "3:high:native:auto",
+                    "3:high:native:off",
+                    "3:high:native:2",
+                    "3:high:native:4",
+                ],
+            ],
+        ];
+        RECORDS[self.graphics as usize][usize::from(self.resolution == WorldResolution::Native)]
+            [self.anti_aliasing as usize]
     }
 }
 
@@ -78,6 +256,7 @@ pub struct SettingsState {
     pending: Option<&'static str>,
     not_saved: bool,
     native_available: bool,
+    effective_samples: u32,
 }
 impl SettingsState {
     /// Restore preferences without scheduling storage work.
@@ -91,6 +270,7 @@ impl SettingsState {
             pending: None,
             not_saved: false,
             native_available: true,
+            effective_samples: 1,
         }
     }
     /// Copied requested preferences, also used to freeze Play.
@@ -132,20 +312,25 @@ impl SettingsState {
         if !self.open || intent.panel != PANEL || intent.generation != self.generation {
             return;
         }
-        match intent.control {
-            QUALITY => {
-                if let Some(high) = intent.checked {
-                    let quality = if high {
-                        MenuQuality::High
-                    } else {
-                        MenuQuality::Low
-                    };
-                    if quality != self.preferences.quality {
-                        self.preferences.quality = quality;
-                        self.pending = Some(self.preferences.serialize());
-                    }
+        if intent.checked == Some(true) {
+            if let Some((_, graphics)) =
+                QUALITY_CHOICES.iter().find(|(id, _)| *id == intent.control)
+            {
+                if self.preferences.graphics != *graphics {
+                    self.preferences.graphics = *graphics;
+                    self.pending = Some(self.preferences.serialize());
                 }
+                return;
             }
+            if let Some((_, aa)) = AA_CHOICES.iter().find(|(id, _)| *id == intent.control) {
+                if self.preferences.anti_aliasing != *aa {
+                    self.preferences.anti_aliasing = *aa;
+                    self.pending = Some(self.preferences.serialize());
+                }
+                return;
+            }
+        }
+        match intent.control {
             DONE | BACKDROP => self.close(),
             RESOLUTION => {
                 if let Some(native) = intent.checked {
@@ -165,7 +350,12 @@ impl SettingsState {
     }
     /// The existing dev/reference control shares the same Quality authority.
     pub fn legacy_toggle(&mut self) -> &'static str {
-        self.preferences.quality.toggle()
+        self.preferences.graphics = if self.preferences.quality() == MenuQuality::High {
+            GraphicsQuality::Low
+        } else {
+            GraphicsQuality::Auto
+        };
+        self.preferences.quality().storage_value()
     }
     /// Drain once, outside input/painter borrows. Failure retries only on a new change.
     pub fn take_write(&mut self) -> Option<&'static str> {
@@ -178,6 +368,14 @@ impl SettingsState {
     /// Host preflight reports capability without changing the requested preference.
     pub fn native_available(&mut self, available: bool) {
         self.native_available = available;
+    }
+    /// The renderer reports the actual prepared attachment, never its ceiling.
+    pub fn effective_samples(&mut self, samples: u32) {
+        self.effective_samples = samples;
+    }
+    /// Actual sample count of the prepared world attachment.
+    pub fn world_samples(&self) -> u32 {
+        self.effective_samples
     }
     /// Explicit generation-bound action, shared by native widgets and offline tests.
     pub fn intent(

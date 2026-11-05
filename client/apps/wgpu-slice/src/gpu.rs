@@ -194,22 +194,26 @@ struct PaintPass<'a> {
     base: Option<&'a wgpu::BindGroup>,
 }
 pub struct Renderer {
+    /// Historical Auto ceiling, distinct from the last presented attachment.
     pub sample_count: u32,
+    pub supported_samples: Vec<u32>,
+    pub anti_aliasing: slither_client::settings::AntiAliasing,
+    pub effective_sample_count: u32,
     pub(crate) format: wgpu::TextureFormat,
     pub device: wgpu::Device,
     pub queue: wgpu::Queue,
     pub adapter_info: wgpu::AdapterInfo,
     layout: wgpu::BindGroupLayout,
-    over: wgpu::RenderPipeline,
+    over: BTreeMap<u32, wgpu::RenderPipeline>,
     overlay_over: wgpu::RenderPipeline,
     overlay_black_over: wgpu::RenderPipeline,
     overlay_lighter: wgpu::RenderPipeline,
-    lighter: wgpu::RenderPipeline,
-    pair_lighter: wgpu::RenderPipeline,
+    lighter: BTreeMap<u32, wgpu::RenderPipeline>,
+    pair_lighter: BTreeMap<u32, wgpu::RenderPipeline>,
     overlay_pair_lighter: wgpu::RenderPipeline,
     glow_lighter: [wgpu::RenderPipeline; 3],
     glow_pair_lighter: [wgpu::RenderPipeline; 3],
-    black_over: wgpu::RenderPipeline,
+    black_over: BTreeMap<u32, wgpu::RenderPipeline>,
     textures: BTreeMap<ResourceKey, Texture>,
     arrays: BTreeMap<(u32, u32, u32, usize), Group>,
     bindings: BTreeMap<ResourceKey, TextureArray>,
@@ -226,8 +230,8 @@ pub struct Renderer {
     layer_history: LayerHistory,
     fine_composite_single: wgpu::RenderPipeline,
     outline_target: Option<LayerTarget>,
-    outline_composite: wgpu::RenderPipeline,
-    glow_composite: wgpu::RenderPipeline,
+    outline_composite: BTreeMap<u32, wgpu::RenderPipeline>,
+    glow_composite: BTreeMap<u32, wgpu::RenderPipeline>,
     glow_composite_single: wgpu::RenderPipeline,
     draw_calls: usize,
     pass_count: usize,
@@ -236,6 +240,23 @@ pub struct Renderer {
     diagnostic_passes: Option<Vec<(&'static str, u32)>>,
 }
 impl Renderer {
+    pub fn world_plan(
+        &self,
+        requested: slither_client::settings::WorldResolution,
+        projection: [u32; 2],
+        physical: [u32; 2],
+    ) -> Result<crate::world_resolution::WorldTargetPlan> {
+        crate::world_resolution::WorldTargetPlan::with_anti_aliasing(
+            requested,
+            projection,
+            physical,
+            self.sample_count,
+            self.device.limits().max_texture_dimension_2d,
+            self.anti_aliasing,
+            &self.supported_samples,
+        )
+        .map_err(Into::into)
+    }
     pub fn supports_native(&self, physical: [u32; 2]) -> bool {
         // Capability includes Native's single-sample path at large outputs.
         crate::world_resolution::validate_target(
@@ -364,11 +385,31 @@ impl Renderer {
         timestamps: bool,
         trace: wgpu::Trace,
     ) -> Result<Self> {
-        if !matches!(max_samples, 1 | 4) {
+        if !matches!(max_samples, 1 | 2 | 4) {
             return Err("Unsupported sample count".into());
         }
         let info = adapter.get_info();
+        // 2× is adapter-specific; Auto retains the historical 4/1 ceiling.
+        let format_features = wgpu::Features::TEXTURE_ADAPTER_SPECIFIC_FORMAT_FEATURES;
+        let adapter_formats = adapter.features().contains(format_features);
+        let required_features = required_features
+            | if adapter_formats {
+                format_features
+            } else {
+                wgpu::Features::empty()
+            };
         let supported = adapter.get_texture_format_features(format).flags;
+        let supported_samples: Vec<_> = [1, 2, 4]
+            .into_iter()
+            .filter(|n| {
+                *n <= max_samples
+                    && (*n == 1
+                        || (supported.sample_count_supported(*n)
+                            && supported
+                                .contains(wgpu::TextureFormatFeatureFlags::MULTISAMPLE_RESOLVE)
+                            && (*n != 2 || adapter_formats)))
+            })
+            .collect();
         let sample_count = if max_samples == 4
             && supported.contains(
                 wgpu::TextureFormatFeatureFlags::MULTISAMPLE_X4
@@ -466,12 +507,13 @@ impl Renderer {
                 cache: None,
             })
         };
-        let over = pipeline(
-            wgpu::BlendState::PREMULTIPLIED_ALPHA_BLENDING,
-            "fs",
-            sample_count,
-            false,
-        );
+        let world_pipeline = |blend, fragment, composite| {
+            supported_samples
+                .iter()
+                .map(|&samples| (samples, pipeline(blend, fragment, samples, composite)))
+                .collect::<BTreeMap<_, _>>()
+        };
+        let over = world_pipeline(wgpu::BlendState::PREMULTIPLIED_ALPHA_BLENDING, "fs", false);
         let overlay_over = pipeline(
             wgpu::BlendState::PREMULTIPLIED_ALPHA_BLENDING,
             "fs",
@@ -486,20 +528,19 @@ impl Renderer {
             },
             alpha: wgpu::BlendState::PREMULTIPLIED_ALPHA_BLENDING.alpha,
         };
-        let black_over = pipeline(black_blend, "fs_black", sample_count, false);
+        let black_over = world_pipeline(black_blend, "fs_black", false);
         let overlay_black_over = pipeline(black_blend, "fs_black", 1, false);
         let add = wgpu::BlendComponent {
             src_factor: wgpu::BlendFactor::One,
             dst_factor: wgpu::BlendFactor::One,
             operation: wgpu::BlendOperation::Add,
         };
-        let lighter = pipeline(
+        let lighter = world_pipeline(
             wgpu::BlendState {
                 color: add,
                 alpha: add,
             },
             "fs",
-            sample_count,
             false,
         );
         let overlay_lighter = pipeline(
@@ -515,15 +556,15 @@ impl Renderer {
             color: add,
             alpha: add,
         };
-        let pair_lighter = pipeline(glow_blend, "fs_pair", sample_count, false);
+        let pair_lighter = world_pipeline(glow_blend, "fs_pair", false);
         let overlay_pair_lighter = pipeline(glow_blend, "fs_pair", 1, false);
         let glow_lighter =
             ["fs_glow2", "fs_glow4", "fs_glow8"].map(|entry| pipeline(glow_blend, entry, 1, false));
         let glow_pair_lighter =
             ["fs_pair2", "fs_pair4", "fs_pair8"].map(|entry| pipeline(glow_blend, entry, 1, false));
-        let outline_composite = pipeline(glow_blend, "fs", sample_count, true);
+        let outline_composite = world_pipeline(glow_blend, "fs", true);
         let fine_composite_single = pipeline(glow_blend, "fs", 1, true);
-        let glow_composite = pipeline(glow_blend, "fs_glow_composite", sample_count, true);
+        let glow_composite = world_pipeline(glow_blend, "fs_glow_composite", true);
         let glow_composite_single = pipeline(glow_blend, "fs_glow_composite", 1, true);
         let diagnostic_timestamps = timestamps.then(|| {
             device.create_query_set(&wgpu::QuerySetDescriptor {
@@ -549,10 +590,13 @@ impl Renderer {
             &device,
             &layout,
             format,
-            sample_count,
+            &supported_samples,
         ));
         Ok(Self {
             sample_count,
+            supported_samples,
+            anti_aliasing: Default::default(),
+            effective_sample_count: sample_count,
             format,
             device,
             queue,
@@ -829,7 +873,7 @@ impl Renderer {
         attachment: [u32; 2],
         samples: u32,
     ) -> RenderResult<()> {
-        if samples != 1 && samples != self.sample_count {
+        if !self.supported_samples.contains(&samples) {
             return Err("Unsupported world sample count".into());
         }
         self.render_inner(frame, target, false, attachment, samples, true)
@@ -966,10 +1010,11 @@ impl Renderer {
                     clear,
                 );
             }
-            crate::world_resolution::validate_target(
+            crate::world_resolution::validate_world_target(
                 attachment,
                 samples,
                 self.device.limits().max_texture_dimension_2d,
+                self.anti_aliasing,
             )?;
             self.validate_frame(frame)?;
             let mut pellets = self.pellets.take().expect("pellet renderer");
@@ -986,7 +1031,7 @@ impl Renderer {
         if frame.extent.contains(&0) {
             return Ok(());
         }
-        crate::world_resolution::validate_target(
+        crate::world_resolution::validate_world_target(
             attachment,
             samples,
             if overlay {
@@ -995,6 +1040,11 @@ impl Renderer {
                 crate::frame::MAX_EXTENT
             } else {
                 self.device.limits().max_texture_dimension_2d
+            },
+            if overlay {
+                slither_client::settings::AntiAliasing::Auto
+            } else {
+                self.anti_aliasing
             },
         )?;
         let chunk_count = frame.draws.len().div_ceil(VERTEX_CHUNK_QUADS);
@@ -1567,7 +1617,7 @@ impl Renderer {
                             if samples == 1 {
                                 &self.overlay_black_over
                             } else {
-                                &self.black_over
+                                &self.black_over[&samples]
                             }
                         }
                         Pipeline::PairLighter => {
@@ -1576,7 +1626,7 @@ impl Renderer {
                             } else if samples == 1 {
                                 &self.overlay_pair_lighter
                             } else {
-                                &self.pair_lighter
+                                &self.pair_lighter[&samples]
                             }
                         }
                         Pipeline::Lighter => {
@@ -1585,14 +1635,14 @@ impl Renderer {
                             } else if samples == 1 {
                                 &self.overlay_lighter
                             } else {
-                                &self.lighter
+                                &self.lighter[&samples]
                             }
                         }
                         Pipeline::Over => {
                             if samples == 1 {
                                 &self.overlay_over
                             } else {
-                                &self.over
+                                &self.over[&samples]
                             }
                         }
                     });
@@ -1656,7 +1706,7 @@ impl Renderer {
             ..Default::default()
         });
         if let Some(bind) = base {
-            pass.set_pipeline(&self.outline_composite);
+            pass.set_pipeline(&self.outline_composite[&samples]);
             pass.set_bind_group(0, bind, &[]);
             pass.draw(0..3, 0..1);
         }
@@ -1668,7 +1718,7 @@ impl Renderer {
             pass.set_pipeline(if samples == 1 {
                 &self.fine_composite_single
             } else {
-                &self.outline_composite
+                &self.outline_composite[&samples]
             });
             pass.set_bind_group(0, bind, &[]);
             pass.draw(0..3, 0..1);
@@ -1677,7 +1727,7 @@ impl Renderer {
             pass.set_pipeline(if samples == 1 {
                 &self.glow_composite_single
             } else {
-                &self.glow_composite
+                &self.glow_composite[&samples]
             });
             pass.set_bind_group(0, bind, &[]);
             pass.draw(0..3, 0..1);
@@ -1938,13 +1988,8 @@ impl SurfaceHost {
         if self.extent.contains(&0) || frame.extent.contains(&0) {
             return Ok(false);
         }
-        crate::world_resolution::WorldTargetPlan::new(
-            requested,
-            frame.extent,
-            self.extent,
-            self.renderer.sample_count,
-            self.renderer.device.limits().max_texture_dimension_2d,
-        )?;
+        self.renderer
+            .world_plan(requested, frame.extent, self.extent)?;
         if !self.acquire().map_err(RenderError::Host)? {
             return Ok(false);
         }
