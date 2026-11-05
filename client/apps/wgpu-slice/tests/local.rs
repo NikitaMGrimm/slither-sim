@@ -286,20 +286,39 @@ fn custom_login_attempts_unknown_challenges_and_accepts_extensions_before_setup(
         assert_eq!(&sent[1][..2], b"s\x1e");
         assert_eq!(game.phase(), Phase::Setup);
         let extension = vec![b'k', 0, 7, 9];
+        // Sector count is retained legacy metadata, unused by the client. A
+        // zero value must not reject otherwise valid Setup or snake creation.
+        let mut custom_setup = setup();
+        custom_setup[8..10].fill(0);
         if bundled {
-            game.receive(generation, &bundle(&[extension, setup(), snake(44)]), 4.)
-                .unwrap();
+            game.receive(
+                generation,
+                &bundle(&[extension, custom_setup, snake(44)]),
+                4.,
+            )
+            .unwrap();
         } else {
             game.receive(generation, &extension, 4.).unwrap();
             assert_eq!(game.phase(), Phase::Setup);
             assert!(game.client().received().setup.is_none());
             assert!(effects(&mut game).is_empty());
-            game.receive(generation, &bundle(&[setup(), snake(44)]), 5.)
+            game.receive(generation, &bundle(&[custom_setup, snake(44)]), 5.)
                 .unwrap();
         }
         assert_eq!(game.phase(), Phase::Playing);
+        assert_eq!(
+            game.client()
+                .received()
+                .setup
+                .as_ref()
+                .unwrap()
+                .sector_count,
+            0
+        );
         assert!(game.client().received().own_snake_id.is_some());
         assert!(effects(&mut game).is_empty(), "login is sent only once");
+        pictures(&mut game);
+        pump(&mut game, 20.);
         assert!(game.failure.is_none());
     }
 }

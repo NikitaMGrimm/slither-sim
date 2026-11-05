@@ -227,8 +227,14 @@ fn invalid_wire_sizes_alphabet_and_nibble_reject() {
 
 #[test]
 fn production_answers_recognized_programs_exactly_and_attempts_unknown_challenges() {
-    let recognized = encode(source().join(" ").as_bytes());
-    assert_eq!(answer_challenge(&recognized), solve_challenge(&recognized));
+    let recognized = encode(
+        synthetic_tokens(b"AbCdE", b"fGhIjKlMnOpQrStUvWxYzA")
+            .join(" ")
+            .as_bytes(),
+    );
+    let expected = b"DiOvDmWhTgUjZqIbVqMjHgGhJmQ";
+    assert_eq!(solve_challenge(&recognized).unwrap(), expected);
+    assert_eq!(answer_challenge(&recognized).unwrap(), expected);
     let legacy = encode(
         format!(
             "var a='{}';for(var i=0;i<24;i++)idba[i]=a.charCodeAt(i);",

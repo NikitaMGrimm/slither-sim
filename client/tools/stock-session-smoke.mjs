@@ -31,6 +31,9 @@ export function stockSessionSmoke(wasm) {
   const challenge = challengeFixture();
   const expectedReply = Uint8Array.from({ length: 27 }, (_, index) => 65 + (3 + index * 4) % 26);
   assert.deepEqual(wasm.solve_challenge(challenge), expectedReply);
+  const varied = challengeFixture('var a="AbCdE";a+="fGhIjKlMnOpQrStUvWxYzA";for(var i=0;i<27;i++){idba[i]=a.charCodeAt(i);}');
+  assert.deepEqual(wasm.solve_challenge(varied),
+    Uint8Array.from(Buffer.from('DiOvDmWhTgUjZqIbVqMjHgGhJmQ', 'ascii')));
   const profile = { clientVersion: 7,
     pageEcho: Uint8Array.from({ length: 20 }, (_, index) => (index * 13 + 7) & 255),
     protocolVersion: 19 };
@@ -178,19 +181,21 @@ export function stockSessionSmoke(wasm) {
       const custom = harness();
       const customSocket = custom.start(challengeFixture("var unused='synthetic'// no proof"));
       const extension = Uint8Array.of(107, 0, 7, 9);
-      if (bundled) customSocket.receive(bundle(extension, setup, appearance));
+      const customSetup = setup.slice();
+      customSetup.fill(0, 8, 10);
+      if (bundled) customSocket.receive(bundle(extension, customSetup, appearance));
       else {
         customSocket.receive(extension);
         assert.equal(custom.session.snapshot().phase, 'setup');
         assert.equal(custom.scene.control_view().connected, false);
-        customSocket.receive(bundle(setup, appearance));
+        customSocket.receive(bundle(customSetup, appearance));
       }
       assert.equal(custom.session.snapshot().phase, 'playing');
       assert.equal(custom.scene.control_view().connected, true);
       assert.equal(customSocket.sends.length, 4);
       assert.deepEqual(custom.errors, []);
     }
-    cases.push('unknown challenge login and pre-Setup extensions, separate and bundled');
+    cases.push('unknown challenge login, pre-Setup extensions and zero sector-count metadata');
 
     const main = harness(true);
     assert.ok(main.scene.control_view().own);

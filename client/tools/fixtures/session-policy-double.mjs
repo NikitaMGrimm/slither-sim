@@ -20,7 +20,7 @@ export class TestSessionPolicy {
   static negotiation_packet(index){return index===0?Uint8Array.of(1):Uint8Array.of(99,0);}
   opened(){this.phase='challenge';}
   receive_bytes(size){if(!this.connected){this.handshakeFrames++;this.handshakeBytes+=size;if(this.handshakeFrames>16||this.handshakeBytes>1048576)fail('Handshake receive budget exceeded');}}
-  receive_header(count,first){if(this.phase==='challenge'){if(count!==1||first!==54)fail('Expected one challenge command');return true;}if(!this.connected&&this.phase!=='setup')fail('Unexpected protocol frame');if(this.phase==='setup'&&first!==97)fail('Expected Setup after login');return false;}
+  receive_header(count,first){if(this.phase==='challenge'){if(count!==1||first!==54)fail('Expected one challenge command');return true;}if(!this.connected&&this.phase!=='setup')fail('Unexpected protocol frame');return false;}
   command_requires_version(opcode,length){if(opcode===54)fail('Repeated challenge');if(opcode===112&&length!==1)fail('Invalid pong');if(opcode===118&&length!==2)fail('Invalid life control');return opcode===97;}
   admit_protocol(version){if(version!==13&&version!==19)fail('Unsupported protocol');}
   challenged(){this.launch=false;this.phase='setup';}

@@ -84,6 +84,7 @@ allowing community servers that omit or ignore the proof. The client never runs
 server-supplied JavaScript; an unknown program that requires a different computed
 reply can still be rejected by the server. Unknown extension messages may precede
 Setup, including in the same frame. Setup still selects the supported protocol.
+The legacy sector-count field is retained as metadata, including zero.
 
 The window opens on login, restoring saved appearance preferences. Explicit
 `--nickname` and `--skin` override restored values for that run. Change Skin opens

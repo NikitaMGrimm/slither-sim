@@ -32,18 +32,39 @@ fn version_selection_and_setup_admission_are_explicit() {
     assert_eq!(decode(&base, ClientReceived).unwrap_err().offset, 31);
     base.push(7);
     assert!(decode(&base, ClientReceived).is_ok());
-    for (at, len) in [(8, 2), (27, 3)] {
-        let mut p = base.clone();
-        p[at..at + len].fill(0);
-        assert!(decode(&p, Sim).is_ok());
-        let e = decode(&p, ClientReceived).unwrap_err();
-        assert_eq!((e.kind, e.offset), (ErrorKind::InvalidScalar, at));
-    }
+    let mut zero_radius = base.clone();
+    zero_radius[27..30].fill(0);
+    assert!(decode(&zero_radius, Sim).is_ok());
+    let e = decode(&zero_radius, ClientReceived).unwrap_err();
+    assert_eq!((e.kind, e.offset), (ErrorKind::InvalidScalar, 27));
     for n in [26, 28, 29] {
         assert!(decode(&base[..n], Sim).is_err());
     }
     base[23] = 19;
     assert_eq!(decode(&base, Sim).unwrap_err().offset, 23);
+}
+
+#[test]
+fn zero_sector_count_is_retained_metadata_for_both_protocols_and_all_consumers() {
+    for protocol in [13, 19] {
+        let mut packet = common::setup();
+        packet[23] = protocol;
+        packet[8..10].fill(0);
+        for admission in [Sim, ClientReceived, ClientPresentation] {
+            let count = if protocol == 13 {
+                let Message::Setup(setup) = decode(&packet, admission).unwrap() else {
+                    panic!()
+                };
+                setup.sector_count
+            } else {
+                let v19::Message::Setup(setup) = v19::decode(&packet, admission).unwrap() else {
+                    panic!()
+                };
+                setup.sector_count
+            };
+            assert_eq!(count, 0);
+        }
+    }
 }
 
 #[test]

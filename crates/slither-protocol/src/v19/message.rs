@@ -39,6 +39,7 @@ pub struct SetupRef<'a> {
     pub grid_center: u32,
     pub max_segments: u16,
     pub sector_size: u16,
+    /// Legacy sector-grid metadata; clients also receive zero from custom peers.
     pub sector_count: u16,
     pub spangdv: u8,
     pub nsp1: u16,
@@ -125,7 +126,6 @@ pub(crate) fn setup_for_version(
         require(p, valid, offset, ErrorKind::InvalidScalar)?;
     }
     if admission != DecodeAdmission::Sim {
-        require(p, s.sector_count != 0, 8, ErrorKind::InvalidScalar)?;
         require(p, s.radius != Some(0), 27, ErrorKind::InvalidScalar)?;
     }
     Ok(s)
