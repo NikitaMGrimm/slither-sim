@@ -1,5 +1,5 @@
-//! Thread-count invariance of the parallel step: every tick's authoritative
-//! checkpoint, deaths and events must match the serial world on any pool.
+//! Thread-count invariance of the parallel step: sampled authoritative
+//! checkpoints and every tick's deaths and events match the serial world.
 use super::*;
 use crate::EventRecording;
 use std::cell::Cell;
@@ -335,4 +335,324 @@ fn battledome_world_steps_identically_on_any_pool() {
     let rows = assert_pool_invariant(&world, 1500, 10, 2, dome_steer, band_respawns);
     assert!(rows.iter().any(|(_, e)| e.contains("Pit")));
     assert!(deaths(&rows) > 10, "{}", deaths(&rows));
+}
+
+fn empty_config() -> Config {
+    Config {
+        radius: 20_000.0,
+        food_count: 0,
+        ambient_replenish_per_second: 0.0,
+        ..Config::sandbox()
+    }
+}
+
+fn split_once(mut world: Simulator, threads: usize, per_task: usize) -> Simulator {
+    world.set_parallel(true);
+    rayon::ThreadPoolBuilder::new()
+        .num_threads(threads)
+        .build()
+        .unwrap()
+        .install(|| {
+            TASK_SNAKES.with(|task| task.set(per_task));
+            assert!(step_parts(true, world.snakes.iter().filter(|s| s.alive).count()) > 1);
+            world.step(&hold(&world, 0)).unwrap();
+        });
+    world
+}
+
+fn collision_order(world: &Simulator) -> Vec<usize> {
+    let mut order = world.buffers.alive.clone();
+    order.sort_unstable_by_key(|&i| world.joins[i]);
+    order
+}
+
+/// Rebuild the grid from the retained geometry of the actual step, guarding
+/// against a fixture silently taking BoundsIndex or the full-scan fallback.
+fn retained_grid(world: &Simulator) -> (CollisionGrid, f64) {
+    let order = collision_order(world);
+    assert!(order.len() > 4096);
+    let longest = order
+        .iter()
+        .map(|&i| world.snakes[i].segments)
+        .max()
+        .unwrap();
+    let bounds: Vec<_> = order
+        .iter()
+        .map(|&i| world.buffers.bodies[i].unwrap())
+        .collect();
+    let reaches: Vec<_> = order
+        .iter()
+        .map(|&i| {
+            3.666 * collision_distance(longest.min(GRID_HEAD_SEGMENTS), world.snakes[i].segments)
+        })
+        .collect();
+    (
+        CollisionGrid::new(&bounds, &reaches).expect("fixture must use the collision grid"),
+        3.666 * collision_distance(longest, longest),
+    )
+}
+
+#[test]
+fn large_head_research_uses_the_grid_after_its_cached_target_falls() {
+    let mut world = world(empty_config(), 4104);
+    const TURN: f64 = 0.3;
+    let (sin, cos) = TURN.sin_cos();
+    let at = |x: f64, y: f64| Point {
+        x: x * cos - y * sin,
+        y: x * sin + y * cos + 6500.0,
+    };
+    lay(&mut world, 0, at(200.0, -2.0), TURN, 10);
+    lay(&mut world, 1, at(-200.0, 2.0), TURN + PI, 10);
+    lay(&mut world, 2, at(0.0, -25.0), TURN + FRAC_PI_2, 40);
+    lay(&mut world, 3, at(-225.0, 300.0), TURN + FRAC_PI_2, 10);
+    for slot in 4..world.snakes.len() {
+        let k = slot - 4;
+        lay(
+            &mut world,
+            slot,
+            Point {
+                x: -7500.0 + (k % 64) as f64 * 230.0,
+                y: -10_000.0 + (k / 64) as f64 * 210.0,
+            },
+            0.0,
+            4,
+        );
+    }
+    assert_pool_invariant(&world, 1, 1, SNAKES_PER_TASK, hold, |_, _| {});
+    let parallel = split_once(world, 3, SNAKES_PER_TASK);
+    let order = collision_order(&parallel);
+    let position = order.iter().position(|&i| i == 2).unwrap();
+    assert!(parallel.snakes[2].segments > GRID_HEAD_SEGMENTS);
+    assert_eq!(
+        parallel.buffers.strikes[position],
+        Some(1),
+        "cached target must fall first"
+    );
+    assert_eq!(
+        parallel
+            .deaths
+            .iter()
+            .map(|d| (d.victim.as_str(), d.killer.as_deref()))
+            .collect::<Vec<_>>(),
+        [("s1", Some("s3")), ("s2", Some("s0"))]
+    );
+    let grid = retained_grid(&parallel);
+    let scene = Collisions {
+        snakes: &parallel.snakes,
+        bodies: &parallel.buffers.bodies,
+        heads: &parallel.buffers.heads,
+        last_tips: &parallel.buffers.last_tips,
+        order: &order,
+        grid: Some(&grid),
+        index: None,
+    };
+    let (tip, _, head_scale) = scene.heads[2];
+    let mut candidates = Vec::new();
+    assert!(head_scale > scale(GRID_HEAD_SEGMENTS));
+    assert!(
+        grid.0
+            .candidates_for_head(
+                tip,
+                head_scale,
+                scale(GRID_HEAD_SEGMENTS),
+                grid.1,
+                &mut candidates
+            )
+            .is_some()
+    );
+    let mut profile = StepProfile::default();
+    assert_eq!(
+        scene.first_strike::<false>(2, |_| false, &mut candidates, &mut profile),
+        Some(1)
+    );
+    assert_eq!(
+        scene.first_strike::<false>(2, |i| i == 1, &mut candidates, &mut profile),
+        Some(0)
+    );
+}
+
+fn spread(world: &mut Simulator, segments: usize) {
+    for slot in 0..world.snakes.len() {
+        lay(
+            world,
+            slot,
+            Point {
+                x: -6000.0 + (slot % 4) as f64 * 4000.0,
+                y: -6000.0 + (slot / 4) as f64 * 4000.0,
+            },
+            0.0,
+            segments,
+        );
+    }
+}
+
+fn prime_body_bounds(world: &mut Simulator) {
+    world.buffers.body_bounds = world
+        .snakes
+        .iter()
+        .map(|s| snake_body_bounds(&s.body))
+        .collect();
+}
+
+#[test]
+fn kiosk_shrink_and_recovery_invalidate_cached_bodies_in_a_split_step() {
+    let mut config = empty_config();
+    config.kiosk = KioskConfig {
+        floor_score: 10.0,
+        grace_seconds: 0.0,
+        stationary_radius: 500.0,
+        shrink_per_second: 50.0,
+        recovery_per_second: 50.0,
+        ..Default::default()
+    };
+    let mut world = world(config, 16);
+    spread(&mut world, 80);
+    world.kiosks[0].anchor = Some(world.snakes[0].head);
+    world.kiosks[0].held_seconds = 1.0;
+    world.kiosks[1].anchor = Some(Point {
+        x: world.snakes[1].head.x + 2000.0,
+        y: world.snakes[1].head.y,
+    });
+    world.kiosks[1].score_credit = 1000.0;
+    let initial_credit = world.kiosks[1].score_credit;
+    let mut serial = world.clone();
+    prime_body_bounds(&mut serial);
+    let old_bounds = serial.buffers.body_bounds[0].unwrap();
+    serial.step(&hold(&serial, 0)).unwrap();
+    assert!(
+        serial.snakes[0].body.len() < 80,
+        "penalty must remove anchors"
+    );
+    assert!(serial.kiosks[0].score_credit > 0.0);
+    assert!(serial.kiosks[1].score_credit < initial_credit && serial.kiosks[1].score_credit > 0.0);
+    assert!(
+        serial.snakes[1].fam > 0.0,
+        "recovery must restore physical mass"
+    );
+    assert!(serial.buffers.body_bounds[0].unwrap().min.x > old_bounds.min.x);
+    let expected = serde_json::to_vec(&serial.checkpoint().unwrap()).unwrap();
+    for threads in [2, 3, 7] {
+        let mut parallel = world.clone();
+        prime_body_bounds(&mut parallel);
+        let parallel = split_once(parallel, threads, 1);
+        assert_eq!(
+            serde_json::to_vec(&parallel.checkpoint().unwrap()).unwrap(),
+            expected
+        );
+        assert_eq!(parallel.pickup_events(), serial.pickup_events());
+        assert_eq!(parallel.food_spawn_events(), serial.food_spawn_events());
+        for slot in [0, 1] {
+            let cached = parallel.buffers.body_bounds[slot].unwrap();
+            let actual = snake_body_bounds(&parallel.snakes[slot].body).unwrap();
+            assert_eq!((cached.min, cached.max), (actual.min, actual.max));
+        }
+    }
+}
+
+#[test]
+fn equal_distance_food_tie_uses_lexical_id_during_split_pickup() {
+    let mut world = world(empty_config(), 16);
+    spread(&mut world, 4);
+    lay(&mut world, 2, Point { x: 0.0, y: -25.0 }, 0.0, 4);
+    lay(&mut world, 10, Point { x: 0.0, y: 25.0 }, 0.0, 4);
+    let pellet = Food {
+        x: 50.0,
+        y: 0.0,
+        value: 0.125,
+        size: None,
+        origin: None,
+    };
+    world.replace_food(vec![pellet]).unwrap();
+    assert_pool_invariant(&world, 1, 1, 1, hold, |_, _| {});
+    let parallel = split_once(world, 3, 1);
+    assert!(parallel.snakes.iter().all(|s| s.alive));
+    assert_eq!(
+        pellet.point().distance(parallel.snakes[2].head).to_bits(),
+        pellet.point().distance(parallel.snakes[10].head).to_bits()
+    );
+    assert!(
+        parallel.eater_grid.occupied_len() > 1,
+        "must split occupied eater cells"
+    );
+    assert_eq!(
+        parallel.pickup_events().unwrap(),
+        &[PickupEvent {
+            eater: 10,
+            item: PickupItem::Food(pellet)
+        }]
+    );
+    assert_eq!(parallel.buffers.hits, [(0, 10)]);
+}
+
+#[test]
+fn boundary_death_precedes_a_body_strike_in_the_same_split_step() {
+    let mut world = world(empty_config(), 16);
+    spread(&mut world, 4);
+    lay(
+        &mut world,
+        0,
+        Point {
+            x: 19_980.0,
+            y: 0.0,
+        },
+        0.0,
+        10,
+    );
+    lay_body(
+        &mut world,
+        1,
+        vec![
+            Point {
+                x: 19_980.0,
+                y: 250.0,
+            },
+            Point {
+                x: 19_990.0,
+                y: 100.0,
+            },
+            Point {
+                x: 19_995.0,
+                y: 0.0,
+            },
+            Point {
+                x: 19_990.0,
+                y: -100.0,
+            },
+        ],
+        FRAC_PI_2,
+    );
+    const TURN: f64 = 0.3;
+    let (sin, cos) = TURN.sin_cos();
+    let at = |x: f64, y: f64| Point {
+        x: x * cos - y * sin,
+        y: x * sin + y * cos,
+    };
+    lay(&mut world, 2, at(-200.0, 2.0), TURN + PI, 10);
+    lay(&mut world, 3, at(-225.0, 300.0), TURN + FRAC_PI_2, 10);
+    assert_pool_invariant(&world, 1, 1, 1, hold, |_, _| {});
+    let parallel = split_once(world, 3, 1);
+    let position = collision_order(&parallel)
+        .iter()
+        .position(|&i| i == 0)
+        .unwrap();
+    assert_eq!(
+        parallel.buffers.strikes[position],
+        Some(1),
+        "boundary victim must also have a cached body strike"
+    );
+    assert_eq!(
+        parallel.buffers.boundary_deaths,
+        [(0, DeathReason::Boundary)]
+    );
+    assert_eq!(
+        parallel
+            .deaths
+            .iter()
+            .map(|d| (d.victim.as_str(), d.killer.as_deref(), d.reason))
+            .collect::<Vec<_>>(),
+        [
+            ("s0", None, DeathReason::Boundary),
+            ("s2", Some("s3"), DeathReason::Body)
+        ]
+    );
 }

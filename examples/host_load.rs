@@ -37,6 +37,10 @@ struct Options {
 }
 
 fn options() -> Result<Options, String> {
+    parse_options(&std::env::args().skip(1).collect::<Vec<_>>())
+}
+
+fn parse_options(args: &[String]) -> Result<Options, String> {
     let mut options = Options {
         bots: 500,
         bot_threads: 2,
@@ -45,7 +49,6 @@ fn options() -> Result<Options, String> {
         seconds: 60.,
         round_trip: 0.04,
     };
-    let args: Vec<String> = std::env::args().skip(1).collect();
     for pair in args.chunks(2) {
         let [flag, value] = pair else {
             return Err(USAGE.into());
@@ -54,7 +57,9 @@ fn options() -> Result<Options, String> {
         match flag.as_str() {
             "--bots" => options.bots = number(value)? as usize,
             "--bot-threads" => options.bot_threads = number(value)? as usize,
-            "--world-threads" => options.world_threads = number(value)? as usize,
+            "--world-threads" => {
+                options.world_threads = value.parse::<usize>().map_err(|_| USAGE.to_string())?;
+            }
             "--radius" => options.radius = Some(number(value)?),
             "--seconds" => options.seconds = number(value)?,
             "--round-trip-ms" => options.round_trip = number(value)? / 1000.,
@@ -62,6 +67,25 @@ fn options() -> Result<Options, String> {
         }
     }
     Ok(options)
+}
+
+#[test]
+fn world_threads_requires_an_integer() {
+    for value in [
+        "2.9",
+        "1.9",
+        "-1",
+        "NaN",
+        "inf",
+        "2e0",
+        "18446744073709551616",
+    ] {
+        assert!(parse_options(&["--world-threads".into(), value.into()]).is_err());
+    }
+    for value in ["1", "2", "7"] {
+        let options = parse_options(&["--world-threads".into(), value.into()]).unwrap();
+        assert_eq!(options.world_threads, value.parse::<usize>().unwrap());
+    }
 }
 
 fn percentile(sorted: &[f64], share: f64) -> f64 {

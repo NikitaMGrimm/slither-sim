@@ -53,8 +53,9 @@ pub(super) fn movement(
             motion.pit_radius,
             motion.radius,
         );
-        // The fused loop compares lengths once, after kiosk penalties; either
-        // removal invalidates the cache there too.
+        // Like the combined serial pass in Simulator::advance, invalidate on
+        // tail removal. Check boost separately because motion may append an
+        // anchor; that append also invalidates, even if total length is equal.
         if s.body.len() != body_len {
             slots.body_bounds[i] = None;
         }
@@ -111,6 +112,8 @@ pub(super) fn movement(
                 ) {
                     deaths.push((i, reason));
                 }
+                // The second half of the serial pass's invalidation invariant:
+                // kiosk tail removal must also discard the cached bounds.
                 if snake.body.len() != body_len {
                     b[n] = None;
                 }

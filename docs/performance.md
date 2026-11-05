@@ -159,7 +159,10 @@ against bodies that fell earlier in the walk.
 
 `src/simulator/parallel_step_tests.rs` steps official, dense, Battledome and
 constructed collision-order worlds on pools of 1, 2, 3, 4 and 7 threads and
-requires every tick's checkpoint, deaths and events to match the serial world.
+requires deaths and recorded events to match the serial world every tick.
+Checkpoint digests match every 3 ticks for the official world, every 8 for the
+dense world and every 10 for Battledome, plus each final tick. Constructed
+edge cases compare checkpoints every tick.
 
 ### Measured scaling
 

@@ -1776,7 +1776,10 @@ impl Simulator {
                 ) {
                     boundary_deaths.push((i, reason));
                 }
-                // Boost and kiosk penalties can both remove tail anchors.
+                // Invalidate on any tail removal across the combined boost and
+                // motion pass. parallel_step::movement checks each pass: motion
+                // can append an anchor after boost removed one, hiding a net
+                // length change (and already invalidates on that append).
                 if s.body.len() != body_len {
                     body_bounds[i] = None;
                 }
@@ -2884,8 +2887,6 @@ impl std::fmt::Debug for StepBuffers {
     }
 }
 
-/// Largest per-tick count of a fixed-period event that is an exact f64 integer
-/// and fits usize.
 /// Fewest living snakes worth one parallel task in the split step phases.
 /// Official-500 profiles spend 70-95 µs per tick in each of motion, collision
 /// search and pickup lookup, about 0.15-0.2 µs per snake, and waking pool
@@ -3241,6 +3242,8 @@ impl Motion<'_> {
     }
 }
 
+/// Largest per-tick count of a fixed-period event that is an exact f64 integer
+/// and fits usize.
 fn max_tick_count() -> f64 {
     (2f64)
         .powi(f64::MANTISSA_DIGITS as i32)
