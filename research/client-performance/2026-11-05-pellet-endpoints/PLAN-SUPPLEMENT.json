@@ -1,0 +1,6 @@
+{
+  "scope": "Add at most four AMD-only matched blocks, numbered 13 through 16, selecting the first additional clean pair. Existing source, binaries, driver, configuration, statistics and exclusions stay fixed.",
+  "created_utc": "2026-11-05T02:23:40.9249978Z",
+  "reason": "Initial twelve-block ceiling exhausted: all RTX cells have five clean pairs; AMD Native far has four. Preserve every prior selection, including slow clean pairs.",
+  "source_change": "none"
+}

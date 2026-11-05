@@ -174,6 +174,14 @@ timings while other compilers or GPU workloads are running.
 
 ## Retained-food CPU preparation
 
+Retained food projects the two endpoints of each axis once and assembles the
+original six vertices from them. Source selection, continuous floors, area alpha,
+coverage accumulation and food census stay unchanged. Invalid or overflowing
+rectangles retain the generic projector's error path. The
+[endpoint study](../../research/client-performance/2026-11-05-pellet-endpoints/REPORT.md)
+records the scalar bit oracle, authored offscreen image controls and release
+comparison; this does not establish presented cadence.
+
 The `frame_perf` driver also has a GPU-free food-validation workload:
 
 ```powershell

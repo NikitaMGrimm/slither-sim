@@ -1,0 +1,53 @@
+{
+  "baseline": {
+    "base_revision": "e066bc334e04c7f8159c4c6a4893083fbd284f05",
+    "binary_sha256": "1aad6fbd1d25f7031470621fe155174bf0c5c977f1c9a1e9b9a19dd3aa4e3a2a",
+    "driver_sha256": "4206f694ef142da03e4fc86f76489f667d6cef82621ddb5a32573382200f46ce",
+    "runtime_source_sha256": "ab370199a1198844eb832abf703cc1d47791a4d53706c75959b30887b711b010",
+    "measured_source_sha256": "ab370199a1198844eb832abf703cc1d47791a4d53706c75959b30887b711b010",
+    "passive_instrumentation": {
+      "client/src/presentation/food.rs": {
+        "runtime": "f18556627c8e546b56cb9f9aba868c5f7492b5f7352e388476b0f0ca6bbc6945",
+        "measured": "ee102942d218b0e4d1b24ebc3022eda0312bde1887b079ecf2f4e84dcea9fb38"
+      },
+      "client/src/presentation.rs": {
+        "runtime": "4882f863090249d5907bdf0b23695af52a64a6be0d31881ef6c1fddc09c1b00f",
+        "measured": "b9137c77c9d57e9e80b74db2bd05745453b43dd41bf463f1ec4a54264efd4a61"
+      },
+      "client/apps/wgpu-slice/src/render.rs": {
+        "runtime": "b1a204ae95280b5e1a2eae88dee74c24c8c776d69be3341550e2778b65438bc0",
+        "measured": "09cdfa555fe85daa2d80fc87a2bb7b8137d8019cd3362d340223ea30495c47e5"
+      },
+      "client/apps/wgpu-slice/src/pellet_gpu.rs": {
+        "runtime": "ba5d3695d9991b0b30d3b81747fe6c5ef394f4f91de591e285f04a6a27c97ab6",
+        "measured": "16850b382a111d936a89551963184de3a7e0ea786470fdefe970c2540f07fe35"
+      }
+    }
+  },
+  "endpoints": {
+    "base_revision": "e066bc334e04c7f8159c4c6a4893083fbd284f05",
+    "binary_sha256": "56b05a8d9b666d61564d78db796bb98fe5bd7e798ed3f92c93ff675c5662288f",
+    "driver_sha256": "4206f694ef142da03e4fc86f76489f667d6cef82621ddb5a32573382200f46ce",
+    "runtime_source_sha256": "8b17e772d6864dfc064825c43d2226f97fb0a7d18c52fd78a834ef16a879745b",
+    "measured_source_sha256": "8b17e772d6864dfc064825c43d2226f97fb0a7d18c52fd78a834ef16a879745b",
+    "passive_instrumentation": {
+      "client/src/presentation/food.rs": {
+        "runtime": "f18556627c8e546b56cb9f9aba868c5f7492b5f7352e388476b0f0ca6bbc6945",
+        "measured": "ee102942d218b0e4d1b24ebc3022eda0312bde1887b079ecf2f4e84dcea9fb38"
+      },
+      "client/src/presentation.rs": {
+        "runtime": "4882f863090249d5907bdf0b23695af52a64a6be0d31881ef6c1fddc09c1b00f",
+        "measured": "b9137c77c9d57e9e80b74db2bd05745453b43dd41bf463f1ec4a54264efd4a61"
+      },
+      "client/apps/wgpu-slice/src/render.rs": {
+        "runtime": "b1a204ae95280b5e1a2eae88dee74c24c8c776d69be3341550e2778b65438bc0",
+        "measured": "09cdfa555fe85daa2d80fc87a2bb7b8137d8019cd3362d340223ea30495c47e5"
+      },
+      "client/apps/wgpu-slice/src/pellet_gpu.rs": {
+        "runtime": "ba5d3695d9991b0b30d3b81747fe6c5ef394f4f91de591e285f04a6a27c97ab6",
+        "measured": "16850b382a111d936a89551963184de3a7e0ea786470fdefe970c2540f07fe35"
+      }
+    },
+    "delivered_source_sha256": "124d168e66f3f4835847f9d0f254d7d5debac1cfcc392f6635fdfe6f165ea943"
+  }
+}

@@ -1,0 +1,5 @@
+--- a/join_profile.rs
++++ b/join_profile.rs
+@@ -500 +500 @@
+-            while let Some(p) = g.take_frame() {
++            while let Some(p) = g.take_frame_with_menu(menus && login.as_ref().is_some_and(|login| login.needs_menu_pass(g.can_play()))) {

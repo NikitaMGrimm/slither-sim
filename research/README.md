@@ -7,6 +7,7 @@ archive integrity establishes neither scientific rules nor product adoption.
 
 | Topic | Study | Scope and decision |
 | --- | --- | --- |
+| Client performance | [Pellet rectangle endpoints](client-performance/2026-11-05-pellet-endpoints/REPORT.md) | Reuse axis endpoints within each projection; exact authored 4K images/census and matched CPU preparation measurements, retaining rejected geometry-cache pilots and cold-spike limits. |
 | Client presentation | [Continuous wheel-zoom detail](client-performance/2026-11-04-continuous-zoom/REPORT.md) | Owner-approved area floors and detail fades; factor-one image controls, finite authored pop probes, far-view release cost and complete-or-reject budgeting. |
 | Client performance | [Retained pellets through wheel zoom](client-performance/2026-11-03-retained-pellet-zoom/REPORT.md) | Share exact zoom/LOD inputs with compact food batches; current-main RTX/Vulkan 4K pairs, AMD guardrails and image controls. Whole-map input omits art under existing LOD; high-refresh p95 remains over budget. |
 | Client performance | [Reuse food source classifications](client-performance/2026-11-03-food-source-groups/REPORT.md) | Weak creation identities preserve ordered grouping while reclassifying only new or moved records; current-main RTX/Vulkan 4K pairs, AMD guardrails and exact images; art p95 remains above the high-refresh budget. |

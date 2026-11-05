@@ -467,7 +467,8 @@ fn project_food(
             destination,
         } => (source, destination),
     };
-    let quad = frame.project(
+    let quad = project_rectangle(
+        frame,
         &Draw {
             asset: a,
             corners: None,
@@ -483,6 +484,45 @@ fn project_food(
         source,
     )?;
     Ok((quad, gain))
+}
+
+// Food rectangles have no rotation, translation, explicit corners or repeat UVs.
+// Project each axis endpoint once, then assemble the original six vertices.
+// Normalization removes the signed-zero differences of the identity transform;
+// invalid/overflowing inputs retain the general projector's exact error path.
+#[inline(always)]
+fn project_rectangle(frame: &Frame, draw: &Draw, source: BodyRect) -> Result<crate::frame::Quad> {
+    let r = draw.destination;
+    let endpoint = |u| {
+        let x = r.x + u * r.width;
+        let y = r.y + u * r.height;
+        [
+            2. * (x * frame.viewport_scale) / f64::from(frame.extent[0]) - 1.,
+            1. - 2. * (y * frame.viewport_scale) / f64::from(frame.extent[1]),
+            (source.x + u * source.width) / f64::from(draw.asset.width),
+            (source.y + u * source.height) / f64::from(draw.asset.height),
+            draw.effective_alpha,
+        ]
+    };
+    let a = endpoint(0.);
+    let c = endpoint(1.);
+    if a.iter()
+        .chain(&c)
+        .any(|v| !v.is_finite() || v.abs() > f64::from(f32::MAX))
+    {
+        return frame.project(draw, source);
+    }
+    let a = a.map(|v| v as f32);
+    let c = c.map(|v| v as f32);
+    let b = [c[0], a[1], c[2], a[3], a[4]];
+    let d = [a[0], c[1], a[2], c[3], a[4]];
+    Ok(crate::frame::Quad {
+        key: draw.asset.into(),
+        repeat: false,
+        black_effect: false,
+        blend: BodyBlend::Lighter,
+        vertices: [a, b, c, a, c, d],
+    })
 }
 #[inline(always)]
 pub(crate) fn glow_pair(
@@ -567,6 +607,73 @@ pub(crate) fn exact_instance(
 pub(crate) mod tests {
     use super::*;
     use crate::bank::Bank;
+
+    #[test]
+    fn rectangle_endpoints_match_general_projection_bits_and_errors() {
+        let asset = BodyAsset {
+            handle: 1,
+            revision: 1,
+            width: 31,
+            height: 19,
+            status: BodyAssetStatus::Ready,
+        };
+        for viewport_scale in [0.64, 1., 2.56, 4.] {
+            let frame = Frame {
+                identity: 1,
+                extent: [1500, 844],
+                viewport_scale,
+                tick: 0,
+                draws: Vec::new(),
+                snakes: Vec::new(),
+                food_batch: None,
+            };
+            for x in [
+                -0.,
+                0.,
+                -0.1,
+                0.1,
+                -31.1,
+                31.1,
+                -1e30,
+                1e30,
+                f64::INFINITY,
+                f64::NAN,
+            ] {
+                for width in [0., 0.01, 1., 32., 1e10, f64::MAX] {
+                    for alpha in [0., 0.0001, 0.9, 1., f64::INFINITY] {
+                        let source = BodyRect {
+                            x: 0.,
+                            y: 0.,
+                            width: 30.25,
+                            height: 18.75,
+                        };
+                        let draw = Draw {
+                            asset,
+                            corners: None,
+                            source: Some(source),
+                            repeat_uv: None,
+                            black_effect: false,
+                            destination: BodyRect {
+                                x,
+                                y: -x,
+                                width,
+                                height: width / 3.,
+                            },
+                            translation: [0., 0.],
+                            rotation: 0.,
+                            effective_alpha: alpha,
+                            blend: BodyBlend::Lighter,
+                        };
+                        let bits = |q: crate::frame::Quad| q.vertices.map(|v| v.map(f32::to_bits));
+                        assert_eq!(
+                            project_rectangle(&frame, &draw, source).map(bits),
+                            frame.project(&draw, source).map(bits)
+                        );
+                    }
+                }
+            }
+        }
+    }
 
     pub(crate) fn rectangle(bank: &Bank) -> FoodWorld {
         rectangle_count(bank, 25_000)
