@@ -1405,7 +1405,7 @@ impl AnimatedClient {
                 *direction,
                 None,
                 AnchorView {
-                    zoom: camera.zoom(),
+                    zoom: camera.automatic_zoom(),
                     extrapolated_distance: 0.,
                 },
             )?;
@@ -2864,10 +2864,12 @@ impl AnimatedClient {
                             }
                         }
                         let geometry = resolved.presentation;
+                        // Spacing is retained and eases by only 0.0035 per draw.
+                        // Wheel projection must not sparsify newly seen bodies.
                         let snake = SnakePresentation::from_appearance_with_active_face_geometry(
                             &appearance,
                             setup,
-                            next.camera.zoom(),
+                            next.camera.automatic_zoom(),
                             geometry.face,
                         )
                         .map_err(ClientPresentationError::from)?;
@@ -2962,7 +2964,7 @@ impl AnimatedClient {
                                     direction,
                                     if grew { fam } else { None },
                                     AnchorView {
-                                        zoom: next.camera.zoom(),
+                                        zoom: next.camera.automatic_zoom(),
                                         extrapolated_distance: 0.,
                                     },
                                 )
@@ -2991,7 +2993,7 @@ impl AnimatedClient {
                     PresentationEvent::SnakeTailRemoved { id, fam } => {
                         if let Some(index) = next.lookup_index(id) {
                             Arc::make_mut(&mut next.entries[index].snake)
-                                .remove_tail(fam, next.camera.zoom())
+                                .remove_tail(fam, next.camera.automatic_zoom())
                                 .map_err(ClientPresentationError::from)?;
                             if next.entries[index].own {
                                 own_length_scheduled = Some(next.entries[index].token);

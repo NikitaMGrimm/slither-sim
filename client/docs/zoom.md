@@ -33,7 +33,14 @@ wheel steps leave no floating-point residue in paint policy.
 Culling, body/face geometry, arena, world labels and repeating background use the
 resulting scale.
 Food/prey keep stock creation-time source selection, with user zoom applied to
-their sprite extents. At nondefault zoom, the arena keeps the stock nearby arc
+their sprite extents. Snake creation, anchor and tail updates likewise use the
+automatic scale for retained body-point spacing. Using the displayed scale there
+retained widely spaced samples after zooming back in, with different spacing
+for snakes first seen at different zooms. Wheel zoom changes their projection
+without changing that stock sampling path; the authored
+`wheel_zoom_does_not_change_retained_body_spacing_across_rejoin` regression
+covers both zoom directions and death/reset/rejoin.
+At nondefault zoom, the arena keeps the stock nearby arc
 while it covers the visible boundary band. Circle/viewport intersections select
 a whole circle only when visible coverage extends beyond that arc or its
 4,000-unit distance gate. Full-circle tessellation uses the projected outer band
