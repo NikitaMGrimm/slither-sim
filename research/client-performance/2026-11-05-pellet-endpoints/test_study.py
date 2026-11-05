@@ -36,6 +36,7 @@ class StudyTests(unittest.TestCase):
     def test_canonical_arm_requires_its_own_executable(self):
         self.rejects(lambda d: d["canonical"]["endpoints"].update(binary_sha256=d["identities"]["baseline"]["binary_sha256"]))
 
+    @unittest.skipUnless((recompute.ROOT / "sources.json.gz").exists(), "source archives are kept outside Git")
     def test_corrupted_historical_source(self):
         self.rejects(lambda d: d["sources"].update(endpoints=d["sources"]["endpoints"] + "\n"))
 
@@ -48,6 +49,7 @@ class StudyTests(unittest.TestCase):
     def test_rebase_cannot_use_the_prior_binary(self):
         self.rejects(lambda d: d["rebase"]["identities"]["endpoints"].update(binary_sha256=d["identities"]["endpoints"]["binary_sha256"]))
 
+    @unittest.skipUnless((recompute.ROOT / "sources.json.gz").exists(), "source archives are kept outside Git")
     def test_rebase_source_corruption(self):
         self.rejects(lambda d: d["rebase_sources"]["common"]["client/apps/wgpu-slice/src/game.rs"].update(runtime="corrupted"))
 

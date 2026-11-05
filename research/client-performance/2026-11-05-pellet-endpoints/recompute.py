@@ -34,7 +34,18 @@ def digest(value: str, length: int = 64) -> None:
     assert re.fullmatch(f"[0-9a-f]{{{length}}}", value), value
 
 
-def load() -> dict:
+def load(sources_dir: str | Path | None = None) -> dict:
+    # Full authored source archives stay outside Git; their hashes are bound here.
+    archives = json.loads((ROOT / "source-archives.json").read_text())
+    where = Path(sources_dir) if sources_dir else (ROOT if (ROOT / "sources.json.gz").exists() else None)
+
+    def archive(name: str):
+        if where is None:
+            return None
+        raw = (where / name).read_bytes()
+        assert sha(raw) == archives[name], name
+        return json.loads(gzip.decompress(raw))
+
     with (ROOT / "runs.csv").open(newline="", encoding="utf-8") as stream:
         runs = list(csv.DictReader(stream))
     return {
@@ -42,12 +53,12 @@ def load() -> dict:
         "identities": json.loads((ROOT / "identities.json").read_text()),
         "images": json.loads((ROOT / "image-controls.json").read_text()),
         "canonical": json.loads((ROOT / "canonical-controls.json").read_text()),
-        "sources": json.loads(gzip.decompress((ROOT / "sources.json.gz").read_bytes())),
+        "sources": archive("sources.json.gz"),
         "measurement_patch": (ROOT / "measurement.patch").read_text(encoding="utf-8"),
         "rebase": json.loads((ROOT / "rebase-controls.json").read_text()),
-        "rebase_sources": json.loads(gzip.decompress((ROOT / "rebase-sources.json.gz").read_bytes())),
+        "rebase_sources": archive("rebase-sources.json.gz"),
         "rebase_driver_patch": (ROOT / "rebase-driver.patch").read_text(encoding="utf-8"),
-        "historical_hashes": {p: sha((ROOT / p).read_bytes()) for p in ["runs.csv", "identities.json", "image-controls.json", "canonical-controls.json", "sources.json.gz", "measurement.patch"]},
+        "historical_hashes": {p: archives[p] if p in archives else sha((ROOT / p).read_bytes()) for p in ["runs.csv", "identities.json", "image-controls.json", "canonical-controls.json", "sources.json.gz", "measurement.patch"]},
     }
 
 
@@ -73,8 +84,10 @@ def validate_rebase(data: dict) -> None:
     for arm, identity in identities.items():
         for key in ["binary_sha256", "driver_sha256"]:
             digest(identity[key])
-        assert set(identity["runtime_source_sha256"]) == set(sources["common"]) | {projector}
         assert set(identity["runtime_source_sha256"]) == set(identity["measured_source_sha256"])
+        if sources is None:
+            continue
+        assert set(identity["runtime_source_sha256"]) == set(sources["common"]) | {projector}
         for path in identity["runtime_source_sha256"]:
             for kind in ["runtime", "measured"]:
                 source = sources["projector"][arm] if path == projector else sources["common"][path][kind]
@@ -118,8 +131,8 @@ def validate(data: dict) -> dict:
     for arm, identity in ids.items():
         for key in ["binary_sha256", "driver_sha256", "runtime_source_sha256", "measured_source_sha256"]:
             digest(identity[key])
-        source = data["sources"][arm]
-        assert sha(source.encode()) == identity["runtime_source_sha256"]
+        if data["sources"] is not None:
+            assert sha(data["sources"][arm].encode()) == identity["runtime_source_sha256"]
         # The projector is not modified by passive timing instrumentation.
         assert identity["runtime_source_sha256"] == identity["measured_source_sha256"]
         for hashes in identity["passive_instrumentation"].values():
@@ -127,6 +140,13 @@ def validate(data: dict) -> dict:
             for value in hashes.values():
                 digest(value)
     assert ids["baseline"]["passive_instrumentation"] == ids["endpoints"]["passive_instrumentation"]
+    if data["sources"] is not None:
+        validate_sources(data)
+    return validate_controls(data)
+
+
+def validate_sources(data: dict) -> None:
+    ids = data["identities"]
     assert set(data["sources"]["instrumentation"]) == set(ids["baseline"]["passive_instrumentation"])
     for path, hashes in ids["baseline"]["passive_instrumentation"].items():
         for kind, expected in hashes.items():
@@ -141,6 +161,9 @@ def validate(data: dict) -> dict:
     assert marker in delivered and marker in data["sources"]["endpoints"]
     assert delivered.split(marker)[0] == data["sources"]["endpoints"].split(marker)[0]
 
+
+def validate_controls(data: dict) -> dict:
+    ids = data["identities"]
     assert set(data["images"]) == IMAGES
     for arms in data["images"].values():
         assert set(arms) == set(ids)
@@ -264,8 +287,9 @@ def main() -> None:
     sys.stdout.reconfigure(encoding="utf-8")
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--check", action="store_true")
+    parser.add_argument("--sources", help="directory holding the out-of-Git source archives")
     args = parser.parse_args()
-    data = load()
+    data = load(args.sources)
     result = table(data)
     if args.check:
         report = (ROOT / "REPORT.md").read_text(encoding="utf-8")

@@ -161,8 +161,8 @@ alpha, source-identity, consumed-food, census, capacity and frozen-retry control
 `identities.json` binds every run and image arm to its distinct executable and
 common driver. It distinguishes runtime files from passive instrumentation in
 food advance, phase observers and pellet preparation. The projector file itself
-has no timing instrumentation. `sources.json.gz` contains historical authored
-Rust source, not recordings: baseline, measured endpoints and delivered source,
+has no timing instrumentation. `sources.json.gz`, kept outside Git with its
+SHA-256 in `source-archives.json`, contains historical authored Rust source, not recordings: baseline, measured endpoints and delivered source,
 plus frozen bases/instrumented files for the four passive changes exposed in
 `measurement.patch` (zero context).
 The original delivered file (`24f610b2`) differs from the sealed endpoint source only inside its test
@@ -239,8 +239,11 @@ tests, native/Wasm Clippy, desktop/Wasm builds and synthetic ABI checks.
 `rebase-controls.json` records distinct executable identities, a common updated
 driver, the complete image matrix, active canonical launch/log receipts and
 hashes of the six unchanged historical evidence files. `rebase-sources.json.gz`
-freezes the selected caller/projector and instrumented sources. The checker
-validates these archives without later working-file or old-Git-object gates.
+freezes the selected caller/projector and instrumented sources. Both full source
+archives stay outside Git; `source-archives.json` binds their SHA-256. The checker
+validates every committed record without them and, given `--sources <dir>`, also
+verifies the archive hashes and every source body, without later working-file or
+old-Git-object gates.
 Four additional study regressions reject incomplete rebased image matrices,
 reuse of an old executable, source corruption and timing relabeling.
 
