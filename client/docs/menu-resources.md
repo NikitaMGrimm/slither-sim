@@ -137,13 +137,23 @@ publish into a replacement document. Missing images use authored controls.
 
 ## Native focus outlines
 
-Keyboard focus outlines use the idle control radius, with half-height corners for
-studio capsules, inset inside the control bounds. Pointer focus stays silent;
+Every native screen draws one keyboard-focus ring, `egui_theme::focus_ring`: two
+logical pixels in the theme text colour. Core-panel controls (picker, studio, login
+links) inset it inside the control bounds at the idle control radius, with
+half-height corners for studio capsules. Theme pills (Play, Settings, in-game menu)
+draw it 3 px outside, concentric with their round ends. Theme pills take the core
+buttons' hover and press overlays, with the dark backdrop colour as the label on
+the light hover; focus adds no tint. Their idle stops are shaded (green ×0.75,
+purple ×0.9) so every enabled state keeps 4.5:1 label contrast against the whole
+fill (`tests/menu_contrast.rs`). Pointer focus stays silent;
 selection uses a separate marker. A studio round trip restores the opener's
 focus modality and clears pointer feedback.
 
 Run `cargo run --manifest-path apps/wgpu-slice/Cargo.toml --example menu_specimens
 -- NEW_EXTERNAL_DIRECTORY --focus` from `client/`, with `CARGO_BUILD_JOBS=2`.
+`--polish` renders the login, Settings with its Graphics group (opened, hovered,
+Done focused), the server picker and the studio at 1080p DPR 1 and 4K DPR 2 in
+Original and Native for visual review.
 The fixed-clock sweep covers DPR 1–8 plus 1.25/1.5/1.75, wide/narrow/short layouts,
 Settings, each studio section, section fades, return and early Builder entry.
 Screenshots compose page, egui and the studio preview as the desktop host presents

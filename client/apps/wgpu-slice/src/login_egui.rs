@@ -430,13 +430,10 @@ impl LoginUi {
                                     );
                                 }
                                 if response.has_focus() && self.keyboard_focus {
-                                    ui.painter().rect_stroke(
+                                    theme::focus_ring(
+                                        ui.painter(),
                                         r,
                                         4.,
-                                        egui::Stroke::new(
-                                            2.,
-                                            theme::ink(MenuTheme::default().text),
-                                        ),
                                         egui::StrokeKind::Inside,
                                     );
                                 }

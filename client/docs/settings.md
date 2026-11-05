@@ -96,7 +96,8 @@ Existing browser rendering still consumes its legacy High/Low projection; clicki
 its legacy Quality control selects Auto/Low while retaining resolution and AA.
 
 Preset and AA choices expose radio semantics and checked state; world resolution
-retains checkbox semantics. Reselecting a checked radio schedules no write. The
+retains checkbox semantics. All three draw the same ringed box, filled primary
+green with a tick when checked. Reselecting a checked radio schedules no write. The
 visual and Tab orders match; matching
 pointer release and Enter/Space carry an explicit next value into the same
 generation-checked settings owner. The host tracks ordered held-key state before

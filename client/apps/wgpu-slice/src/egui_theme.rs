@@ -1,7 +1,7 @@
 //! Shared native egui style, installed fonts and authored menu widgets.
 use crate::Result;
 use egui::{Color32, Id, Rect, RichText, Sense, Stroke, pos2, vec2};
-use slither_client::menu_theme::MenuTheme;
+use slither_client::menu_theme::{ControlState, ControlStyle, MenuTheme};
 
 pub const PANEL_WIDTH: f32 = 560.;
 pub const PANEL_PADDING: i8 = 24;
@@ -80,11 +80,27 @@ pub fn panel_frame() -> egui::Frame {
             color: Color32::from_black_alpha(180),
         })
 }
+/// A panel heading, centred like the core panels' Servers and Skin studio.
 pub fn title(ui: &mut egui::Ui, label: &str) {
-    ui.label(
-        RichText::new(label)
-            .size(24.)
-            .family(egui::FontFamily::Name("bold".into())),
+    ui.vertical_centered(|ui| {
+        ui.label(
+            RichText::new(label)
+                .size(24.)
+                .family(egui::FontFamily::Name("bold".into())),
+        );
+    });
+}
+/// Width of the keyboard-focus ring every native menu control shares, in
+/// logical pixels.
+pub const FOCUS_RING: f32 = 2.;
+/// The shared keyboard-focus ring in the text colour. `radius` is the ring's
+/// own corner radius, so it follows the control's shape.
+pub fn focus_ring(painter: &egui::Painter, rect: Rect, radius: f32, kind: egui::StrokeKind) {
+    painter.rect_stroke(
+        rect,
+        radius,
+        Stroke::new(FOCUS_RING, ink(MenuTheme::default().text)),
+        kind,
     );
 }
 pub fn help(ui: &mut egui::Ui, text: &str) {
@@ -181,6 +197,54 @@ pub fn pill_at(
     )
 }
 
+/// A theme pill's pointer state. Keyboard focus adds only the ring and
+/// checked state only the box, so neither changes the label's background.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum PillState {
+    Idle,
+    Hovered,
+    Pressed,
+}
+/// Idle pills shade the theme's gradient stops so the white label keeps
+/// WCAG AA 4.5:1 contrast against every point of the fill; the unshaded light
+/// stops measure 2.8:1 (green) and 3.9:1 (purple). `MenuTheme` stays the
+/// colour authority shared with the Canvas reference.
+const PRIMARY_SHADE: f32 = 0.75;
+const SECONDARY_SHADE: f32 = 0.9;
+/// Fill stops (top, bottom) and label colour for a theme pill. Hover and press
+/// use the core buttons' overlay stops (`egui_panel::button`); the light mint
+/// hover takes the dark backdrop colour as its label.
+pub fn pill_palette(primary: bool, state: PillState) -> ([Color32; 2], Color32) {
+    let theme = MenuTheme::default();
+    let style = if primary {
+        ControlStyle::PrimaryButton
+    } else {
+        ControlStyle::SecondaryButton
+    };
+    match state {
+        PillState::Idle => {
+            let shade = if primary {
+                PRIMARY_SHADE
+            } else {
+                SECONDARY_SHADE
+            };
+            let fill = theme.surface(style, ControlState::Idle).colors.map(|rgb| {
+                let [r, g, b] = rgb.map(|c| (f32::from(c) * shade).round() as u8);
+                Color32::from_rgb(r, g, b)
+            });
+            (fill, Color32::WHITE)
+        }
+        PillState::Hovered => (
+            theme.surface(style, ControlState::Hovered).colors.map(ink),
+            ink(theme.backdrop),
+        ),
+        PillState::Pressed => (
+            theme.surface(style, ControlState::Pressed).colors.map(ink),
+            Color32::WHITE,
+        ),
+    }
+}
+
 #[allow(clippy::too_many_arguments)]
 fn painted_pill(
     ui: &mut egui::Ui,
@@ -202,14 +266,6 @@ fn painted_pill(
         }
     });
     let theme = MenuTheme::default();
-    let tokens = theme.surface(
-        if primary {
-            slither_client::menu_theme::ControlStyle::PrimaryButton
-        } else {
-            slither_client::menu_theme::ControlStyle::SecondaryButton
-        },
-        slither_client::menu_theme::ControlState::Idle,
-    );
     let shadow = egui::epaint::Shadow {
         offset: [0, 3],
         blur: 8,
@@ -217,45 +273,53 @@ fn painted_pill(
         color: Color32::from_black_alpha(100),
     };
     ui.painter().add(shadow.as_shape(rect, 20));
-    let colors = tokens
-        .colors
-        .map(|rgb| Color32::from_rgb(rgb[0], rgb[1], rgb[2]));
-    capsule(
-        ui,
-        rect,
-        colors,
-        if response.is_pointer_button_down_on() {
-            0.8
-        } else if response.hovered() {
-            1.1
-        } else {
-            1.
-        },
-    );
-    if response.has_focus() && focus_visible {
-        ui.painter().rect_stroke(
+    let focused = response.has_focus() && focus_visible;
+    // Focus shows as the ring alone: these pills also take focus from the
+    // pointer, and a focus tint would wash the purple pills grey.
+    let state = if !ui.is_enabled() {
+        PillState::Idle
+    } else if response.is_pointer_button_down_on() {
+        PillState::Pressed
+    } else if response.hovered() {
+        PillState::Hovered
+    } else {
+        PillState::Idle
+    };
+    let (fill, text) = pill_palette(primary, state);
+    capsule(ui, rect, fill, 1.);
+    if focused {
+        // Outside the capsule and concentric with its round ends.
+        focus_ring(
+            ui.painter(),
             rect.expand(3.),
-            23.,
-            Stroke::new(2., ink(theme.text)),
+            rect.height() / 2. + 3.,
             egui::StrokeKind::Outside,
         );
     }
     let galley = ui.painter().layout_no_wrap(
         label.into(),
         egui::FontId::new(font_size, egui::FontFamily::Name("bold".into())),
-        Color32::WHITE,
+        text,
     );
     let extra = if checked.is_some() { 34. } else { 0. };
     let left = rect.center().x - (galley.size().x + extra) / 2.;
     if let Some(checked) = checked {
         let box_rect = Rect::from_center_size(pos2(left + 11., rect.center().y), vec2(22., 22.));
+        // Checked takes the primary pill's green, which reads on the purple
+        // pill and keeps the white tick's contrast; the ring keeps either
+        // state visible on the hover fill.
         let fill = if checked {
-            theme.selection
+            pill_palette(true, PillState::Idle).0[0]
         } else {
-            theme.backdrop
+            ink(theme.backdrop)
         };
-        ui.painter()
-            .rect_filled(box_rect, 4., Color32::from_rgb(fill[0], fill[1], fill[2]));
+        ui.painter().rect_filled(box_rect, 4., fill);
+        ui.painter().rect_stroke(
+            box_rect,
+            4.,
+            Stroke::new(FOCUS_RING, ink(theme.text)),
+            egui::StrokeKind::Inside,
+        );
         if checked {
             ui.painter().add(egui::Shape::line(
                 vec![
@@ -270,7 +334,7 @@ fn painted_pill(
     ui.painter().galley(
         pos2(left + extra, rect.center().y - galley.size().y / 2.),
         galley,
-        Color32::WHITE,
+        text,
     );
     response
 }

@@ -226,12 +226,13 @@ pub fn shadow(ui: &egui::Ui, r: Rect, radius: f32, scale: f32, drop: Drop) {
     );
 }
 
-/// One logical-pixel keyboard-focus ring, kept inside the hit box.
-pub fn outline(ui: &egui::Ui, r: Rect, radius: f32, tokens: MenuTheme) {
-    ui.painter().rect_stroke(
+/// The shared keyboard-focus ring, one pixel inside the hit box so neighbours
+/// and scroll clipping never cut it.
+pub fn outline(ui: &egui::Ui, r: Rect, radius: f32) {
+    theme::focus_ring(
+        ui.painter(),
         r.shrink(1.),
         (radius - 1.).max(0.),
-        Stroke::new(1., theme::ink(tokens.text)),
         egui::StrokeKind::Inside,
     );
 }
@@ -323,7 +324,7 @@ pub fn button(
         control.style != ControlStyle::StudioAction,
     );
     if focused {
-        outline(ui, r, radius, tokens);
+        outline(ui, r, radius);
     }
     response
 }
@@ -388,7 +389,7 @@ pub fn text_field(
             .clip_text(true),
     );
     if response.has_focus() && keyboard_focus && ui.is_enabled() {
-        outline(ui, r, radius, tokens);
+        outline(ui, r, radius);
     }
     response
 }

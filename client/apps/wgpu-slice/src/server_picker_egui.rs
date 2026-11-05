@@ -391,7 +391,7 @@ impl PickerUi {
                 }
                 if focused && ui.is_enabled() {
                     let radius = tokens.surface(control.style, ControlState::Idle).radius;
-                    outline(ui, r, f32::from(radius) * scale, tokens);
+                    outline(ui, r, f32::from(radius) * scale);
                 }
                 let inset = 14. * scale;
                 column(
