@@ -50,3 +50,18 @@ test('unexpected protocol and repeated challenges fail closed', () => {
     assert.equal(session.state, 'failed');
   }
 });
+
+test('extension commands can precede Setup in separate or bundled frames', () => {
+  for (const bundled of [false, true]) {
+    const session = new HandshakeSession(fakeWasm(), profile, probeNickname);
+    session.receive(packed([[54, 1]]));
+    if (!bundled) {
+      assert.deepEqual(session.receive(packed([[107, 7]])),
+        { outbound: [], complete: false, protocolVersion: undefined });
+      assert.equal(session.state, 'setup');
+    }
+    const result = session.receive(packed(bundled ? [[107, 7], [97, 19]] : [[97, 19]]));
+    assert.equal(result.complete, true);
+    assert.deepEqual(result.outbound, []);
+  }
+});

@@ -78,6 +78,13 @@ that copied the official login.
 The server's Setup selects protocol 13 or 19 for the connection; both use the
 same client core and stock login.
 
+Recognized copy challenges receive their calculated reply. Other challenge text
+uses an initialized 27-byte acknowledgement and attempts the ordinary login,
+allowing community servers that omit or ignore the proof. The client never runs
+server-supplied JavaScript; an unknown program that requires a different computed
+reply can still be rejected by the server. Unknown extension messages may precede
+Setup, including in the same frame. Setup still selects the supported protocol.
+
 The window opens on login, restoring saved appearance preferences. Explicit
 `--nickname` and `--skin` override restored values for that run. Change Skin opens
 the offline [skin studio](docs/skin-studio.md); Save commits the draft and Cancel

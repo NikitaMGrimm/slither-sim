@@ -267,6 +267,44 @@ fn playing() -> LocalGame {
 }
 
 #[test]
+fn custom_login_attempts_unknown_challenges_and_accepts_extensions_before_setup() {
+    for bundled in [false, true] {
+        let mut game = LocalGame::new(0.).unwrap();
+        game.play("ws://192.0.2.1:19491/slither", "Player", 0)
+            .unwrap();
+        pump(&mut game, 1.);
+        effects(&mut game);
+        let generation = game.generation();
+        game.opened(generation, 2.).unwrap();
+        assert_eq!(effects(&mut game), [vec![1], vec![99, 0]]);
+        // Odd-length text is accepted by stock login but has no supported copy
+        // program. This synthetic fixture exercises the general fallback.
+        game.receive(generation, b"6A", 3.).unwrap();
+        let sent = effects(&mut game);
+        assert_eq!(sent.len(), 2);
+        assert_eq!(sent[0], b"DHLPTXBFJNRVZDHLPTXBFJNRVZD");
+        assert_eq!(&sent[1][..2], b"s\x1e");
+        assert_eq!(game.phase(), Phase::Setup);
+        let extension = vec![b'k', 0, 7, 9];
+        if bundled {
+            game.receive(generation, &bundle(&[extension, setup(), snake(44)]), 4.)
+                .unwrap();
+        } else {
+            game.receive(generation, &extension, 4.).unwrap();
+            assert_eq!(game.phase(), Phase::Setup);
+            assert!(game.client().received().setup.is_none());
+            assert!(effects(&mut game).is_empty());
+            game.receive(generation, &bundle(&[setup(), snake(44)]), 5.)
+                .unwrap();
+        }
+        assert_eq!(game.phase(), Phase::Playing);
+        assert!(game.client().received().own_snake_id.is_some());
+        assert!(effects(&mut game).is_empty(), "login is sent only once");
+        assert!(game.failure.is_none());
+    }
+}
+
+#[test]
 fn champion_send_uses_current_victory_session_once_and_exact_bytes() {
     use slither_client::menu_controls::Activation::{Enter, Pointer};
     let mut game = playing();

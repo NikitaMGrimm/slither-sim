@@ -79,7 +79,7 @@ fn staged_close_cancels_launch_without_clearing_observable_owner() {
     );
 }
 #[test]
-fn phase_and_canonical_control_admission_are_closed() {
+fn phase_and_canonical_control_admission_allow_pre_setup_extensions() {
     let mut p = SessionPolicy::new();
     assert_eq!(SessionPolicy::negotiation_packet(0).unwrap(), vec![1]);
     assert_eq!(SessionPolicy::negotiation_packet(1).unwrap(), vec![99, 0]);
@@ -91,7 +91,8 @@ fn phase_and_canonical_control_admission_are_closed() {
     assert!(p.receive_header(1, 97).is_err());
     assert!(p.receive_header(1, 54).unwrap());
     p.challenged();
-    assert!(p.receive_header(1, 118).is_err());
+    assert!(!p.receive_header(1, 107).unwrap());
+    assert!(!p.receive_header(2, 107).unwrap());
     assert!(!p.receive_header(1, 97).unwrap());
     for (op, len) in [(54, 1), (112, 2), (118, 1), (118, 3)] {
         assert!(p.command_requires_version(op, len).is_err());

@@ -34,7 +34,6 @@ export class HandshakeSession {
       if (++this.#frames > 16) throw new Error('Handshake frame limit exceeded');
       const commands = unpackCommands(this.#wasm.decode_frame(frame, false));
       if (this.#state === 'challenge' && (commands.length !== 1 || commands[0][0] !== 54)) throw new Error('Expected one challenge command');
-      if (this.#state === 'setup' && commands[0][0] !== 97) throw new Error('Expected setup after login');
       let state = this.#state;
       let protocolVersion;
       const outbound = [];
@@ -51,7 +50,7 @@ export class HandshakeSession {
           if (protocolVersion !== this.#profile.protocolVersion) throw new Error('Unexpected advertised protocol version');
           state = 'done';
           break; // Remaining structurally validated commands belong to gameplay, outside this probe.
-        } else throw new Error('Unexpected command before setup');
+        } else if (state !== 'setup') throw new Error('Unexpected command before setup');
       }
       this.#state = state;
       return { outbound, complete: state === 'done', protocolVersion };

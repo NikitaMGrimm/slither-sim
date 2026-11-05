@@ -26,7 +26,7 @@ pub fn encode_login(
 
 #[wasm_bindgen]
 pub fn solve_challenge(encoded: &[u8]) -> Result<Vec<u8>, JsValue> {
-    challenge::solve_challenge(encoded).map_err(error)
+    challenge::answer_challenge(encoded).map_err(error)
 }
 
 /// Preserve per-UTF-16-unit menu normalization before shared serialization.

@@ -9,8 +9,7 @@ import { unpackCommands } from '../web/handshake-session.mjs';
 import { bundle, syntheticScene, syntheticSetup, syntheticStep } from '../web/synthetic-scene.mjs';
 
 // Original closed-grammar fixture, never a captured challenge or evaluated program.
-function challengeFixture() {
-  const source = 'var a="AAAAA";a+="AAAAAAAAAAAAAAAAAAAAAA";for(var i=0;i<27;i++){idba[i]=a.charCodeAt(i);}';
+function challengeFixture(source = 'var a="AAAAA";a+="AAAAAAAAAAAAAAAAAAAAAA";for(var i=0;i<27;i++){idba[i]=a.charCodeAt(i);}') {
   let key = 23;
   const encoded = [];
   for (const byte of Buffer.from(source, 'ascii')) {
@@ -123,7 +122,7 @@ export function stockSessionSmoke(wasm) {
         session.commitControl();
         return { observed, actions, intents: intents.map(bytes => [...bytes]) };
       },
-      start() {
+      start(challengeBytes = challenge) {
         assert.equal(sockets.length, 0);
         session.play(login);
         assert.equal(sockets.length, 0);
@@ -135,7 +134,7 @@ export function stockSessionSmoke(wasm) {
         assert.equal(sockets[0].binaryType, 'arraybuffer');
         sockets[0].open();
         assert.deepEqual(sockets[0].sends, [Uint8Array.of(1), Uint8Array.of(99, 0)]);
-        sockets[0].receive(Uint8Array.from([54, ...challenge]));
+        sockets[0].receive(Uint8Array.from([54, ...challengeBytes]));
         assert.equal(sockets[0].sends.length, 4);
         assert.deepEqual(sockets[0].sends[2], expectedReply);
         assert.deepEqual(sockets[0].sends[3], expectedLogin);
@@ -174,6 +173,24 @@ export function stockSessionSmoke(wasm) {
     legacySocket.receive(bundle([115, 0, 0, 1], [118, 0]));
     assert.equal(legacy.session.snapshot().phase, 'dead');
     cases.push('protocol 13 stock login, coordinate motion, food, presentation and death');
+
+    for (const bundled of [false, true]) {
+      const custom = harness();
+      const customSocket = custom.start(challengeFixture("var unused='synthetic'// no proof"));
+      const extension = Uint8Array.of(107, 0, 7, 9);
+      if (bundled) customSocket.receive(bundle(extension, setup, appearance));
+      else {
+        customSocket.receive(extension);
+        assert.equal(custom.session.snapshot().phase, 'setup');
+        assert.equal(custom.scene.control_view().connected, false);
+        customSocket.receive(bundle(setup, appearance));
+      }
+      assert.equal(custom.session.snapshot().phase, 'playing');
+      assert.equal(custom.scene.control_view().connected, true);
+      assert.equal(customSocket.sends.length, 4);
+      assert.deepEqual(custom.errors, []);
+    }
+    cases.push('unknown challenge login and pre-Setup extensions, separate and bundled');
 
     const main = harness(true);
     assert.ok(main.scene.control_view().own);

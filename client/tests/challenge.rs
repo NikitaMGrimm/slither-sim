@@ -1,6 +1,8 @@
 //! Synthetic programs and literals only; no captured challenge fixtures.
 
-use slither_client::challenge::{ChallengeError, MAX_SOURCE_BYTES, solve_challenge};
+use slither_client::challenge::{
+    ChallengeError, MAX_SOURCE_BYTES, answer_challenge, solve_challenge,
+};
 
 // Construct synthetic source from individual grammar tokens. This is a test
 // generator, not an embedded decoded challenge or a copied JavaScript snippet.
@@ -221,4 +223,52 @@ fn invalid_wire_sizes_alphabet_and_nibble_reject() {
     for end in (2..valid.len()).step_by(2) {
         assert!(solve_challenge(&valid[..end]).is_err());
     }
+}
+
+#[test]
+fn production_answers_recognized_programs_exactly_and_attempts_unknown_challenges() {
+    let recognized = encode(source().join(" ").as_bytes());
+    assert_eq!(answer_challenge(&recognized), solve_challenge(&recognized));
+    let legacy = encode(
+        format!(
+            "var a='{}';for(var i=0;i<24;i++)idba[i]=a.charCodeAt(i);",
+            "A".repeat(24)
+        )
+        .as_bytes(),
+    );
+    assert_eq!(
+        answer_challenge(&legacy).unwrap(),
+        b"DHLPTXBFJNRVZDHLPTXBFJNR"
+    );
+
+    // Authored no-op, unsupported-expression and throwing-program shapes. The
+    // fallback is independent of their syntax and never executes their source.
+    for source in [
+        "var unused='synthetic'// a community server may omit the proof",
+        "/* no reply mutation */",
+        "throw new Error('synthetic');",
+        "idba[0]=1;",
+        "for(;;){}",
+    ] {
+        assert_eq!(
+            answer_challenge(&encode(source.as_bytes())).unwrap(),
+            b"DHLPTXBFJNRVZDHLPTXBFJNRVZD"
+        );
+    }
+}
+
+#[test]
+fn production_uses_stock_text_admission_with_the_existing_frame_bound() {
+    let expected = b"DHLPTXBFJNRVZDHLPTXBFJNRVZD";
+    // The stock text check admits A..=z, not only letter pairs or valid nibbles.
+    for encoded in [b"".as_slice(), b"A", b"na", b"[\\]^_`", &[b'A'; 514]] {
+        assert_eq!(answer_challenge(encoded).unwrap(), expected);
+    }
+    for encoded in [b"@".as_slice(), b"{", &[0xff]] {
+        assert_eq!(answer_challenge(encoded), Err(ChallengeError::Alphabet));
+    }
+    let mut encoded = vec![b'A'; slither_client::protocol::MAX_FRAME_BYTES - 1];
+    assert_eq!(answer_challenge(&encoded).unwrap(), expected);
+    encoded.push(b'A');
+    assert_eq!(answer_challenge(&encoded), Err(ChallengeError::FrameSize));
 }
