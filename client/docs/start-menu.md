@@ -193,6 +193,9 @@ key-up always passes. This opt-in seam does not change the legacy
 the previous text focus. `sync_menu` consumes #300's focus intents and current
 hidden/disabled state. `commit_menu` updates the committed nickname and dispatches Enter through the existing
 admission gate; the once-only Play request still comes from the next menu step.
+The egui login owns the native field, so `NativeLogin` mirrors each egui edit
+into this editor; otherwise the host's `commit_menu` after every event would
+write the stale copy back over the typed nickname.
 
 Skin, server and graphics-quality names and high/low values come from the shared
 `MenuWording` table in English, German, French and Portuguese. These names and

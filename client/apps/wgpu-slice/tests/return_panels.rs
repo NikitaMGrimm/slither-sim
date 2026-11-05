@@ -1,5 +1,7 @@
 //! Authored packet and widget replay; no windows, sockets or external assets.
 #![cfg(not(any(target_arch = "wasm32", target_os = "linux")))]
+#[path = "support/desktop_typing.rs"]
+mod desktop_typing;
 #[path = "support/announcement_tape.rs"]
 mod tape;
 use slither_client::{
@@ -516,4 +518,14 @@ fn return_panels_keep_modal_play_routing_and_queued_play_remains_once_only() {
         queued.frame();
         assert_eq!(queued.plays(), 1);
     }
+}
+
+#[test]
+fn desktop_nickname_edits_survive_the_host_commit_after_a_death_return() {
+    let mut trial = Trial::new();
+    trial.until(5500);
+    let admission = trial.game.can_play();
+    assert_eq!(trial.login.state.view(admission).phase, MenuPhase::Login);
+    assert!(!trial.login.state.view(admission).disabled);
+    desktop_typing::edit_nickname(&mut trial.login, [960, 720], admission);
 }

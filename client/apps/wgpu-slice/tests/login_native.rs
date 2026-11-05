@@ -947,8 +947,60 @@ fn acquisition_cancel_and_pre_game_socket_outcomes_release_native_admission() {
     }
 }
 
+#[path = "support/desktop_typing.rs"]
+mod desktop_typing;
 #[path = "support/announcement_tape.rs"]
 mod endpoint_tape;
+
+#[test]
+fn desktop_nickname_edits_survive_the_host_commit_at_startup_and_during_discovery() {
+    for discovery in [false, true] {
+        let mut login = settled("Player");
+        if discovery {
+            login.picker.policy.start_directory();
+            assert!(login.picker.policy.can_play());
+        }
+        desktop_typing::edit_nickname(&mut login, [960, 540], true);
+    }
+}
+
+#[test]
+fn desktop_nickname_edits_survive_the_host_commit_after_a_failed_or_closed_connection() {
+    use slither_wgpu_slice::game::{EffectKind, LocalGame};
+    for closed in [false, true] {
+        let mut login = NativeLogin::new("Player").unwrap();
+        let mut game = LocalGame::new(0.).unwrap();
+        login.step(0., true, false).unwrap();
+        login.activate(true);
+        login.step(16., true, false).unwrap();
+        game.play("ws://127.0.0.1:19491/slither", "Player", 0)
+            .unwrap();
+        game.begin_frame(1., [960, 540], 1.).unwrap();
+        while game.take_frame().is_some() {
+            game.presented(true).unwrap();
+        }
+        let effect = game.effect().unwrap();
+        assert!(matches!(effect.kind, EffectKind::Connect(_)));
+        game.construct(effect.generation, effect.id, 1.).unwrap();
+        game.acknowledge(effect.generation, effect.id, true)
+            .unwrap();
+        if closed {
+            game.closed(effect.generation);
+        } else {
+            game.fail("Synthetic socket failure");
+        }
+        while let Some(effect) = game.effect() {
+            game.acknowledge(effect.generation, effect.id, true)
+                .unwrap();
+        }
+        login.observe_game(&game).unwrap();
+        for now in (32..=9600).step_by(16) {
+            login.step(now as f64, game.can_play(), false).unwrap();
+        }
+        assert_eq!(login.state.view(true).phase, MenuPhase::Login);
+        desktop_typing::edit_nickname(&mut login, [960, 540], game.can_play());
+    }
+}
 
 #[test]
 fn returned_menu_keeps_presenting_buttons_while_death_close_is_pending() {
