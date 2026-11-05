@@ -1,0 +1,29 @@
+{
+  "arms": {
+    "baseline": {
+      "name": "baseline",
+      "revision": "60bac3eae6967afc0f62325ad2f48d034f950159",
+      "binary_sha256": "5ac719c2ca85749f3baecfef03a81d080e3addfc426f8196417cd0a56f9c4707",
+      "driver_sha256": "506611c9fc50ac9014b316a22796ef037d5615f15052f2bbc4ef22e7dfbcc58e"
+    },
+    "candidate": {
+      "name": "uploads",
+      "revision": "b95ada1d5cbbfcf7474adb0a56569dd160278076",
+      "binary_sha256": "d9e66c098b8f7799d22ef7a5d2e2f21e4b0b54f4a0feb2558dd49a242265c8c6",
+      "driver_sha256": "506611c9fc50ac9014b316a22796ef037d5615f15052f2bbc4ef22e7dfbcc58e"
+    }
+  },
+  "measured_base": "60bac3eae6967afc0f62325ad2f48d034f950159",
+  "delivered_base": "a9289bfa",
+  "input": {
+    "name": "retained-join-A",
+    "sha256": "a9e9bbdaf3c8ebc940f9c75ecfda7aa6aff58d09f396119e13ab0ead16d8cc43",
+    "access": "restricted local owner/reviewer scratch; timing only"
+  },
+  "metrics": {
+    "f60_wall_ms": "Frame 60",
+    "f61_wall_ms": "Frame 61",
+    "cold_wall_max_ms": "Cold-window max",
+    "art_wall_p95_ms": "Art p95"
+  }
+}
