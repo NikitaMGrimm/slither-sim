@@ -89,15 +89,21 @@ fn coverage(x: f64, y: f64, center: Point, radius: f64) -> f64 {
     f64::from(count) / 16.
 }
 
+// The first build is a cold join cost of tens of milliseconds at large sides.
+// Each pass reads only the previous pass, so its rows are independent and can
+// run on separate threads with unchanged per-pixel arithmetic.
 fn background(plan: MinimapBackgroundPlan, side: u32) -> RgbaImage {
     let mut out = image(side, side);
     let n = side as usize;
-    let mut mask = vec![0.; n * n];
-    for y in 0..n {
-        for x in 0..n {
-            mask[y * n + x] = coverage(x as f64, y as f64, plan.center, plan.radius);
-        }
+    if n == 0 {
+        return out;
     }
+    let mut mask = vec![0.; n * n];
+    crate::cold_parallel::rows(&mut mask, n, |y, row| {
+        for (x, value) in row.iter_mut().enumerate() {
+            *value = coverage(x as f64, y as f64, plan.center, plan.radius);
+        }
+    });
     // Match the existing material adapter's Canvas-shadow approximation.
     let sigma = plan.shadow_blur / 2.;
     let radius = (3. * sigma).ceil() as i32;
@@ -107,18 +113,18 @@ fn background(plan: MinimapBackgroundPlan, side: u32) -> RgbaImage {
     let sum: f64 = weights.iter().sum();
     weights.iter_mut().for_each(|v| *v /= sum);
     let mut horizontal = vec![0.; n * n];
-    for y in 0..n {
-        for x in 0..n {
+    crate::cold_parallel::rows(&mut horizontal, n, |y, row| {
+        for (x, value) in row.iter_mut().enumerate() {
             for (k, weight) in (-radius..=radius).zip(&weights) {
                 let xx = x as i32 + k;
                 let yy = y as i32 - plan.shadow_offset.y as i32;
                 if (0..n as i32).contains(&xx) && (0..n as i32).contains(&yy) {
-                    horizontal[y * n + x] += mask[yy as usize * n + xx as usize] * weight;
+                    *value += mask[yy as usize * n + xx as usize] * weight;
                 }
             }
         }
-    }
-    for y in 0..n {
+    });
+    crate::cold_parallel::rows(&mut out.pixels, n * 4, |y, row| {
         for x in 0..n {
             let mut shadow = 0.;
             for (k, weight) in (-radius..=radius).zip(&weights) {
@@ -127,7 +133,7 @@ fn background(plan: MinimapBackgroundPlan, side: u32) -> RgbaImage {
                     shadow += horizontal[yy as usize * n + x] * weight;
                 }
             }
-            let dst = &mut out.pixels[(y * n + x) * 4..][..4];
+            let dst = &mut row[x * 4..][..4];
             dst[3] = (shadow * 255.).round() as u8;
             let mut rgb = [0.; 3];
             let mut alpha: f64 = 0.;
@@ -164,7 +170,7 @@ fn background(plan: MinimapBackgroundPlan, side: u32) -> RgbaImage {
                 1.,
             );
         }
-    }
+    });
     out
 }
 
