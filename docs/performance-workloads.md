@@ -249,6 +249,25 @@ and workload identities. The new row is a bounded integration workload, not a
 host capacity or playing-strength measurement; host capacity comes from the
 [500-bot host qualification](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/performance/2026-10-26-500-bot-qualification/REPORT.md).
 
+## World-thread host bots
+
+An ignored library test measures `center` and `follow` host bots on one thread:
+
+```sh
+cargo test --release --locked --no-default-features --features networking --lib   host_bots_tick_benchmark -- --ignored --nocapture --test-threads=1
+```
+
+Each behavior runs 3,000 bot slots and one scripted owner that circles at its
+maximum turn rate, with seed 73 and the default 7 ms tick: 30 simulated seconds
+of warm-up, then 60 measured. The owner starts with 80 segments and rejoins
+after a death; deaths are reported. The world uses official rules at a fixed
+32,000-unit radius, because the seat-scaled radius for 3,001 players would
+exceed the wire limit. Linux thread CPU time brackets each whole backend tick:
+respawns, steering, physics and encoding for the one player, but not draining
+its output. The build leaves out `parallel` and starts no client threads. The
+numbers describe this synthetic scene, not wall-clock delivery or long-lived
+worlds.
+
 ## Steady-state lifecycle
 
 Legacy cases reset after any death. Scenario rows keep deaths, death food,

@@ -53,6 +53,7 @@ fn appearance(encoder: &mut Encoder, id: u16) -> Vec<u8> {
             &snake(),
             0.,
             &PlayerAppearance {
+                owner: false,
                 nickname: b"Reader".to_vec(),
                 skin: 3,
                 custom_skin: vec![4, 5],

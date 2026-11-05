@@ -2293,6 +2293,7 @@ fn boosting_within_the_window_never_resends_the_body() {
 
 fn profile(nickname: &str) -> PlayerAppearance {
     PlayerAppearance {
+        owner: false,
         nickname: nickname.as_bytes().to_vec(),
         skin: 7,
         custom_skin: vec![1, 2, 3],

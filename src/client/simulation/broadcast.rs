@@ -379,6 +379,7 @@ impl SimulatorBackend {
             }
             self.ingest(slot, end)?;
         }
+        self.drive_in_world_bots()?;
         let actions: Vec<_> = self
             .world
             .snakes()

@@ -49,9 +49,11 @@ both delays.
 | `maxTick` | `null` (fixed ticks) | Optional maximum physics tick in seconds, finite and at least `simulation.world.dt`. Both endpoints must satisfy the world's dt limits (including the sliding-boundary limit). See [tick stretching](raw-server.md#vps-use). |
 | `players.max` | `4` | Reserved socket slots; at least 1. |
 | `players.latency` | Zero added delay | Server-side link delay added to socket connections; both processing fields must be zero. |
-| `bots.count` | `4` | Background food-seeking bots; players + bots must be at most 65,535. |
-| `bots.threads` | `2` | Background workers, separate from simulation and sockets; at least 1 when `bots.count > 0`. At most `bots.count` workers start. |
-| `bots.latency` | Zero added delay | Bot link and processing settings. |
+| `ownerKey` | `null` | Optional host key: 1–23 printable Latin-1 characters without whitespace. Keys under 6 characters warn. Debug output redacts it; see [owner key](#owner-key). |
+| `bots.count` | `4` | Background bot slots; players + bots must be at most 65,535. |
+| `bots.behavior` | `"forager"` | `forager`: A4 food seekers on worker threads. `center`: steer to the arena center. `follow`: crash into the owner's body; needs `ownerKey` and acts as `center` while no owner is alive. `center` and `follow` need a world without circular spawning, so not Battledome. |
+| `bots.threads` | `2` | Forager worker threads, apart from simulation and sockets; at least 1 when `bots.count > 0`. At most `bots.count` start. Setting it with `center` or `follow` is an error. |
+| `bots.latency` | Zero added delay | Forager link and processing delay. Setting it (even `{}`) with `center` or `follow` is an error. |
 | `simulation` | Defaults below | Host derives `agents` and `controlledSlot`; `recordWire` must be false and `latency` must stay at its default. |
 
 See [hosting](raw-server.md) for TLS, connection limits and supported messages.
@@ -59,6 +61,31 @@ See [hosting](raw-server.md) for TLS, connection limits and supported messages.
 The host applies [population sizing](#population-sizing) to `bots.count` at
 startup; reserved, disconnected player seats do not enlarge it. An official host with no
 bots starts at radius 670. Connected players then contribute to live occupancy.
+
+### Owner key
+
+The owner joins with a nickname that ends in `!` plus the exact, case-sensitive
+`ownerKey`. The host removes that final marker and any spaces directly before
+it; nothing else changes. With the key `bananatest`, `Name !bananatest` shows as
+`Name`, `Dutch Stare !!bananatest` as `Dutch Stare !`, and a name of only spaces
+and the marker as an empty name. Any other name, such as `Name!wrong`, stays as
+typed and is not the owner. The 24-character nickname limit applies to the name
+as typed, marker included. The marker is removed at login for every supported
+login layout, before the name reaches the world, packets, leaderboard,
+recordings or logs.
+
+The newest playing session that presented the key is the only owner; an
+earlier owner session becomes an ordinary player. After the owner dies or
+disconnects there is no owner until a session presents the key again. With
+`forager` or `center` bots the key only removes the marker.
+
+### World-thread bots
+
+`center` and `follow` bots run on the world thread: no bot clients, worker
+threads, frames, latency model or broadcasts to bot slots. They respawn through
+the ordinary spawn search and re-aim on staggered six-tick decisions; follow
+bots close to the owner's predicted path plan every tick. See
+[what is and isn't guaranteed](hosting.md#what-is-and-isnt-guaranteed).
 
 ## SimulationConfig
 

@@ -15,12 +15,24 @@
   and four by a quarter; two threads were slower
   ([measurements](https://github.com/NikitaMGrimm/slither-sim/blob/main/docs/performance.md#measured-view-scaling)).
   `host_load` and the `engine-raw-official-500` row take `--view-threads`.
+- Hosts can set `bots.behavior` to `center` or `follow` for cheap bots that
+  the world thread drives directly, with no bot workers or packets. Center bots
+  head for the arena center. Follow bots chase the owner and crash into the
+  owner's body. While the owner holds a steady heading or turn rate, they keep
+  their bodies off the owner's path, so they don't kill the owner by accident;
+  collisions and death food work as usual. The
+  owner is the newest player whose nickname ends in `!` and the new `ownerKey`,
+  which the host removes from the name at login. The default `forager` bots are
+  unchanged.
 
 ### Breaking
 
 - `HostConfig` has a new public field, `view_threads` (default 1), so Rust
   code that builds a `HostConfig` with a struct literal must set it or end
   with `..HostConfig::default()`. JSON configs need no change.
+- `BotConfig::threads` and `BotConfig::latency` are now `Option`s; `None`
+  keeps the forager defaults. In JSON, an explicit `null` for either is
+  rejected.
 
 ## [0.11.0](https://github.com/NikitaMGrimm/slither-sim/compare/v0.10.0...v0.11.0) - 2026-11-06
 

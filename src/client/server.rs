@@ -5,6 +5,7 @@
 //! and encoding; I/O owns the listener and sockets, sending frames at their
 //! latency-model delivery times; bots decode, decide, ping and model processing
 //! for their own slots, reaching the world through timestamped commands.
+//! Center/follow bots instead keep closed connections and run on the world thread.
 //! Running 480 seekers on the simulation thread delayed remote frames by up to
 //! ~20 ms depending on tick phase ([jitter study], 2026-10-25).
 //!
@@ -22,7 +23,7 @@
 //! challenge; selectors 11/12 choose protocol 13, selector 31 uses a short login
 //! with protocol-19 output.
 use super::{
-    Bot, ClientState, ClientStatus, ForagerBot, SimulationConfig, challenge,
+    Bot, BotBehavior, ClientState, ClientStatus, ForagerBot, OwnerKey, SimulationConfig, challenge,
     latency::{LatencyConfig, Link, Random},
     protocol,
     simulation::{
@@ -126,6 +127,10 @@ pub struct HostConfig {
     pub seed: u32,
     pub players: PlayerConfig,
     pub bots: BotConfig,
+    /// Nickname suffix key that marks the host owner; see the owner key
+    /// section of docs/configuration.md.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub owner_key: Option<OwnerKey>,
     pub simulation: SimulationConfig,
     /// Stretch overloaded ticks up to this many seconds; `None` keeps fixed ticks.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -148,6 +153,7 @@ impl Default for HostConfig {
             seed: 1,
             players: PlayerConfig::default(),
             bots: BotConfig::default(),
+            owner_key: None,
             simulation: SimulationConfig::default(),
             max_tick: None,
             world_threads: 1,
@@ -179,17 +185,40 @@ impl Default for PlayerConfig {
 #[serde(default, deny_unknown_fields, rename_all = "camelCase")]
 pub struct BotConfig {
     pub count: usize,
-    /// Workers apart from the simulation and socket threads.
-    pub threads: usize,
-    pub latency: LatencyConfig,
+    pub behavior: BotBehavior,
+    /// Forager workers apart from the simulation and socket threads;
+    /// `None` starts `DEFAULT_BOT_THREADS`. Only forager hosts accept it.
+    #[serde(
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "explicit_bot_setting"
+    )]
+    pub threads: Option<usize>,
+    /// Forager link and processing delay; `None` adds none. Only forager
+    /// hosts accept it.
+    #[serde(
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "explicit_bot_setting"
+    )]
+    pub latency: Option<LatencyConfig>,
+}
+
+/// Forager worker threads when `bots.threads` is omitted.
+const DEFAULT_BOT_THREADS: usize = 2;
+
+/// Omission selects the forager defaults; an explicit null is not a setting.
+fn explicit_bot_setting<'de, D: serde::Deserializer<'de>, T: Deserialize<'de>>(
+    deserializer: D,
+) -> Result<Option<T>, D::Error> {
+    T::deserialize(deserializer).map(Some)
 }
 
 impl Default for BotConfig {
     fn default() -> Self {
         Self {
             count: 4,
-            threads: 2,
-            latency: LatencyConfig::default(),
+            behavior: BotBehavior::Forager,
+            threads: None,
+            latency: None,
         }
     }
 }
@@ -205,7 +234,11 @@ impl HostConfig {
         if let Some(max) = self.max_tick {
             simulation.world.dt = max;
         }
-        simulation.warnings()
+        let mut warnings = simulation.warnings();
+        if self.owner_key.as_ref().is_some_and(OwnerKey::short) {
+            warnings.push("ownerKey shorter than 6 characters is easy to guess".into());
+        }
+        warnings
     }
 
     fn world_config(&self) -> Result<SimulationConfig, String> {
@@ -233,7 +266,18 @@ impl HostConfig {
         if !cfg!(feature = "parallel") && self.view_threads > 1 {
             return Err("viewThreads above 1 needs the parallel build feature".into());
         }
-        if self.bots.count > 0 && self.bots.threads == 0 {
+        if let Some(key) = &self.owner_key {
+            key.validate()?;
+        }
+        if self.bots.behavior == BotBehavior::Follow && self.owner_key.is_none() {
+            return Err("bots.behavior follow requires ownerKey".into());
+        }
+        if self.bots.behavior != BotBehavior::Forager
+            && (self.bots.threads.is_some() || self.bots.latency.is_some())
+        {
+            return Err("bots.threads and bots.latency apply only to forager behavior".into());
+        }
+        if self.bots.count > 0 && self.bots.threads == Some(0) {
             return Err("Bots need 1 or more bots.threads".into());
         }
         if self.simulation.record_wire {
@@ -253,16 +297,26 @@ impl HostConfig {
             .map_err(|e| format!("players.latency: {e}"))?;
         self.bots
             .latency
+            .as_ref()
+            .unwrap_or(&LatencyConfig::default())
             .validate()
             .map_err(|e| format!("bots.latency: {e}"))?;
         let mut config = SimulationConfig {
             agents,
             controlled_slot: 0,
-            latency: self.bots.latency.clone(),
+            latency: self.bots.latency.clone().unwrap_or_default(),
             ..self.simulation.clone()
         };
         config.world.size_for_population(self.bots.count);
         config.validate_for_population(self.bots.count)?;
+        // Circular worlds queue every join for socket priority and growth
+        // holds; world-thread respawns would bypass that admission queue.
+        if self.bots.behavior != BotBehavior::Forager
+            && self.bots.count > 0
+            && config.world.spawn_radius.is_some()
+        {
+            return Err("bots.behavior center and follow need a world without circular spawning, such as official; Battledome hosts use forager bots".into());
+        }
         if let Some(max) = self.max_tick {
             if !max.is_finite() || max < config.world.dt {
                 return Err("maxTick must be finite and at least simulation.world.dt".into());
@@ -456,6 +510,7 @@ impl Delivery {
 pub struct Host {
     #[cfg(all(test, feature = "parallel"))]
     world_context: Option<Sender<WorldContext>>,
+    owner_key: Option<OwnerKey>,
     listener: TcpListener,
     world: RawSimulator,
     max_clients: usize,
@@ -478,13 +533,18 @@ impl Host {
         let simulation = config.world_config()?;
         let latency = simulation.latency.clone();
         let decision_seconds = simulation.decision_ticks as f64 * simulation.world.dt;
-        // Bots are clients of their own slots, like sockets.
+        // Every host slot starts absent. Forager workers later connect like
+        // sockets; world-thread policies leave their bot connections closed.
         let mut world = RawSimulator::new(
             config.seed,
             simulation,
             config.players.max + config.bots.count,
         )?;
         world.set_player_latency(config.players.max, config.players.latency);
+        if config.bots.behavior != BotBehavior::Forager && config.bots.count > 0 {
+            let profiles = (0..config.bots.count).map(bot_appearance).collect();
+            world.set_in_world_bots(config.players.max, config.bots.behavior, profiles);
+        }
         #[cfg(feature = "frame-bench")]
         world.set_frame_bench(config.frame_bench);
         #[cfg(feature = "parallel")]
@@ -498,7 +558,15 @@ impl Host {
             world,
             max_clients: config.players.max,
             bots: config.bots.count,
-            bot_threads: config.bots.threads.min(config.bots.count),
+            bot_threads: if config.bots.behavior == BotBehavior::Forager {
+                config
+                    .bots
+                    .threads
+                    .unwrap_or(DEFAULT_BOT_THREADS)
+                    .min(config.bots.count)
+            } else {
+                0
+            },
             seed: config.seed,
             latency,
             decision_seconds,
@@ -507,6 +575,7 @@ impl Host {
             world_threads: config.world_threads,
             #[cfg(feature = "parallel")]
             view_threads: config.view_threads,
+            owner_key: config.owner_key,
             #[cfg(feature = "latency-rig")]
             latency_truth: None,
         })
@@ -611,6 +680,7 @@ impl Host {
             #[cfg(target_os = "linux")]
             readiness: readiness::Readiness::default(),
             gate: Gate {
+                owner_key: self.owner_key,
                 occupied: vec![false; self.max_clients],
                 generations: vec![0; self.max_clients],
                 challenge,
@@ -1357,6 +1427,7 @@ struct Gateway {
 
 /// Admission state shared by all sessions.
 struct Gate {
+    owner_key: Option<OwnerKey>,
     occupied: Vec<bool>,
     /// Last session generation per socket slot.
     generations: Vec<u64>,
@@ -1898,7 +1969,7 @@ impl<S: io::Read + io::Write> Open<S> {
     /// Claim a free slot and ask the world to connect it. The world answers
     /// with setup, or closes the session if it cannot admit the snake.
     fn join(&mut self, gate: &mut Gate, login: &[u8]) -> Result<(), String> {
-        let appearance = parse_login(login)?;
+        let appearance = parse_login_with_owner(login, gate.owner_key.as_ref())?;
         let slot = gate.free_slot().ok_or("Server is full")?;
         gate.occupied[slot] = true;
         gate.generations[slot] += 1;
@@ -2282,11 +2353,7 @@ impl Seat {
         let _ = commands.send(Command::Connect {
             slot: self.slot,
             generation: self.generation,
-            appearance: PlayerAppearance {
-                nickname: bot_nickname(self.bot),
-                skin: bot_skin(self.bot),
-                custom_skin: Vec::new(),
-            },
+            appearance: bot_appearance(self.bot),
             session_id: false,
             physical_food: true,
             protocol13: false,
@@ -2337,6 +2404,15 @@ fn bot_nickname(bot: usize) -> Vec<u8> {
     .into_bytes()
 }
 
+/// Every bot seat's profile, whichever behavior drives it.
+pub(super) fn bot_appearance(bot: usize) -> PlayerAppearance {
+    PlayerAppearance {
+        nickname: bot_nickname(bot),
+        skin: bot_skin(bot),
+        ..Default::default()
+    }
+}
+
 /// These legacy selectors describe the login layout, not the output version.
 fn legacy_login(bytes: &[u8]) -> bool {
     matches!(bytes.get(1), Some(11 | 12))
@@ -2344,7 +2420,15 @@ fn legacy_login(bytes: &[u8]) -> bool {
 
 /// Stock: skin/name length at 24/25; legacy: at 2/3. All end with the name,
 /// two reserved bytes and custom skin. Stock bytes are interpreted as before.
+#[cfg(test)]
 fn parse_login(bytes: &[u8]) -> Result<PlayerAppearance, String> {
+    parse_login_with_owner(bytes, None)
+}
+
+pub(super) fn parse_login_with_owner(
+    bytes: &[u8],
+    owner_key: Option<&OwnerKey>,
+) -> Result<PlayerAppearance, String> {
     let (skin, name) = if legacy_login(bytes) {
         (2, 3)
     } else if bytes.get(1) == Some(&31) {
@@ -2369,8 +2453,11 @@ fn parse_login(bytes: &[u8]) -> Result<PlayerAppearance, String> {
     if custom.len() > MAX_CUSTOM_SKIN {
         return Err("Custom skin longer than 255 bytes".into());
     }
+    let mut nickname = bytes[start..end].to_vec();
+    let owner = owner_key.is_some_and(|key| key.strip(&mut nickname));
     Ok(PlayerAppearance {
-        nickname: bytes[start..end].to_vec(),
+        nickname,
+        owner,
         skin: bytes[skin],
         custom_skin: custom.to_vec(),
     })
@@ -2974,10 +3061,10 @@ mod tests {
                 },
                 bots: BotConfig {
                     count: 1,
-                    latency: LatencyConfig {
+                    latency: Some(LatencyConfig {
                         processing_seconds: [0.03, 0.03],
                         ..LatencyConfig::fixed(rtts[1])
-                    },
+                    }),
                     ..Default::default()
                 },
                 simulation: SimulationConfig {
@@ -2987,7 +3074,10 @@ mod tests {
                 ..Default::default()
             };
             let host = Host::bind(config.clone()).unwrap();
-            assert_eq!(host.latency, config.bots.latency);
+            assert_eq!(
+                host.latency,
+                config.bots.latency.clone().unwrap_or_default()
+            );
             let mut world = host.world;
             for slot in 0..2 {
                 assert!(world.connect(slot, PlayerAppearance::default()).unwrap());
@@ -3236,6 +3326,7 @@ mod tests {
             deferred,
         };
         let gate = Gate {
+            owner_key: None,
             occupied: vec![true],
             generations: vec![1],
             challenge: Vec::new(),
@@ -4012,6 +4103,7 @@ mod tests {
             #[cfg(target_os = "linux")]
             readiness: readiness::Readiness::default(),
             gate: Gate {
+                owner_key: None,
                 occupied: vec![false],
                 generations: vec![0],
                 challenge: Vec::new(),
@@ -4650,5 +4742,178 @@ mod tests {
         assert!(queue(&mut simulation, 0, 3), "new socket owner");
         assert!(!queue(&mut simulation, 1, 1), "first bot life");
         assert!(!queue(&mut simulation, 1, 2), "later bot life");
+    }
+
+    #[test]
+    fn host_bots_owner_marker_is_exact_and_private_for_every_login_layout() {
+        let key = OwnerKey::from("bananatest".to_owned());
+        for selector in [11, 12, 30, 31] {
+            for (typed, visible, owner) in [
+                ("Name!bananatest", "Name", true),
+                ("Name !bananatest", "Name", true),
+                ("   !bananatest", "", true),
+                ("!bananatest", "", true),
+                ("Name!wrong", "Name!wrong", false),
+                ("Name!BananaTest", "Name!BananaTest", false),
+                ("Name!bananatest ", "Name!bananatest ", false),
+                ("A!B!bananatest", "A!B", true),
+                ("  Name  !bananatest", "  Name", true),
+                ("Name\t!bananatest", "Name\t", true),
+            ] {
+                let mut login = vec![b's', selector];
+                if selector == 30 {
+                    login.extend([0; 22]);
+                }
+                if selector == 31 {
+                    login.extend([1, 161]);
+                }
+                login.extend([7, typed.len() as u8]);
+                login.extend(typed.as_bytes());
+                login.extend([0, 255]);
+                let appearance = parse_login_with_owner(&login, Some(&key)).unwrap();
+                assert_eq!(appearance.nickname, visible.as_bytes());
+                assert_eq!(appearance.owner, owner);
+                if owner {
+                    assert!(!format!("{appearance:?}").contains("bananatest"));
+                }
+            }
+        }
+        let login = |name: &[u8]| {
+            let mut bytes = vec![b's', 11, 0, name.len() as u8];
+            bytes.extend(name);
+            bytes.extend([0, 255]);
+            bytes
+        };
+        let exactly = b"1234567890123!bananatest";
+        assert_eq!(exactly.len(), MAX_NICKNAME);
+        assert!(
+            parse_login_with_owner(&login(exactly), Some(&key))
+                .unwrap()
+                .owner
+        );
+        let error =
+            parse_login_with_owner(&login(b"12345678901234!bananatest"), Some(&key)).unwrap_err();
+        assert_eq!(error, "Nickname longer than 24 bytes");
+        assert!(!error.contains("bananatest"));
+        let log = shared(crate::physics::LOOP_SECONDS, 1);
+        log.reject_admission("login", &error);
+        assert!(!format!("{:?}", log.admission_rejections.lock().unwrap()).contains("bananatest"));
+        // Only the final marker goes; an earlier `!` stays in the name. The
+        // 24-byte limit counts the typed name, so one more letter is refused.
+        let example = parse_login_with_owner(&login(b"Dutch Stare !!bananatest"), Some(&key));
+        assert_eq!(example.unwrap().nickname, b"Dutch Stare !");
+        assert!(parse_login_with_owner(&login(b"Dutch Stares !!bananatest"), Some(&key)).is_err());
+        let latin = OwnerKey::from("caf\u{e9}123".to_owned());
+        assert_eq!(
+            parse_login_with_owner(&login(b"Name!caf\xe9123"), Some(&latin))
+                .unwrap()
+                .nickname,
+            b"Name"
+        );
+    }
+
+    #[test]
+    fn host_bots_config_validation_roundtrip_and_redaction() {
+        for behavior in ["center", "follow"] {
+            for field in [r#""threads":2"#, r#""latency":{}"#] {
+                let json = format!(
+                    r#"{{"ownerKey":"bananatest","bots":{{"behavior":"{behavior}",{field}}}}}"#
+                );
+                let config: HostConfig = serde_json::from_str(&json).unwrap();
+                let error = config.validate().unwrap_err();
+                assert!(error.contains("apply only to forager"));
+                assert!(!error.contains("bananatest"));
+            }
+        }
+        for field in ["threads", "latency"] {
+            let json = format!(r#"{{"bots":{{"{field}":null}}}}"#);
+            assert!(serde_json::from_str::<HostConfig>(&json).is_err());
+        }
+        let missing: HostConfig =
+            serde_json::from_str(r#"{"bots":{"behavior":"follow"}}"#).unwrap();
+        assert!(
+            missing
+                .validate()
+                .unwrap_err()
+                .contains("requires ownerKey")
+        );
+        for key in [
+            "",
+            " ",
+            "a b",
+            "line\nend",
+            "tab\tend",
+            "\u{7f}",
+            "\u{80}",
+            "\u{a0}",
+            "\u{ad}",
+            "\u{100}",
+            "123456789012345678901234",
+        ] {
+            let config = HostConfig {
+                owner_key: Some(OwnerKey::from(key.to_owned())),
+                ..Default::default()
+            };
+            let error = config.validate().unwrap_err();
+            assert!(error.starts_with("ownerKey must contain"));
+            assert!(!format!("{config:?}").contains(&format!("OwnerKey({key:?})")));
+        }
+        for behavior in [
+            BotBehavior::Forager,
+            BotBehavior::Center,
+            BotBehavior::Follow,
+        ] {
+            let config = HostConfig {
+                owner_key: Some(OwnerKey::from("bananatest".to_owned())),
+                bots: BotConfig {
+                    behavior,
+                    ..Default::default()
+                },
+                ..Default::default()
+            };
+            config.validate().unwrap();
+            assert!(!format!("{config:?}").contains("bananatest"));
+            assert!(!config.warnings().join(" ").contains("bananatest"));
+            let json = serde_json::to_string(&config).unwrap();
+            let copy: HostConfig = serde_json::from_str(&json).unwrap();
+            copy.validate().unwrap();
+            assert_eq!(serde_json::to_string(&copy).unwrap(), json);
+            assert!(!json.contains("threads") && !json.contains("bots.latency"));
+        }
+        let config = HostConfig {
+            owner_key: Some(OwnerKey::from("short".to_owned())),
+            ..Default::default()
+        };
+        assert!(
+            config
+                .warnings()
+                .iter()
+                .any(|warning| warning == "ownerKey shorter than 6 characters is easy to guess")
+        );
+        for key in ["12345678901234567890123", "!caf\u{e9}\u{ff}"] {
+            HostConfig {
+                owner_key: Some(OwnerKey::from(key.to_owned())),
+                ..Default::default()
+            }
+            .validate()
+            .unwrap();
+        }
+        // World-thread respawns would bypass circular admission's queue.
+        let mut dome: HostConfig = serde_json::from_str(
+            r#"{"ownerKey":"bananatest","bots":{"behavior":"follow"},
+                "simulation":{"world":{"preset":"battledome"}}}"#,
+        )
+        .unwrap();
+        assert!(dome.validate().unwrap_err().contains("circular spawning"));
+        dome.bots.behavior = BotBehavior::Forager;
+        dome.validate().unwrap();
+        let mut ordinary = HostConfig::default();
+        let baseline = ordinary.world_config().unwrap();
+        ordinary.bots.threads = Some(2);
+        ordinary.bots.latency = Some(LatencyConfig::default());
+        assert_eq!(
+            serde_json::to_value(ordinary.world_config().unwrap()).unwrap(),
+            serde_json::to_value(baseline).unwrap()
+        );
     }
 }

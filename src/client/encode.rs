@@ -939,6 +939,7 @@ mod tests {
         };
         let plain = appearance(5, &snake, 1., &PlayerAppearance::default()).unwrap();
         let profile = PlayerAppearance {
+            owner: false,
             nickname: b"Bot".to_vec(),
             skin: 9,
             custom_skin: vec![1, 2],
