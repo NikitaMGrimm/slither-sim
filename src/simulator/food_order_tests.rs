@@ -60,7 +60,7 @@ fn many_eaters_keep_dense_pickup_after_food_is_depleted() {
     for tick in 0..4 {
         world.step(&actions).unwrap();
         reference.step(&actions).unwrap();
-        assert!(world.eater_grid.occupied().next().is_some());
+        assert!(world.eater_grid.occupied_len() > 0);
         assert_eq!(world.pickup_events(), reference.pickup_events());
         assert_eq!(world.food_spawn_events(), reference.food_spawn_events());
         if tick == 0 {

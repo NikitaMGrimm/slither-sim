@@ -156,6 +156,9 @@ enum World {
     Sandbox,
     Official(usize),
     Battledome,
+    /// Official mechanics in a fixed arena of this radius, far denser than
+    /// population sizing allows.
+    Dense(usize, f64),
 }
 
 impl World {
@@ -166,6 +169,20 @@ impl World {
                 World::Sandbox => Config::sandbox(),
                 World::Official(snakes) => Config::official(snakes),
                 World::Battledome => Config::battledome(),
+                World::Dense(snakes, radius) => {
+                    // Food and prey keep the official per-area densities of
+                    // `Config::official`: 7 pellets and 0.1024 refill attempts
+                    // per 300-unit sector, one prey per ten million square units.
+                    let area = PI * radius * radius;
+                    let mut config = Config::official(snakes);
+                    config.radius = radius;
+                    config.dynamic_radius = false;
+                    config.size_to_population = false;
+                    config.food_count = (7.0 * area / 90_000.0) as usize;
+                    config.ambient_replenish_per_second = 0.1024 * area / 90_000.0;
+                    config.prey.count = (area / 10_000_000.0).round().max(1.0) as usize;
+                    config
+                }
             },
         )
     }
@@ -173,7 +190,7 @@ impl World {
     fn mode(self) -> &'static str {
         match self {
             World::Sandbox => "sandbox",
-            World::Official(_) => "official",
+            World::Official(_) | World::Dense(..) => "official",
             World::Battledome => "battledome",
         }
     }
@@ -182,6 +199,9 @@ impl World {
         match self {
             World::Sandbox | World::Official(_) => {
                 "wander controller; straight drawn-length spawns and respawns"
+            }
+            World::Dense(..) => {
+                "wander controller; straight drawn-length spawns and respawns; fixed radius far below population sizing"
             }
             World::Battledome => {
                 "wander controller; floor-size Simulator::spawn_body ring lives; harness contact clearance, not host admission; blocked initial lives and deaths queue for retries"
@@ -194,6 +214,9 @@ impl World {
             World::Sandbox => json!({"kind": "sandbox"}),
             World::Official(snakes) => json!({"kind": "official", "snakes": snakes}),
             World::Battledome => json!({"kind": "battledome"}),
+            World::Dense(snakes, radius) => {
+                json!({"kind": "dense", "snakes": snakes, "radius": radius})
+            }
         }
     }
 }
@@ -332,6 +355,19 @@ static REGISTRATIONS: &[Registration] = &[
         epoch: EPOCH_OPERATIONS,
         step: op(7000, 16, Full),
         bot: Some(op(800, 3, Full)),
+    }),
+    // Thousands of snakes for the parallel step; see docs/performance.md.
+    Registration::Scenario(Scenario {
+        id: "dense-8192",
+        world: World::Dense(8192, 24_000.0),
+        population: 8192,
+        segments: (8, 24),
+        clearance: 0.0,
+        controller: Controller::Wander,
+        warmup_ticks: 600,
+        epoch: EPOCH_OPERATIONS,
+        step: op(200, 1, Full),
+        bot: None,
     }),
     Registration::Client(ClientScenario {
         id: "client-battledome-64",

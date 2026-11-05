@@ -33,6 +33,14 @@ pub(crate) fn map_ranges<T: Send, R: Send>(
         .collect()
 }
 
+/// Split `0..len` into at most `parts` consecutive ranges of nearly equal length.
+pub(crate) fn even(len: usize, parts: usize) -> Vec<Range<usize>> {
+    let parts = parts.clamp(1, len.max(1));
+    (0..parts)
+        .map(|part| len * part / parts..len * (part + 1) / parts)
+        .collect()
+}
+
 /// Split `0..flags.len()` into at most `parts` consecutive ranges holding
 /// roughly equal numbers of set flags.
 pub(crate) fn balanced(flags: &[bool], parts: usize) -> Vec<Range<usize>> {
@@ -74,6 +82,20 @@ mod tests {
                         "{len} {parts} {ranges:?}"
                     );
                 }
+            }
+        }
+    }
+
+    #[test]
+    fn even_ranges_cover_every_item_in_order() {
+        for len in 0..40 {
+            for parts in 1..9 {
+                let ranges = even(len, parts);
+                assert_eq!(ranges[0].start, 0);
+                assert_eq!(ranges.last().unwrap().end, len);
+                assert!(ranges.windows(2).all(|w| w[0].end == w[1].start));
+                assert!(ranges.len() <= parts.max(1));
+                assert!(ranges.iter().all(|r| r.len() <= len.div_ceil(ranges.len())));
             }
         }
     }

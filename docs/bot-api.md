@@ -297,9 +297,12 @@ no WebSocket/TLS dependencies, `client` module or CLI binary. Core simulation,
 observations, JSON transport and the `basic`/`fidelity_replay` examples remain
 available. `networking` is enabled by default and restores the full interface.
 
-`Simulator::set_parallel(true)` splits large `observe_all` and `observe_selected`
-batches over the current [rayon](https://docs.rs/rayon) pool without changing
-results. It defaults off to avoid competing with parallel worlds. Size the pool
+`Simulator::set_parallel(true)` lets one world use the current
+[rayon](https://docs.rs/rayon) pool without changing results. Large
+`observe_all` and `observe_selected` batches split by observer, and steps with
+at least 1,024 living snakes split by snake
+([parallel step](performance.md#parallel-step)). It defaults off to avoid
+competing with parallel worlds. Size the pool
 with `RAYON_NUM_THREADS` or use `ThreadPool::install`. `transport::serve` steps
 worlds on the same pool. Both need the default-enabled `parallel` feature.
 

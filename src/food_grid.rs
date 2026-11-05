@@ -570,9 +570,16 @@ impl std::fmt::Debug for EaterGrid {
     }
 }
 impl EaterGrid {
-    /// Each occupied cell once, with its original ascending eater list.
-    pub(crate) fn occupied(&self) -> impl Iterator<Item = (u32, Candidates<'_>)> {
-        self.touched.iter().map(|&cell| {
+    /// Number of occupied cells, the range `occupied` accepts.
+    pub(crate) fn occupied_len(&self) -> usize {
+        self.touched.len()
+    }
+    /// Occupied cells `cells`, each once, with its original ascending eater list.
+    pub(crate) fn occupied(
+        &self,
+        cells: std::ops::Range<usize>,
+    ) -> impl Iterator<Item = (u32, Candidates<'_>)> {
+        self.touched[cells].iter().map(|&cell| {
             let x = self.lo.0 + (cell as usize % self.width) as i64;
             let y = self.lo.1 + (cell as usize / self.width) as i64;
             (
@@ -1221,7 +1228,7 @@ mod tests {
                 .collect();
             assert!(grid.build(circles.iter().copied(), MAX_CELLS));
             let occupied: HashMap<_, Vec<_>> = grid
-                .occupied()
+                .occupied(0..grid.occupied_len())
                 .map(|(cell, candidates)| (cell, candidates.collect()))
                 .collect();
             assert_eq!(occupied.len(), grid.touched.len());
@@ -1293,7 +1300,7 @@ mod tests {
             };
             assert!(grid.build([(center, radius)].into_iter(), MAX_CELLS));
             let occupied: HashMap<_, Vec<_>> = grid
-                .occupied()
+                .occupied(0..grid.occupied_len())
                 .map(|(cell, c)| (cell, c.collect()))
                 .collect();
             let coordinates = [
