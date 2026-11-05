@@ -258,28 +258,40 @@ measure your own workload before relying on them.
 
 ### World threads
 
-A large world can step on several cores. Set `worldThreads` to the number of
-cores the world may use:
+A world with thousands of snakes can step on several cores. Set
+`worldThreads` to the number of cores the world may use:
 
 ```json
 {
-  "bots": { "count": 16000, "threads": 4 },
+  "bots": { "count": 8000, "threads": 4 },
+  "simulation": {
+    "world": {
+      "preset": "official",
+      "radius": 32000,
+      "foodCount": 250210,
+      "ambientReplenishPerSecond": 3660,
+      "prey": { "count": 322 }
+    }
+  },
   "worldThreads": 4
 }
 ```
 
 The world then gets its own pool of that many threads, apart from the socket
-thread and `bots.threads`; give each its own core. Once at least 1,024 snakes
+thread and `bots.threads`; give each its own core. Once at least 4,096 snakes
 are alive, each tick splits snake movement, collision checks and food pickup
 across the pool. Everything that draws random numbers or decides who killed
 whom still runs in order on one thread, so the game is identical for every
 thread count.
 
-Smaller worlds don't split. On our bench machine a 500-player official world
-step took about 0.3 ms of its 7 ms tick; most of such a server's time goes into
-per-player updates, which `worldThreads` doesn't spread yet. Measure your own
-world with the [parallel step benchmark](performance.md#parallel-step) before
-relying on it.
+Protocol 19 caps the arena radius at 32,000, which official sizing reaches at
+2,281 seats, so only a fixed, denser arena like the one above has enough snakes
+to split. The example keeps official food and prey per area; a fixed radius
+does not rescale them. Smaller worlds don't split: a 500-player official step
+takes about 0.2–0.3 ms of its 7 ms tick. Most of a large server's time goes
+into per-player updates, which `worldThreads` doesn't spread yet. With 4,500
+bots, eight world threads cut simulation time per tick by about 10%
+([measurements](performance.md#measured-scaling)).
 
 ### Build and allocator
 

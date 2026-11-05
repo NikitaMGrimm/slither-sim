@@ -137,7 +137,7 @@ batch's immutable world borrow.
 
 `Simulator::set_parallel(true)` and the host's
 [`worldThreads`](hosting.md#world-threads) also split a step over the current
-rayon pool once at least 1,024 snakes are alive: one task per 512 living
+rayon pool once at least 4,096 snakes are alive: one task per 512 living
 snakes, at most four per thread. Three phases split:
 
 - **Movement.** A serial pass first applies boost and drops boost food in slot
@@ -152,26 +152,55 @@ snakes, at most four per thread. Three phases split:
   back into the serial order before anything is eaten.
 
 Index building, deaths and death food, nutrition, prey, ambient refill and
-arena radius stay serial. With the flag off, or below 1,024 living snakes,
-every phase runs the serial code. A 500-snake `official-500-step` world took
-0.26 ms per step on a 4-vCPU Zen 5 EPYC KVM guest, 70–95 µs per phase, too
-little to repay waking pool threads. Phase profiles still time each phase;
-with a split collision search, `bodyPairs` and `segmentTests` also count
-searches against bodies that fell earlier in the walk.
+arena radius stay serial. With the flag off, or below 4,096 living snakes,
+every phase runs the serial code. Phase profiles still time each phase; with a
+split collision search, `bodyPairs` and `segmentTests` also count searches
+against bodies that fell earlier in the walk.
 
 `src/simulator/parallel_step_tests.rs` steps official, dense, Battledome and
 constructed collision-order worlds on pools of 1, 2, 3, 4 and 7 threads and
 requires every tick's checkpoint, deaths and events to match the serial world.
 
-To measure scaling, run the [dense row](performance-workloads.md#families) on an
-otherwise idle machine with at least eight cores, alternating pool sizes:
+### Measured scaling
+
+On an AWS c8a.4xlarge (16 Zen 5 cores, no SMT, two 32 MiB L3 halves) on
+2026-11-05, median of 5 alternating runs (3 for the 4,096-snake world):
+
+| World | Serial | 2 threads | 4 | 8 | 16 |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| `dense-8192-step` mean | 3.76 ms | 3.60 ms | 2.78 ms | 2.39 ms | 2.23 ms |
+| `dense-8192-step` p99 | 4.84 ms | 4.70 ms | 3.88 ms | 3.47 ms | 3.33 ms |
+| 4,096 snakes, official density, mean | 2.17 ms | 2.05 ms | 1.75 ms | 1.54 ms | 1.55 ms |
+| `official-500-step` mean | 185 µs | 185 µs | 185 µs | 185 µs | — |
+
+A pool of 8 makes the densest world 1.6 times faster, and 16 threads add
+little. Each split phase keeps serial work: the collision grid build, the boost
+pass and the resolution walk. Splitting also pays a second pass over snake
+memory and pool dispatch. Below the threshold nothing splits:
+`official-100-step` (32 µs) and `battledome-32-step` (7.5 µs) stayed within
+0.2% with 8 and 16 threads. An earlier 1,024-snake threshold made 1,024-snake
+official worlds about 10% slower than serial on every pool size, and 2,048
+snakes gained nothing on two threads; that set the 4,096 minimum. Traces of
+`official-500`, the 1,024–4,096-snake worlds and `dense-8192` were
+byte-identical on 1, 2, 4, 8 and 16 threads, apart from the report's
+`parallel` flag.
+
+A host gains less. Official sizing stops at 2,281 seats, below the minimum, so
+only a fixed-radius arena splits. `host_load --bots 4500 --radius 32000` spent
+16.8–18.2 ms of simulation time per tick with one world thread and 15.8 ms with
+eight. The world was about twice as dense as official sizing. Per-player
+work dominated, and both fell far behind the 8 ms tick. At 500 bots, four
+world threads changed nothing (0.84 ms per tick, no deferred ticks).
+
+To repeat the measurement, run the [dense row](performance-workloads.md#families)
+on an otherwise idle machine with at least eight cores, alternating pool sizes:
 
 ```sh
 cargo build --release --locked --example perf_baseline
 B=target/release/examples/perf_baseline
 for repeat in 1 2 3 4 5; do
   $B dense-8192-step 200 > dense-serial-$repeat.json
-  for n in 1 2 4 8; do
+  for n in 1 2 4 8 16; do
     RAYON_NUM_THREADS=$n $B dense-8192-step 200 --parallel > dense-$n-$repeat.json
   done
 done
@@ -180,7 +209,7 @@ done
 The last line of each file is the report: the mean step is
 `timing.wallSeconds / timing.operations`, and `timing.latencySeconds` holds p50,
 p95 and p99. Run `official-500-step` the same way to check that small worlds
-are not slowed down.
+are not slowed down. For a host, compare `host_load --world-threads N`.
 
 ## Controller transport
 

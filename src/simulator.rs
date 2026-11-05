@@ -888,7 +888,7 @@ impl Simulator {
     }
     /// Let this world use the current rayon pool, with results identical to the
     /// serial world for any pool size. Large `observe_all` and `observe_selected`
-    /// batches split by observer. Steps with at least 1,024 living snakes split
+    /// batches split by observer. Steps with at least 4,096 living snakes split
     /// snake motion, collision search and pickup lookup by snake; boost drops,
     /// collision resolution, death and ambient food and prey stay serial. The
     /// global pool uses `RAYON_NUM_THREADS` or the core count;
@@ -2900,7 +2900,7 @@ const SNAKES_PER_TASK: usize = 512;
 /// plus pool dispatch. On an AWS c8a.4xlarge (2026-11-05, official density)
 /// splitting 1,024 snakes was about 10% slower than serial on 2-16 threads,
 /// 2,048 broke even on 2 threads, and 4,096 was faster on every pool size
-/// (1.05x on 2 threads, 1.5x on 8); see docs/performance.md#parallel-step.
+/// (1.06x on 2 threads, 1.4x on 8); see docs/performance.md#measured-scaling.
 #[cfg(feature = "parallel")]
 const MIN_STEP_TASKS: usize = 8;
 

@@ -7,11 +7,13 @@
 - One large world can step on several cores, with results identical to a
   single thread for any thread count. `Simulator::set_parallel(true)` now also
   splits snake movement, collision checks and food pickup lookup once at least
-  1,024 snakes are alive, and a new host setting, `worldThreads`, gives the
-  world its own pool of that many threads. Smaller worlds, including a
+  4,096 snakes are alive, and a new host setting, `worldThreads`, gives the
+  world its own pool of that many threads. On a 16-core machine, 8 threads
+  stepped an 8,192-snake world 1.6 times faster. Smaller worlds, including a
   500-player official server, step on one thread as before
   ([guide](https://github.com/NikitaMGrimm/slither-sim/blob/main/docs/performance.md#parallel-step)).
-  A new `dense-8192-step` benchmark row measures it.
+  A new `dense-8192-step` benchmark row measures it, and `host_load` takes
+  `--world-threads` and a fixed `--radius`.
 
 ## [0.10.0](https://github.com/NikitaMGrimm/slither-sim/compare/v0.9.0...v0.10.0) - 2026-11-03
 

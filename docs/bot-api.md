@@ -300,7 +300,7 @@ available. `networking` is enabled by default and restores the full interface.
 `Simulator::set_parallel(true)` lets one world use the current
 [rayon](https://docs.rs/rayon) pool without changing results. Large
 `observe_all` and `observe_selected` batches split by observer, and steps with
-at least 1,024 living snakes split by snake
+at least 4,096 living snakes split by snake
 ([parallel step](performance.md#parallel-step)). It defaults off to avoid
 competing with parallel worlds. Size the pool
 with `RAYON_NUM_THREADS` or use `ThreadPool::install`. `transport::serve` steps

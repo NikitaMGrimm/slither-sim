@@ -303,7 +303,7 @@ poses and lengths; client slots reconnect before the next decision.
 
 `--parallel` calls `Simulator::set_parallel(true)` on the timed world, so
 `observe` and `-bot` rows observe on the rayon pool, and steps with at least
-1,024 living snakes split across it. It needs the default
+4,096 living snakes split across it. It needs the default
 `parallel` feature and adds `"parallel": true` to the report; every other trace
 line must match the run without it. Runners and PR comparisons don't pass it.
 
