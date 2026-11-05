@@ -269,3 +269,11 @@ cargo test --locked -p slither-wgpu-slice --test food_ingress singleton_motion_a
 This bounds copying regressions without a wall-time test gate. The
 [2026-11-01 motion study](../../research/client-performance/2026-11-01-motion-transactions/REPORT.md)
 records the separate restricted-input replay comparison and its remaining limits.
+
+## Texture-layer uploads
+
+`Renderer::sync_resources` stages all of a sync's new or moved texture layers
+in one mapped buffer and submits one copy encoder, rather than one wgpu
+staging buffer per layer and mip. Wasm and single-layer syncs keep
+`Queue::write_texture`. The [batched-upload study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/client-performance/2026-11-05-batched-uploads/REPORT.md)
+records the AMD/DX12 join timings and exact readback/image controls.
