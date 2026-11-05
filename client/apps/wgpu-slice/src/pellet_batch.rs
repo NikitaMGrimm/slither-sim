@@ -257,6 +257,7 @@ impl Cache {
             physical_pixels_per_unit: 1.,
             early_at: 0,
             late_at: 0,
+            canonical_submission: false,
         }))
     }
 }
@@ -331,6 +332,8 @@ pub struct Batch {
     pub(crate) physical_pixels_per_unit: f64,
     pub(crate) early_at: usize,
     pub(crate) late_at: usize,
+    // A nonblack menu prefix needs the canonical outlines and primitive order.
+    pub(crate) canonical_submission: bool,
 }
 impl PartialEq for Batch {
     fn eq(&self, other: &Self) -> bool {
@@ -341,6 +344,7 @@ impl PartialEq for Batch {
             && self.physical_pixels_per_unit == other.physical_pixels_per_unit
             && self.early_at == other.early_at
             && self.late_at == other.late_at
+            && self.canonical_submission == other.canonical_submission
     }
 }
 impl Batch {
@@ -348,7 +352,124 @@ impl Batch {
         // Compact native budgeting counts the three paired GPU quads, not
         // their seven-command canonical expansion. Generic composition still
         // preflights all seven before allocating and can reject the picture.
-        self.visible_count * if self.user_zoom < 1. { 3 } else { 7 }
+        self.visible_count
+            * if self.user_zoom < 1. && !self.canonical_submission {
+                3
+            } else {
+                7
+            }
+    }
+    pub(crate) fn admit_canonical(&mut self, surrounding: usize) -> Result<()> {
+        let count = self.visible_count * 7;
+        if count > MAX_FOOD_PAINT_COMMANDS.min(crate::frame::MAX_DRAWS.saturating_sub(surrounding))
+        {
+            return Err(crate::frame::DRAW_MEMORY_LIMIT.into());
+        }
+        self.canonical_submission = true;
+        Ok(())
+    }
+
+    /// Stream the canonical primitives, including outlines, without allocating
+    /// seven commands and draws per food. Keep the generic renderer's chunking,
+    /// sorting, layer admission and blend operations unchanged.
+    pub(crate) fn quads<'a>(
+        &'a self,
+        frame: &'a Frame,
+        resident: &'a BTreeMap<ResourceKey, BodyAsset>,
+    ) -> Result<impl Iterator<Item = Result<crate::frame::Quad>> + 'a> {
+        self.validate(resident)?;
+        let mut visible = Vec::new();
+        visible
+            .try_reserve_exact(self.visible_count)
+            .map_err(|_| crate::frame::DRAW_ALLOCATION_FAILED)?;
+        visible.extend(
+            self.world
+                .foods()
+                .iter()
+                .enumerate()
+                .rev()
+                .filter(|(i, _)| self.visible[self.sources.slots[*i]])
+                .map(|(i, _)| i),
+        );
+        let n = visible.len();
+        let early_end = self.early_at + 3 * n;
+        let late_start = self.late_at + 3 * n;
+        let late_end = late_start + 4 * n;
+        let mut pending = None;
+        Ok((0..frame.draw_count()).map(move |index| {
+            if let Some(quad) = pending.take() {
+                return Ok(quad);
+            }
+            let (food, part) = if (self.early_at..early_end).contains(&index) {
+                let i = index - self.early_at;
+                if i < n { (i, 0) } else { ((i - n) / 2, 1) }
+            } else if (late_start..late_end).contains(&index) {
+                let i = index - late_start;
+                (i / 4, 2 + (i % 4) / 2)
+            } else {
+                let removed = if index >= late_end {
+                    7 * n
+                } else if index >= early_end {
+                    3 * n
+                } else {
+                    0
+                };
+                return frame.project_checked(&frame.draws[index - removed], resident);
+            };
+            let f: FoodPaintSnapshot = self.world.foods()[visible[food]].snapshot().into();
+            let (quad, second) = self.project_pair(frame, f, part)?;
+            if let Some(alpha) = second {
+                let mut next = quad.clone();
+                for vertex in &mut next.vertices {
+                    vertex[4] = alpha;
+                }
+                pending = Some(next);
+            }
+            Ok(quad)
+        }))
+    }
+    pub(crate) fn project_pair(
+        &self,
+        frame: &Frame,
+        f: FoodPaintSnapshot,
+        part: usize,
+    ) -> Result<(crate::frame::Quad, Option<f32>)> {
+        if part == 0 {
+            let (mut quad, _) = project_food(
+                frame,
+                f,
+                f.sources.outline,
+                food_body_center(f, self.view),
+                0.8 * f.animation.fade,
+                self.user_zoom,
+                self.physical_pixels_per_unit,
+            )?;
+            quad.blend = BodyBlend::SourceOver;
+            Ok((quad, None))
+        } else if part == 1 {
+            let pulse = food_pulse(f);
+            let (quad, gain) = project_food(
+                frame,
+                f,
+                f.sources.body,
+                food_body_center(f, self.view),
+                f.animation.fade,
+                self.user_zoom,
+                self.physical_pixels_per_unit,
+            )?;
+            Ok((quad, Some((food_body_alpha(f, 1., pulse)[1] * gain) as f32)))
+        } else {
+            let (quad, second) = glow_pair(
+                frame,
+                f,
+                self.view,
+                part == 3,
+                food_pulse(f),
+                self.user_zoom,
+                self.physical_pixels_per_unit,
+            )?;
+            Ok((quad, Some(second)))
+        }
     }
     pub(crate) fn resource_assets(&self) -> impl Iterator<Item = BodyAsset> + '_ {
         self.sources
@@ -607,6 +728,79 @@ pub(crate) fn exact_instance(
 pub(crate) mod tests {
     use super::*;
     use crate::bank::Bank;
+
+    #[test]
+    fn menu_stream_matches_canonical_primitives_and_preserves_retry_picture() {
+        use crate::{menu::MenuFrame, render::PreparedFrame};
+        let mut bank = Bank::new().unwrap();
+        let mut world = rectangle_count(&bank, 2048);
+        for delta in [0., 0.1, 1., 5., 5.] {
+            world.advance(step(delta), |_| unreachable!()).unwrap();
+            for zoom in [1., 0.065, 0.0005] {
+                for scale in [0.64, 1., 2.56] {
+                    let mut b = batch(&mut Cache::default(), &mut bank, &world, view());
+                    b.user_zoom = zoom;
+                    b.physical_pixels_per_unit = scale;
+                    let frame = Frame {
+                        identity: 1,
+                        extent: [3840, 2160],
+                        viewport_scale: scale,
+                        tick: 0,
+                        draws: Vec::new(),
+                        food_batch: Some(b),
+                        snakes: Vec::new(),
+                    };
+                    let picture = PreparedFrame {
+                        background_draws: 0,
+                        world_draws: 0,
+                        #[cfg(feature = "frame-bench")]
+                        food_submission: None,
+                        resources: bank.resources(&frame).unwrap(),
+                        frame,
+                        overlay: None,
+                    };
+                    let original = picture.frame.clone();
+                    let composed = MenuFrame::world_crossfade([3840, 2160], scale, 0.37)
+                        .unwrap()
+                        .compose_over(&picture)
+                        .unwrap();
+                    assert_eq!(picture.frame, original);
+                    assert_eq!(composed.frame.draws.len(), 2);
+                    assert!(
+                        composed
+                            .frame
+                            .food_batch
+                            .as_ref()
+                            .unwrap()
+                            .canonical_submission
+                    );
+                    let resident = composed
+                        .resources
+                        .iter()
+                        .map(|r| (r.asset.into(), r.asset))
+                        .collect();
+                    let expected = composed
+                        .frame
+                        .canonical()
+                        .unwrap()
+                        .quads(&resident)
+                        .unwrap();
+                    let actual = composed.frame.quads(&resident).unwrap();
+                    assert_eq!(actual.len(), expected.len());
+                    for (a, e) in actual.iter().zip(&expected) {
+                        assert_eq!(
+                            (a.key, a.repeat, a.black_effect, a.blend),
+                            (e.key, e.repeat, e.black_effect, e.blend)
+                        );
+                        assert_eq!(
+                            a.vertices.map(|v| v.map(f32::to_bits)),
+                            e.vertices.map(|v| v.map(f32::to_bits))
+                        );
+                    }
+                }
+            }
+        }
+    }
 
     #[test]
     fn rectangle_endpoints_match_general_projection_bits_and_errors() {
@@ -1403,7 +1597,7 @@ pub(crate) mod tests {
     }
 
     #[test]
-    fn menu_backdrop_expands_batches_in_order_and_failed_admission_publishes_nothing() {
+    fn menu_backdrop_streams_batches_in_order_and_failed_admission_publishes_nothing() {
         use crate::{menu::MenuFrame, render::PreparedFrame};
         let mut bank = Bank::new().unwrap();
         let world = rectangle(&bank);
@@ -1451,11 +1645,18 @@ pub(crate) mod tests {
                 )
                 .unwrap()
             );
-            assert_eq!(actual.frame, expected.frame);
+            assert_eq!(actual.frame.canonical().unwrap(), expected.frame);
             assert_eq!(actual.overlay, expected.overlay);
             assert_eq!(actual.frame, composed.frame);
             assert_eq!(actual.overlay, composed.overlay);
-            assert!(actual.frame.food_batch.is_none());
+            assert!(
+                actual
+                    .frame
+                    .food_batch
+                    .as_ref()
+                    .unwrap()
+                    .canonical_submission
+            );
         }
 
         let mut cover_only = original.clone();

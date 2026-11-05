@@ -135,11 +135,9 @@ impl MenuFrame {
         let ui_extra = usize::from(self.world_cover.is_some());
         frame::check_draw_count(picture.draw_count() + world_extra + ui_extra)?;
         let copy = |frame: &frame::Frame, extra: usize| -> Result<frame::Frame> {
-            let mut canonical;
-            if frame.food_batch.is_some() {
-                canonical = frame.canonical()?;
-                frame::reserve_draws(&mut canonical.draws, extra)?;
-                return Ok(canonical);
+            let mut food_batch = frame.food_batch.clone();
+            if let Some(batch) = &mut food_batch {
+                batch.admit_canonical(frame.draws.len() + extra)?;
             }
             let mut draws = Vec::new();
             draws
@@ -152,7 +150,7 @@ impl MenuFrame {
                 viewport_scale: frame.viewport_scale,
                 tick: frame.tick,
                 draws,
-                food_batch: None,
+                food_batch,
                 snakes: frame.snakes.clone(),
             })
         };
@@ -208,14 +206,23 @@ impl MenuFrame {
             return Err(MENU_PICTURE_QUOTA.into());
         }
         frame::check_draw_count(picture.draw_count() + count)?;
-        // A page prefix invalidates the retained path's black-outline omission.
-        // Stage expansion and all admission before changing the issued picture.
-        let mut canonical = if self.backdrop.is_some() && picture.frame.food_batch.is_some() {
-            Some(picture.frame.canonical()?)
-        } else {
-            None
-        };
-        let world = canonical.as_mut().unwrap_or(&mut picture.frame);
+        picture.frame.check_limits()?;
+        // A page prefix needs the canonical outlines and order. Retain the
+        // inputs and stream those same primitives at submission instead of
+        // expanding commands here. Admission still charges all seven calls.
+        let mut food_batch = picture.frame.food_batch.clone();
+        if self.backdrop.is_some()
+            && let Some(batch) = &mut food_batch
+        {
+            let world_extra = usize::from(self.backdrop.is_some())
+                + if picture.overlay.is_none() {
+                    usize::from(self.world_cover.is_some())
+                } else {
+                    0
+                };
+            batch.admit_canonical(picture.frame.draws.len() + world_extra)?;
+        }
+        let world = &mut picture.frame;
         if let Some(overlay) = &mut picture.overlay {
             frame::reserve_draws(&mut overlay.draws, usize::from(self.world_cover.is_some()))?;
             frame::reserve_draws(&mut world.draws, usize::from(self.backdrop.is_some()))?;
@@ -227,9 +234,7 @@ impl MenuFrame {
             .try_reserve_exact(resources.len())
             .map_err(|_| frame::DRAW_ALLOCATION_FAILED)?;
         admitted_resources.extend(resources.into_values());
-        if let Some(canonical) = canonical {
-            picture.frame = canonical;
-        }
+        picture.frame.food_batch = food_batch;
         if let Some(mut backdrop) = self.backdrop {
             // The page fills the world backing, whose scale can differ from the UI's.
             backdrop.destination = BodyRect {
@@ -239,6 +244,10 @@ impl MenuFrame {
                 height: f64::from(picture.frame.extent[1]) / picture.frame.viewport_scale,
             };
             picture.frame.draws.insert(0, backdrop);
+            if let Some(batch) = &mut picture.frame.food_batch {
+                batch.early_at += 1;
+                batch.late_at += 1;
+            }
             picture.world_draws += 1;
             picture.background_draws += 1;
         }

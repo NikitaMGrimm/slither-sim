@@ -35,6 +35,10 @@ impl RgbaImage {
 /// Coverage is analytic in x and sampled on four subpixel scanlines in y.
 /// The 128 CSS-pixel canvas clips the paths before the host applies scale/opacity.
 pub fn menu_spinner(time: f64, scale: f64) -> Result<RgbaImage> {
+    spinner(time, scale, true)
+}
+
+fn spinner(time: f64, scale: f64, indexed: bool) -> Result<RgbaImage> {
     use std::f64::consts::PI;
     if !time.is_finite() || time < 0. || !scale.is_finite() || scale <= 0. || scale > 16. {
         return Err("Spinner raster bounds".into());
@@ -65,25 +69,43 @@ pub fn menu_spinner(time: f64, scale: f64) -> Result<RgbaImage> {
         let mut path: Vec<_> = (0..=256).map(|i| edge(i, 1.)).collect();
         path.push(point(32., offset + time / 44. + 0.95 * PI));
         path.extend((0..=256).rev().map(|i| edge(i, -1.)));
-        fill_nonzero(&mut image, &path, color);
+        fill_nonzero(&mut image, &path, color, indexed);
     }
     Ok(image)
 }
 
-fn fill_nonzero(image: &mut RgbaImage, path: &[[f64; 2]], color: [u8; 3]) {
+fn fill_nonzero(image: &mut RgbaImage, path: &[[f64; 2]], color: [u8; 3], indexed: bool) {
     let width = image.width as usize;
+    let edges: Vec<_> = path
+        .iter()
+        .zip(path.iter().cycle().skip(1))
+        .take(path.len())
+        .collect();
+    let mut rows = vec![Vec::new(); image.height as usize];
+    let all: Vec<_> = if indexed {
+        Vec::new()
+    } else {
+        (0..edges.len()).collect()
+    };
+    // A row only needs edges that can cross one of its four scanlines. Keep
+    // path order and the original crossing test/arithmetic, including ties.
+    for (i, (a, b)) in edges.iter().enumerate().filter(|_| indexed) {
+        let start = a[1].min(b[1]).floor().max(0.) as usize;
+        let end = a[1].max(b[1]).ceil().max(0.).min(f64::from(image.height)) as usize;
+        for row in rows.iter_mut().take(end).skip(start) {
+            row.push(i);
+        }
+    }
     let mut coverage = vec![0.; width];
     let mut crossings = Vec::with_capacity(path.len());
-    for y in 0..image.height as usize {
+    for (y, row) in rows.iter().enumerate() {
         coverage.fill(0.);
         for sub in 0..4 {
             let scan = y as f64 + (f64::from(sub) + 0.5) / 4.;
             crossings.clear();
-            for (a, b) in path
-                .iter()
-                .zip(path.iter().cycle().skip(1))
-                .take(path.len())
-            {
+            let indices = if indexed { row } else { &all };
+            for &i in indices {
+                let (a, b) = edges[i];
                 if (a[1] <= scan && b[1] > scan) || (b[1] <= scan && a[1] > scan) {
                     crossings.push((
                         a[0] + (scan - a[1]) * (b[0] - a[0]) / (b[1] - a[1]),
@@ -471,9 +493,21 @@ mod spinner_tests {
             height: 8,
             pixels: vec![0; 8 * 8 * 4],
         };
-        fill_nonzero(&mut image, &path, [96, 255, 112]);
+        fill_nonzero(&mut image, &path, [96, 255, 112], true);
         assert_eq!(&image.pixels[(3 * 8 + 3) * 4..][..4], &[96, 255, 112, 255]);
         assert_eq!(&image.pixels[(3 * 8 + 1) * 4..][..4], &[48, 128, 56, 128]);
+    }
+
+    #[test]
+    fn spinner_scanline_index_matches_the_full_edge_walk() {
+        for time in [0., 0.1, 17., 55., 1234.5] {
+            for scale in [0.75, 1., 2.5, 5.] {
+                assert_eq!(
+                    spinner(time, scale, true).unwrap().pixels,
+                    spinner(time, scale, false).unwrap().pixels
+                );
+            }
+        }
     }
 }
 
