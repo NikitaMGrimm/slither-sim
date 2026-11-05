@@ -477,7 +477,8 @@ pub fn benchmark(
             world,
             ..Default::default()
         },
-        ..Default::default()
+        #[cfg(slither_host_world_threads)]
+        world_threads: 1,
     })?
     .start()?;
     let executable = std::env::current_exe().map_err(|e| e.to_string())?;
