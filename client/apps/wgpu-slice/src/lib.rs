@@ -7,6 +7,7 @@ pub mod announcement;
 pub mod bank;
 #[cfg(not(any(target_arch = "wasm32", target_os = "linux")))]
 pub mod champion_egui;
+mod cold_parallel;
 pub mod cosmetics;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod endpoint_login;

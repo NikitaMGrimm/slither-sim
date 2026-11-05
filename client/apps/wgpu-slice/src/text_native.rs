@@ -3,7 +3,10 @@ use super::{Family, Raster, Slant, TextStyle, Weight, display_character};
 use crate::{Result, materials::RgbaImage};
 use fontdue::{Font, FontSettings};
 use slither_client::presentation::TextMeasurement;
-use std::collections::BTreeMap;
+use std::{
+    collections::BTreeMap,
+    sync::{Arc, Mutex},
+};
 
 fn coverage_gamma(color: [u8; 3]) -> f64 {
     let [r, g, b] = color.map(f64::from);
@@ -17,9 +20,93 @@ fn adjusted_coverage(coverage: u8, gamma: f64) -> u8 {
     (255. * (f64::from(coverage) / 255.).powf(gamma)).round() as u8
 }
 
-#[derive(Default)]
 pub struct Rasterizer {
-    faces: BTreeMap<(Family, Weight, Slant), Arial>,
+    faces: BTreeMap<(Family, Weight, Slant), Arc<Arial>>,
+}
+impl Default for Rasterizer {
+    fn default() -> Self {
+        prefetch_hud_faces();
+        Self {
+            faces: BTreeMap::new(),
+        }
+    }
+}
+
+type FaceKey = (Family, Weight, Slant);
+// Decoding one installed face costs about 15 ms and the first gameplay picture
+// needs two, so decoded faces are shared process-wide and the HUD's Arial
+// regular/bold are decoded on a helper thread when the first rasterizer is
+// created. Each file is still decoded at most once, with the same settings.
+// See https://github.com/NikitaMGrimm/slither-sim/blob/main/research/client-performance/2026-11-05-cold-resources/REPORT.md.
+type FaceSlot = Arc<Mutex<Option<Arc<Arial>>>>;
+static SHARED_FACES: Mutex<BTreeMap<&'static str, FaceSlot>> = Mutex::new(BTreeMap::new());
+
+fn shared_face(style: TextStyle) -> Result<Arc<Arial>> {
+    let file = face_name(style);
+    let slot = SHARED_FACES
+        .lock()
+        .unwrap_or_else(|e| e.into_inner())
+        .entry(file)
+        .or_default()
+        .clone();
+    // Holding the face's own lock while decoding makes a concurrent caller
+    // wait for the same decode instead of repeating it. A failure leaves the
+    // slot empty, so the next request retries as before.
+    let mut face = slot.lock().unwrap_or_else(|e| e.into_inner());
+    if let Some(face) = &*face {
+        return Ok(face.clone());
+    }
+    let decoded = Arc::new(decode(style)?);
+    *face = Some(decoded.clone());
+    Ok(decoded)
+}
+
+fn prefetch_hud_faces() {
+    static STARTED: std::sync::Once = std::sync::Once::new();
+    STARTED.call_once(|| {
+        // Failure to start only leaves decoding to the first text request.
+        let _ = std::thread::Builder::new()
+            .name("font-prefetch".into())
+            .spawn(|| {
+                // Upright faces first: every HUD frame needs them. Announcements
+                // use the italic faces, which would otherwise decode on the
+                // frame thread when the first one arrives.
+                for (weight, slant) in [
+                    (Weight::Normal, Slant::Normal),
+                    (Weight::Bold, Slant::Normal),
+                    (Weight::Normal, Slant::Italic),
+                    (Weight::Bold, Slant::Italic),
+                ] {
+                    // Errors are reported again by the request that needs the face.
+                    let _ = shared_face(TextStyle {
+                        family: Family::Arial,
+                        weight,
+                        size: 1.,
+                        slant,
+                        color: [0; 3],
+                    });
+                }
+            });
+    });
+}
+
+fn decode(style: TextStyle) -> Result<Arial> {
+    let file = face_name(style);
+    let bytes = font_bytes(style)?;
+    let font = Font::from_bytes(bytes, FontSettings::default())
+        .map_err(|e| format!("font ({file}): {e}"))?;
+    let metrics = font
+        .horizontal_line_metrics(1.)
+        .ok_or("font line metrics")?;
+    let ascent = f64::from(metrics.ascent);
+    let descent = f64::from(metrics.descent);
+    if ascent <= descent {
+        return Err("font line metrics".into());
+    }
+    Ok(Arial {
+        font,
+        em_ascent: ascent / (ascent - descent),
+    })
 }
 
 #[cfg(test)]
@@ -130,24 +217,9 @@ impl Rasterizer {
         Self::default()
     }
     fn face(&mut self, style: TextStyle) -> Result<&Arial> {
-        let key = (style.family, style.weight, style.slant);
+        let key: FaceKey = (style.family, style.weight, style.slant);
         if let std::collections::btree_map::Entry::Vacant(slot) = self.faces.entry(key) {
-            let file = face_name(style);
-            let bytes = font_bytes(style)?;
-            let font = Font::from_bytes(bytes, FontSettings::default())
-                .map_err(|e| format!("font ({file}): {e}"))?;
-            let metrics = font
-                .horizontal_line_metrics(1.)
-                .ok_or("font line metrics")?;
-            let ascent = f64::from(metrics.ascent);
-            let descent = f64::from(metrics.descent);
-            if ascent <= descent {
-                return Err("font line metrics".into());
-            }
-            slot.insert(Arial {
-                font,
-                em_ascent: ascent / (ascent - descent),
-            });
+            slot.insert(shared_face(style)?);
         }
         Ok(&self.faces[&key])
     }

@@ -280,24 +280,32 @@ impl Bank {
             return Err("Active resource pixel budget exceeded".into());
         }
         self.cache.retain(|i, _| indices.contains(i));
-        for i in &indices {
-            if !self.cache.contains_key(i) {
-                let scale = self.food_raster_scale[*i];
-                let image = if scale == 0 {
-                    materialize(&self.recipes[*i])?
-                } else {
-                    crate::food_texture::materialize(&self.recipes[*i], scale)?
-                };
-                self.cache.insert(
-                    *i,
-                    Resource {
-                        food_glow: self.food_raster_scale[*i] == 1,
-                        food_outline: self.food_outline[*i],
-                        asset: self.assets[*i],
-                        image: image.into(),
-                    },
-                );
+        // A join can need over a hundred cold rasters in one picture. They are
+        // independent, so spread them across threads and admit them in index
+        // order, stopping at the first error as the serial loop did.
+        let missing: Vec<usize> = indices
+            .iter()
+            .copied()
+            .filter(|i| !self.cache.contains_key(i))
+            .collect();
+        let (recipes, scales) = (&self.recipes, &self.food_raster_scale);
+        let images = crate::cold_parallel::map(&missing, |&i| {
+            if scales[i] == 0 {
+                materialize(&recipes[i])
+            } else {
+                crate::food_texture::materialize(&recipes[i], scales[i])
             }
+        });
+        for (i, image) in missing.into_iter().zip(images) {
+            self.cache.insert(
+                i,
+                Resource {
+                    food_glow: self.food_raster_scale[i] == 1,
+                    food_outline: self.food_outline[i],
+                    asset: self.assets[i],
+                    image: image?.into(),
+                },
+            );
         }
         let mut resources: Vec<_> = self.cache.values().cloned().collect();
         resources.extend_from_slice(&text);
@@ -379,6 +387,65 @@ impl Bank {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn cold_materialization_matches_the_serial_rasters() {
+        let mut bank = Bank::new().unwrap();
+        let assets = bank.assets.clone();
+        assert!(
+            assets.len() > 64,
+            "authored catalog exercises many cold rasters"
+        );
+        for (group, chunk) in assets.chunks(48).enumerate() {
+            let draws = chunk
+                .iter()
+                .map(|asset| Draw {
+                    corners: None,
+                    repeat_uv: None,
+                    black_effect: false,
+                    asset: *asset,
+                    source: None,
+                    destination: BodyRect {
+                        x: 0.,
+                        y: 0.,
+                        width: 1.,
+                        height: 1.,
+                    },
+                    translation: [0., 0.],
+                    rotation: 0.,
+                    effective_alpha: 1.,
+                    blend: BodyBlend::SourceOver,
+                })
+                .collect();
+            let frame = Frame {
+                identity: group as u64 + 1,
+                extent: [64, 64],
+                viewport_scale: 1.,
+                tick: 0,
+                draws,
+                food_batch: None,
+                snakes: Vec::new(),
+            };
+            let resources = bank.resources(&frame).unwrap();
+            assert_eq!(resources.len(), chunk.len());
+            for r in resources {
+                let i = bank.assets.iter().position(|a| *a == r.asset).unwrap();
+                let scale = bank.food_raster_scale[i];
+                let serial = if scale == 0 {
+                    materialize(&bank.recipes[i]).unwrap()
+                } else {
+                    crate::food_texture::materialize(&bank.recipes[i], scale).unwrap()
+                };
+                assert_eq!(
+                    (r.image.width, r.image.height),
+                    (serial.width, serial.height)
+                );
+                assert!(r.image.pixels == serial.pixels, "asset {i}");
+                assert_eq!(r.food_glow, scale == 1);
+                assert_eq!(r.food_outline, bank.food_outline[i]);
+            }
+        }
+    }
 
     #[test]
     fn texture_handle_namespaces_are_disjoint() {
