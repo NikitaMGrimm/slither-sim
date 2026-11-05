@@ -93,6 +93,10 @@ fn percentile(sorted: &[f64], share: f64) -> f64 {
 }
 
 fn run(options: Options) -> Result<(), String> {
+    #[cfg(not(slither_host_world_threads))]
+    if options.world_threads != 1 {
+        return Err("this runtime does not support --world-threads above 1".into());
+    }
     println!(
         "policy=A4-mean parameter_manifest_sha256={}",
         slither_sim::bot::PARAMETER_MANIFEST_SHA256,
@@ -126,6 +130,7 @@ fn run(options: Options) -> Result<(), String> {
             world,
             ..Default::default()
         },
+        #[cfg(slither_host_world_threads)]
         world_threads: options.world_threads,
         ..Default::default()
     };
