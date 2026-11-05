@@ -14,7 +14,9 @@ use std::sync::{
 const MAX_PARTICIPANTS: usize = 4;
 
 fn participants(items: usize) -> usize {
-    if cfg!(target_arch = "wasm32") {
+    // Warm frames call this with no work; skip the parallelism probe, which
+    // re-reads affinity and cgroup limits on Linux each time.
+    if items <= 1 || cfg!(target_arch = "wasm32") {
         return 1;
     }
     std::thread::available_parallelism()
