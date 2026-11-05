@@ -1560,11 +1560,16 @@ impl LocalGame {
         Ok(())
     }
     pub fn take_frame(&mut self) -> Option<PreparedFrame> {
+        self.take_frame_with_menu(false)
+    }
+    /// Native menu visibility can lead/lag the session's gameplay handoff.
+    pub fn take_frame_with_menu(&mut self, menu_visible: bool) -> Option<PreparedFrame> {
         latency::generation(self.generation);
         if self.suspended || self.inflight != 0 {
             return None;
         }
-        if let Some(frame) = self.packet_frames.pop_front() {
+        if let Some(mut frame) = self.packet_frames.pop_front() {
+            self.apply_layer_visibility(&mut frame.value, menu_visible);
             self.inflight = 1;
             latency::issue(frame.value.frame.identity);
             #[cfg(feature = "feel-trace")]
@@ -1573,7 +1578,8 @@ impl LocalGame {
             }
             return Some(frame.value);
         }
-        let prepared = self.work.as_mut()?.prepared.take()?;
+        let mut prepared = self.work.as_mut()?.prepared.take()?;
+        self.apply_layer_visibility(&mut prepared.value, menu_visible);
         self.inflight = 2;
         latency::issue(prepared.value.frame.identity);
         #[cfg(feature = "feel-trace")]
@@ -1581,6 +1587,16 @@ impl LocalGame {
             self.issued_observation = prepared.observation;
         }
         Some(prepared.value)
+    }
+    fn apply_layer_visibility(&self, picture: &mut PreparedFrame, menu_visible: bool) {
+        let view = self.session.view();
+        // Gate at issue as well as projection: queued Setup/retry pictures may
+        // predate a death, terminal event, or the native in-game menu opening.
+        if !view.game_world_visible() {
+            picture.hide_game_world();
+        } else if menu_visible || !view.game_hud_visible() || self.controls_captured() {
+            picture.hide_game_hud();
+        }
     }
     /// Non-consuming drain-boundary query: never issue an extra unacknowledged picture.
     pub fn has_frame(&self) -> bool {

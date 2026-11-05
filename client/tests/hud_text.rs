@@ -233,6 +233,10 @@ fn lifecycle_opacity_multiplies_fields_and_header_independently() {
     v.playing = false;
     let p = plan_hud_text(&v, [960, 540], 1.).unwrap();
     assert!(
+        p.lines.is_empty(),
+        "retained opacity cannot display HUD outside play"
+    );
+    assert!(
         p.lines
             .iter()
             .flat_map(|line| &line.spans)

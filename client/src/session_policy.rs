@@ -179,6 +179,17 @@ pub struct View {
     /// Transport constructor attempts.
     pub constructor_attempts: u32,
 }
+impl View {
+    /// Game HUD is exclusive with connecting and interactive return/login menus.
+    /// Retained opacity/history alone cannot grant visibility after a terminal event.
+    pub fn game_hud_visible(&self) -> bool {
+        self.phase == Phase::Playing && self.playing
+    }
+    /// Death may retain the world for its stock hold/crossfade; terminal sockets do not.
+    pub fn game_world_visible(&self) -> bool {
+        self.connected && matches!(self.phase, Phase::Playing | Phase::Dead | Phase::Victory)
+    }
+}
 #[derive(Debug, Clone)]
 struct Controls {
     phase: Phase,

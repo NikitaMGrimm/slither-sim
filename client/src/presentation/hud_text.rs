@@ -89,7 +89,7 @@ pub enum TextBaseline {
 /// Copied shared history for both graphical and compact host readouts.
 #[derive(Clone, Debug, PartialEq)]
 pub struct HudTextView {
-    /// Session playing observation.
+    /// Shared session HUD admission, excluding retained death/terminal history.
     pub playing: bool,
     /// Independent role fades from HUD history.
     pub opacity: HudOpacity,
@@ -129,8 +129,17 @@ impl HudTextView {
             }
         };
         Self {
-            playing: session.view().playing,
-            opacity: hud.requested_opacity,
+            playing: session.view().game_hud_visible(),
+            opacity: if session.view().game_hud_visible() {
+                hud.requested_opacity
+            } else {
+                HudOpacity {
+                    readout: 0.,
+                    header: 0.,
+                    rows: 0.,
+                    announcement: 0.,
+                }
+            },
             status: status.into(),
             score: hud
                 .current
@@ -299,7 +308,7 @@ pub fn plan_hud_text(
             clip: rect(8., 0., w - 16., h),
         });
     }
-    if view.rows.is_empty() || w < 300. || h < 68. {
+    if !view.playing || view.rows.is_empty() || w < 300. || h < 68. {
         return Ok(plan);
     }
     // On narrow/short windows, retain the readout and an ordered prefix of rows.

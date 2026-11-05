@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Hide retained game HUD and terminal world pictures on menus after any session
+  close or failure; keep the death world fade without HUD over interactive menus.
+
 - Keep pellets, glows, snake detail and names continuous while zooming out,
   using area-weighted physical-pixel floors and size fades without subpixel
   omission; preserve the exact factor-one picture.

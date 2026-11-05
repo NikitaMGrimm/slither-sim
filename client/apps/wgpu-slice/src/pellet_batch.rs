@@ -684,6 +684,7 @@ pub(crate) mod tests {
                 snakes: Vec::new(),
             };
             let picture = crate::render::PreparedFrame {
+                world_draws: 0,
                 #[cfg(feature = "frame-bench")]
                 food_submission: None,
                 resources: bank.resources(&frame).unwrap(),
@@ -1309,6 +1310,7 @@ pub(crate) mod tests {
             snakes: Vec::new(),
         };
         let original = PreparedFrame {
+            world_draws: 0,
             #[cfg(feature = "frame-bench")]
             food_submission: None,
             resources: bank.resources(&frame).unwrap(),

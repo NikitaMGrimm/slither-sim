@@ -615,7 +615,10 @@ mod desktop {
             if self.preparation.is_none() {
                 self.login.observe_game(&self.game)?;
             }
-            let Some(p) = self.game.take_frame() else {
+            let Some(p) = self
+                .game
+                .take_frame_with_menu(self.login.needs_menu_pass(admission))
+            else {
                 self.host.discard_acquired();
                 self.schedule.retry(Instant::now());
                 return Ok(());
