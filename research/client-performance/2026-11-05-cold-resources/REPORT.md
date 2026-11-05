@@ -11,7 +11,10 @@ frame thread: they now take 18-24 ms and 18-42 ms.
 - **Fonts.** Decoding each installed face with fontdue takes about 15 ms, and the
   first HUD picture needs Arial regular and bold. Decoded faces are now shared
   process-wide, and those two are decoded on a helper thread when the first text
-  rasterizer is created, long before the join. Each file is still decoded once,
+  rasterizer is created, long before the join. The same helper then decodes the
+  italic and bold italic faces that announcements use, so the first announcement
+  doesn't decode on the frame thread either. That later decode was not timed
+  separately. Each file is still decoded once,
   with the same settings. A failed decode leaves the slot empty and is retried,
   as before.
 - **Sprite rasters.** A join's first two pictures need 90 and 171 cold recipes

@@ -68,13 +68,21 @@ fn prefetch_hud_faces() {
         let _ = std::thread::Builder::new()
             .name("font-prefetch".into())
             .spawn(|| {
-                for weight in [Weight::Normal, Weight::Bold] {
+                // Upright faces first: every HUD frame needs them. Announcements
+                // use the italic faces, which would otherwise decode on the
+                // frame thread when the first one arrives.
+                for (weight, slant) in [
+                    (Weight::Normal, Slant::Normal),
+                    (Weight::Bold, Slant::Normal),
+                    (Weight::Normal, Slant::Italic),
+                    (Weight::Bold, Slant::Italic),
+                ] {
                     // Errors are reported again by the request that needs the face.
                     let _ = shared_face(TextStyle {
                         family: Family::Arial,
                         weight,
                         size: 1.,
-                        slant: Slant::Normal,
+                        slant,
                         color: [0; 3],
                     });
                 }
