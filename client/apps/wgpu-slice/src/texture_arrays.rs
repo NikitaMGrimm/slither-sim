@@ -12,6 +12,27 @@ pub(super) struct Group {
     pub array: TextureArray,
     pub keys: Vec<ResourceKey>,
 }
+// Region offsets satisfy the strictest backend placement rule (DX12: 512).
+const PLACEMENT: u64 = 512;
+
+fn row_pitch(width: u32) -> u32 {
+    (width * 4).next_multiple_of(wgpu::COPY_BYTES_PER_ROW_ALIGNMENT)
+}
+
+/// End offset in a staging buffer after appending every mip of `write` at `size`.
+pub(super) fn staged_end(
+    mut size: u64,
+    (array, _, resource): &(&TextureArray, u32, &Resource),
+) -> u64 {
+    let (mut width, mut height) = (resource.image.width, resource.image.height);
+    for _ in 0..array.texture.mip_level_count() {
+        size = size.next_multiple_of(PLACEMENT) + u64::from(row_pitch(width)) * u64::from(height);
+        width = (width / 2).max(1);
+        height = (height / 2).max(1);
+    }
+    size
+}
+
 impl TextureArray {
     pub fn new(
         device: &wgpu::Device,
@@ -98,19 +119,55 @@ impl TextureArray {
             }
             return;
         }
-        // Region offsets satisfy the strictest backend placement rule (DX12: 512).
-        const PLACEMENT: u64 = 512;
-        let row_pitch =
-            |width: u32| (width * 4).next_multiple_of(wgpu::COPY_BYTES_PER_ROW_ALIGNMENT);
+        // Only the device limit splits a batch, so every sync that fit before
+        // still uses one buffer. The per-call path also held a whole sync's
+        // staged texels until the next submission, so peak memory is similar.
+        let cap = device.limits().max_buffer_size;
+        Self::write_batch_capped(device, queue, writes, cap);
+    }
+
+    /// Splits `writes` into staging buffers of at most `cap` bytes, in order.
+    /// Padded rows can make a staging buffer much larger than the source
+    /// texels (1-pixel-wide mips pad to 256 bytes per row), so the cap keeps
+    /// every buffer within device limits. A single write that alone exceeds
+    /// it goes through the per-call path. Later submissions run after earlier
+    /// ones and pending `write_texture` calls land before the next submission,
+    /// so repeated writes to one layer keep their order.
+    pub(super) fn write_batch_capped(
+        device: &wgpu::Device,
+        queue: &wgpu::Queue,
+        writes: &[(&Self, u32, &Resource)],
+        cap: u64,
+    ) {
+        let mut start = 0;
         let mut size = 0u64;
-        for (array, _, resource) in writes {
-            let (mut width, mut height) = (resource.image.width, resource.image.height);
-            for _ in 0..array.texture.mip_level_count() {
-                size = size.next_multiple_of(PLACEMENT)
-                    + u64::from(row_pitch(width)) * u64::from(height);
-                width = (width / 2).max(1);
-                height = (height / 2).max(1);
+        for (i, write) in writes.iter().enumerate() {
+            let next = staged_end(size, write);
+            if next.next_multiple_of(wgpu::COPY_BUFFER_ALIGNMENT) <= cap {
+                size = next;
+                continue;
             }
+            Self::stage(device, queue, &writes[start..i], size);
+            let alone = staged_end(0, write);
+            if alone.next_multiple_of(wgpu::COPY_BUFFER_ALIGNMENT) <= cap {
+                (start, size) = (i, alone);
+            } else {
+                let (array, layer, resource) = write;
+                array.write(queue, *layer, resource);
+                (start, size) = (i + 1, 0);
+            }
+        }
+        Self::stage(device, queue, &writes[start..], size);
+    }
+
+    fn stage(
+        device: &wgpu::Device,
+        queue: &wgpu::Queue,
+        writes: &[(&Self, u32, &Resource)],
+        size: u64,
+    ) {
+        if writes.is_empty() {
+            return;
         }
         let staging = device.create_buffer(&wgpu::BufferDescriptor {
             label: Some("batched image upload"),

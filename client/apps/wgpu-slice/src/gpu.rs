@@ -2140,16 +2140,30 @@ mod tests {
                 .collect();
             let mips = resources[0].image.mip_level_count().unwrap();
             assert_eq!(mips, levels);
-            let batched = r.new_array([width, height], 3, mips).unwrap();
             let serial = r.new_array([width, height], 3, mips).unwrap();
-            let writes: Vec<_> = resources
-                .iter()
-                .enumerate()
-                .map(|(i, x)| (&batched, i as u32, x))
-                .collect();
-            TextureArray::write_batch(&r.device, &r.queue, &writes);
             for (i, x) in resources.iter().enumerate() {
                 serial.write(&r.queue, i as u32, x);
+            }
+            let layout = |array| {
+                resources
+                    .iter()
+                    .enumerate()
+                    .map(|(i, x)| (array, i as u32, x))
+                    .collect::<Vec<_>>()
+            };
+            let batched = r.new_array([width, height], 3, mips).unwrap();
+            TextureArray::write_batch(&r.device, &r.queue, &layout(&batched));
+            // Caps that split the batch into [0, 1] + [2], and that send every
+            // write through the per-call path because none fits alone.
+            let one = texture_arrays::staged_end(0, &layout(&serial)[0]);
+            let two = texture_arrays::staged_end(one, &layout(&serial)[1]);
+            let caps = [
+                two.next_multiple_of(wgpu::COPY_BUFFER_ALIGNMENT),
+                one.next_multiple_of(wgpu::COPY_BUFFER_ALIGNMENT) - 1,
+            ];
+            let capped = caps.map(|_| r.new_array([width, height], 3, mips).unwrap());
+            for (array, cap) in capped.iter().zip(caps) {
+                TextureArray::write_batch_capped(&r.device, &r.queue, &layout(array), cap);
             }
             for layer in 0..3 {
                 let mut offset = 0;
@@ -2160,6 +2174,9 @@ mod tests {
                         resources[layer as usize].image.pixels[offset..offset + expected.len()]
                     );
                     assert_eq!(read_layer(&r, &batched.texture, layer, level), expected);
+                    for array in &capped {
+                        assert_eq!(read_layer(&r, &array.texture, layer, level), expected);
+                    }
                     offset += expected.len();
                 }
             }

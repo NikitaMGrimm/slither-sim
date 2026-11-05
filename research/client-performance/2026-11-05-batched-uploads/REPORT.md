@@ -20,6 +20,13 @@ leaves earlier groups unwritten instead of half-written; the renderer's maps
 were already left unchanged on that path. Wasm and single-layer syncs keep
 `write_texture`.
 
+Padding can make the staging copy far larger than the texels: a 1-pixel-wide
+row takes 256 bytes. A sync whose padded copy would pass the device's maximum
+buffer size is split into several staging buffers, submitted in order, and a
+single layer too large on its own uses `write_texture`. Every measured sync
+fit in one buffer (the earlier code had no split and would have failed), so
+the timings above are unaffected.
+
 <!-- SUMMARY -->
 Runs: 190; pairs: 95; pairs excluded for observed compiler overlap: 47. Accepted-run median machine load: 8.5-77.2%.
 <!-- /SUMMARY -->
