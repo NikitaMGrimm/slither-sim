@@ -486,6 +486,7 @@ fn generation_capture_blur_resize_escape_and_joint_save_keep_transaction_rules()
             text: None,
             state: ElementState::Pressed,
             repeat: false,
+            synthetic: false,
         },
         false,
     );

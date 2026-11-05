@@ -206,6 +206,7 @@ fn entry_releases_held_gameplay_keys() {
             text: None,
             state: ElementState::Pressed,
             repeat: false,
+            synthetic: false,
         },
         false,
     );

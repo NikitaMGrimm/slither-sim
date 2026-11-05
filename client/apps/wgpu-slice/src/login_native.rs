@@ -408,20 +408,17 @@ impl NativeLogin {
         self.egui.check_error()?;
         match action {
             Some(Control::Leave) => game.request_stop(),
-            Some(Control::Resume) => {
-                game.close_ingame_menu();
-                let cursor = self.egui.window.cursor();
-                let area = extent.map(|n| f64::from(n) / dpr);
-                game.pointer(cursor[0], cursor[1], area[0], area[1], false)?;
-            }
+            // The snake keeps the heading admitted before the menu; only a
+            // later gameplay pointer move steers from the menu's cursor.
+            Some(Control::Resume) => game.close_ingame_menu(),
             Some(Control::Settings) if self.state.settings.open_over_game() => {
                 self.ingame_settings = true;
                 self.settings_ui.over_game = true;
                 self.egui.begin_screen();
                 self.settings_ui
-                    .request_focus(slither_client::settings::QUALITY);
+                    .request_focus(slither_client::settings::QUALITY_CHOICES[0].0);
                 self.egui.focus(crate::settings_egui::widget_id(
-                    slither_client::settings::QUALITY,
+                    slither_client::settings::QUALITY_CHOICES[0].0,
                 ));
                 // egui's initial Area sizing pass must settle before input
                 // reaches the panel, as on the login.
@@ -1410,8 +1407,16 @@ impl NativeLogin {
         {
             self.egui.cancel_pointer();
         }
-        if let WindowEvent::KeyboardInput { event, .. } = event {
-            return self.key(event.into(), admission);
+        if let WindowEvent::KeyboardInput {
+            event,
+            is_synthetic,
+            ..
+        } = event
+        {
+            return self.key(
+                crate::menu_input_native::KeyInput::window(event, *is_synthetic),
+                admission,
+            );
         }
         if self.egui_owns_input() {
             // Keep legacy focus bookkeeping for its next screen, without letting

@@ -37,6 +37,7 @@ fn key(login: &mut NativeLogin, named: NamedKey) -> bool {
                 text: None,
                 state: ElementState::Pressed,
                 repeat: false,
+                synthetic: false,
             },
             true,
         )
@@ -137,6 +138,7 @@ fn entry_order_modality_escape_done_and_play_snapshot() {
             text: None,
             state: ElementState::Pressed,
             repeat: false,
+            synthetic: false,
         },
         true,
     );

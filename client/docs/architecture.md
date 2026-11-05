@@ -106,13 +106,15 @@ the in-game menu's Resume, Settings and Leave game buttons and outside-click
 dismissal; Settings opens the shared panel over it. `LocalGame` gates
 native steering while the menu is open, releases held boost/turn debt at entry,
 and keeps the existing ping/presentation flow running. After it closes, a turn
-or boost key still held from the menu acts again only on a fresh press. Leave and an unadmitted
+or boost key still held from the menu acts again only on a fresh press; neither
+auto-repeat nor winit's synthetic refocus press for a held key counts. Leave and an unadmitted
 Esc queue the existing Close effect through `request_stop()`. The native effect
 owner reuses `begin_close()` and its five-second deadline before acknowledging
 that effect and running the existing session teardown/login return. Frames keep
 presenting while closing, with no new game sends; Enter retains a Play request
-until the old socket has been released. Dismissal samples the current window cursor
-without resetting heading cadence. Browser DOM menus are unchanged.
+until the old socket has been released. Closing (Resume, Escape or outside click,
+including after Settings) keeps the heading admitted before the menu and does not
+reset heading cadence; the menu's cursor steers only after a gameplay pointer move. Browser DOM menus are unchanged.
 `server_picker_egui.rs` paints the shared `ServerPicker` panel at its resolved
 control rectangles; the core keeps choices, list windows and validation, and
 `server_picker_native.rs` keeps preference and custom-server storage.

@@ -21,6 +21,18 @@ pub struct KeyInput<'a> {
     pub text: Option<&'a str>,
     pub state: ElementState,
     pub repeat: bool,
+    /// winit's `is_synthetic`: a press or release it made up on focus change
+    /// for a key already held, not one the user just made.
+    pub synthetic: bool,
+}
+impl<'a> KeyInput<'a> {
+    /// A `WindowEvent::KeyboardInput`, keeping whether winit synthesized it.
+    pub fn window(event: &'a KeyEvent, synthetic: bool) -> Self {
+        Self {
+            synthetic,
+            ..event.into()
+        }
+    }
 }
 impl<'a> From<&'a KeyEvent> for KeyInput<'a> {
     fn from(event: &'a KeyEvent) -> Self {
@@ -30,6 +42,7 @@ impl<'a> From<&'a KeyEvent> for KeyInput<'a> {
             text: event.text.as_deref(),
             state: event.state,
             repeat: event.repeat,
+            synthetic: false,
         }
     }
 }
@@ -56,8 +69,8 @@ impl NativeMenuInput {
         self.modifiers = modifiers;
     }
     /// A modal that owned the keyboard is closing. A gameplay key still held
-    /// from it steers or boosts again only after a fresh press: winit's
-    /// auto-repeat of that key is not one.
+    /// from it steers or boosts again only after a fresh press. Neither winit's
+    /// auto-repeat nor the press it synthesizes for a held key on refocus is one.
     pub fn require_fresh_presses(&mut self) {
         self.stale = [true; 4];
     }
@@ -80,13 +93,18 @@ impl NativeMenuInput {
         };
         if let Some(key) = gameplay {
             let stale = &mut self.stale[key as usize];
-            if pressed && event.repeat && *stale && !editing {
+            if pressed && (event.repeat || event.synthetic) && *stale && !editing {
                 return NativeInputResult {
                     consumed: true,
                     effects: Vec::new(),
                 };
             }
-            *stale = false;
+            // Only a key change the user made ends the barrier: winit's
+            // synthetic release on blur and press on refocus describe the
+            // same continuous hold.
+            if !event.synthetic {
+                *stale = false;
+            }
         }
         let mut intents = Vec::new();
         let process = matches!(event.logical, Key::Named(NamedKey::Process));
@@ -201,7 +219,11 @@ impl NativeMenuInput {
     /// and ModifiersChanged WindowEvents without a window or event loop.
     pub fn window_event(&mut self, event: &WindowEvent) -> NativeInputResult {
         let intent = match event {
-            WindowEvent::KeyboardInput { event, .. } => return self.key(event.into()),
+            WindowEvent::KeyboardInput {
+                event,
+                is_synthetic,
+                ..
+            } => return self.key(KeyInput::window(event, *is_synthetic)),
             WindowEvent::ModifiersChanged(modifiers) => {
                 self.modifiers(modifiers.state());
                 None

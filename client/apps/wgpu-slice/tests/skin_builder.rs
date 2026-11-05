@@ -23,7 +23,8 @@ fn key(login: &mut NativeLogin, named: NamedKey) {
                     physical: PhysicalKey::Code(KeyCode::Enter),
                     text: None,
                     state: ElementState::Pressed,
-                    repeat: false
+                    repeat: false,
+                    synthetic: false
                 },
                 false
             )

@@ -60,6 +60,7 @@ fn escape(login: &mut NativeLogin, game: &mut LocalGame, repeat: bool) -> bool {
                     text: None,
                     state: ElementState::Pressed,
                     repeat,
+                    synthetic: false,
                 },
                 30.,
             )
@@ -301,6 +302,7 @@ fn outgoing_login_keeps_drawing_while_gameplay_owns_keys_pointer_zoom_and_esc() 
             text: None,
             state: ElementState::Pressed,
             repeat: false,
+            synthetic: false,
         },
         false,
     );
@@ -406,18 +408,21 @@ fn open_releases_boost_immediately_freezes_heading_and_keeps_pinging() {
     release_escape(&mut login, &mut game);
     escape(&mut login, &mut game, false);
     let packets = pump(&mut game, 1040.);
-    assert_eq!(
-        packets
-            .iter()
-            .filter(|p| p.len() == 1 && p[0] < 251)
-            .count(),
-        1
-    );
+    assert_eq!(headings(&packets), 0, "the menu's cursor does not steer");
+    game.pointer(100., 100., 960., 540., false).unwrap();
+    let packets = pump(&mut game, 1080.);
+    assert_eq!(headings(&packets), 1);
     assert!(packets.iter().all(|p| p.len() == 1 && p[0] <= 251));
     assert!(
-        pump(&mut game, 1041.).is_empty(),
+        pump(&mut game, 1081.).is_empty(),
         "no turn debt or heading catch-up"
     );
+}
+fn headings(packets: &[Vec<u8>]) -> usize {
+    packets
+        .iter()
+        .filter(|p| p.len() == 1 && p[0] < 251)
+        .count()
 }
 
 #[test]
@@ -601,7 +606,7 @@ fn leave_by_mouse_enter_and_space_returns_to_login_and_can_play_again() {
 }
 
 #[test]
-fn dismissal_retains_heading_cadence_and_samples_the_current_pointer() {
+fn dismissal_retains_heading_cadence() {
     let mut game = playing();
     let mut login = login(&game);
     game.pointer(480., 0., 960., 540., false).unwrap();
@@ -614,6 +619,7 @@ fn dismissal_retains_heading_cadence_and_samples_the_current_pointer() {
     let _ = login.egui.route_window_event(&event, 1., |_| ());
     escape(&mut login, &mut game, false);
     assert!(!game.ingame_menu_open());
+    game.pointer(900., 450., 960., 540., false).unwrap();
     assert!(
         pump(&mut game, 110.).is_empty(),
         "closing does not reset the 33 ms heading gate"
@@ -646,6 +652,7 @@ fn esc_does_not_open_on_login_picker_settings_connecting_dead_or_terminal() {
                     text: None,
                     state: ElementState::Pressed,
                     repeat: false,
+                    synthetic: false,
                 },
                 30.
             )
@@ -732,6 +739,7 @@ fn unadmitted_playing_escape_uses_the_same_pending_close_and_retains_replay() {
                     text: None,
                     state: ElementState::Pressed,
                     repeat: false,
+                    synthetic: false,
                 },
                 51.
             )
@@ -768,6 +776,7 @@ fn replay_during_close_waits_for_the_existing_death_return_admission() {
                     text: None,
                     state: ElementState::Pressed,
                     repeat: false,
+                    synthetic: false,
                 },
                 31.
             )
@@ -963,6 +972,7 @@ fn loopback_leave_waits_for_normal_close_ack_keeps_frames_and_starts_second_game
                             text: None,
                             state: ElementState::Pressed,
                             repeat: false,
+                            synthetic: false,
                         },
                         100.
                     )
@@ -1018,51 +1028,62 @@ fn open_settings(login: &mut NativeLogin, game: &mut LocalGame) {
 
 #[test]
 fn settings_round_trip_returns_focus_to_the_menu_and_keeps_gameplay_out() {
-    use slither_client::{menu_preferences::MenuQuality, settings};
+    use slither_client::settings::{
+        self, AA_CHOICES, AntiAliasing, GraphicsQuality, QUALITY_CHOICES, WorldResolution,
+    };
+    use slither_wgpu_slice::settings_egui::{control_order, widget_id as settings_id};
     let mut game = playing();
     let mut login = login(&game);
     open_settings(&mut login, &mut game);
     assert!(game.ingame_menu_open(), "the menu stays under Settings");
     assert!(login.egui_owns_input() && login.blocks_gameplay());
     assert!(!login.zoom_input_available());
-    assert_eq!(
-        focused(&login),
-        Some(slither_wgpu_slice::settings_egui::widget_id(
-            settings::QUALITY
-        ))
-    );
-    // The held Enter that opened Settings cannot toggle Quality.
+    assert_eq!(focused(&login), Some(settings_id(QUALITY_CHOICES[0].0)));
+    // The held Enter that opened Settings cannot select the focused preset.
+    let before = login.state.settings.preferences();
     input(
         &mut login,
         &mut game,
         vec![key_event(Key::Enter, true, false)],
     );
-    assert_eq!(
-        login.state.settings.preferences().quality,
-        MenuQuality::High
-    );
+    assert_eq!(login.state.settings.preferences(), before);
     input(
         &mut login,
         &mut game,
         vec![key_event(Key::Enter, false, false)],
     );
     // Settings has the same controls and Tab wrap as on the login.
-    for expected in [settings::RESOLUTION, settings::DONE, settings::QUALITY] {
+    let order = control_order();
+    for expected in order.iter().cycle().skip(1).take(order.len()) {
         tab(&mut login, &mut game, false);
-        assert_eq!(
-            focused(&login),
-            Some(slither_wgpu_slice::settings_egui::widget_id(expected))
-        );
+        assert_eq!(focused(&login), Some(settings_id(*expected)));
     }
-    input(
-        &mut login,
-        &mut game,
-        vec![
-            key_event(Key::Space, true, false),
-            key_event(Key::Space, false, false),
-        ],
-    );
-    assert_eq!(login.state.settings.preferences().quality, MenuQuality::Low);
+    let press = |login: &mut NativeLogin, game: &mut LocalGame| {
+        input(
+            login,
+            game,
+            vec![
+                key_event(Key::Space, true, false),
+                key_event(Key::Space, false, false),
+            ],
+        );
+    };
+    // Each Graphics selector applies from over the game: preset, resolution, AA.
+    for (control, steps) in [
+        (QUALITY_CHOICES[1].0, 1),
+        (settings::RESOLUTION, 3),
+        (AA_CHOICES[1].0, 2),
+    ] {
+        for _ in 0..steps {
+            tab(&mut login, &mut game, false);
+        }
+        assert_eq!(focused(&login), Some(settings_id(control)));
+        press(&mut login, &mut game);
+    }
+    let preferences = login.state.settings.preferences();
+    assert_eq!(preferences.graphics, GraphicsQuality::Low);
+    assert_eq!(preferences.resolution, WorldResolution::Native);
+    assert_eq!(preferences.anti_aliasing, AntiAliasing::Off);
     // Gameplay stays captured: no steering, boost or zoom reaches the snake.
     assert!(!game.key("Space", true));
     assert!(!game.key("ArrowLeft", true));
@@ -1175,6 +1196,7 @@ fn keys_held_through_the_menu_need_a_fresh_press_after_resume() {
         text: Some(" "),
         state: ElementState::Pressed,
         repeat,
+        synthetic: false,
     };
     let mut game = playing();
     let mut login = login(&game);
@@ -1213,4 +1235,119 @@ fn keys_held_through_the_menu_need_a_fresh_press_after_resume() {
         login.key(press(true), false).effects.contains(&boost),
         "a fresh hold repeats as before"
     );
+}
+
+#[test]
+fn a_hold_restored_on_refocus_is_not_a_fresh_press() {
+    use slither_client::menu_input::{GameplayKey, HostEditEffect};
+    let space = NativeKey::Named(NamedKey::Space);
+    let event = |state, repeat, synthetic| KeyInput {
+        logical: &space,
+        physical: PhysicalKey::Code(KeyCode::Space),
+        text: Some(" "),
+        state,
+        repeat,
+        synthetic,
+    };
+    let boost = HostEditEffect::Gameplay {
+        key: GameplayKey::Space,
+        pressed: true,
+    };
+    let mut game = playing();
+    let mut login = login(&game);
+    settle(&mut login, &mut game, 40, 1200);
+    escape(&mut login, &mut game, false);
+    release_escape(&mut login, &mut game);
+    // Space activates Resume and stays held through a blur and refocus, which
+    // winit reports as a synthetic release and a synthetic press.
+    login.egui.window.key(&space, ElementState::Pressed);
+    input(
+        &mut login,
+        &mut game,
+        vec![key_event(Key::Space, true, false)],
+    );
+    assert!(!game.ingame_menu_open());
+    login.key(event(ElementState::Released, false, true), false);
+    let result = login.key(event(ElementState::Pressed, false, true), false);
+    assert!(result.consumed && result.effects.is_empty(), "refocus");
+    let result = login.key(event(ElementState::Pressed, true, false), false);
+    assert!(result.consumed && result.effects.is_empty(), "auto-repeat");
+    // The user's own release and press end the barrier.
+    login.key(event(ElementState::Released, false, false), false);
+    let result = login.key(event(ElementState::Pressed, false, false), false);
+    assert!(result.effects.contains(&boost));
+}
+
+/// Open the menu, move the pointer over it, then close it by `close`.
+/// Returns the time the menu closed.
+fn close_after_menu_cursor(login: &mut NativeLogin, game: &mut LocalGame, close: &str) -> u32 {
+    assert!(login.open_ingame_menu(game, 101.).unwrap());
+    settle(login, game, 102, 150);
+    let event = WindowEvent::CursorMoved {
+        device_id: DeviceId::dummy(),
+        position: PhysicalPosition::new(100., 100.),
+    };
+    let _ = login.egui.route_window_event(&event, 1., |_| ());
+    input(login, game, vec![Event::PointerMoved(pos2(100., 100.))]);
+    let now = match close {
+        "escape" => {
+            escape(login, game, false);
+            166
+        }
+        "resume" => {
+            let resume = login.ingame_ui.rect(Control::Resume).center();
+            click(login, game, resume);
+            166
+        }
+        _ => {
+            tab(login, game, false);
+            assert_eq!(login.ingame_ui.focused(), Some(Control::Settings));
+            input(
+                login,
+                game,
+                vec![
+                    key_event(Key::Enter, true, false),
+                    key_event(Key::Enter, false, false),
+                ],
+            );
+            assert!(login.state.settings.is_open());
+            escape(login, game, false);
+            release_escape(login, game);
+            settle(login, game, 166, 900);
+            assert!(game.ingame_menu_open() && !login.state.settings.visible());
+            escape(login, game, false);
+            916
+        }
+    };
+    assert!(!game.ingame_menu_open(), "{close}");
+    now
+}
+
+#[test]
+fn closing_keeps_the_admitted_heading_until_a_gameplay_pointer_move() {
+    for zoomed in [false, true] {
+        for close in ["escape", "resume", "settings"] {
+            let mut game = playing();
+            let mut login = login(&game);
+            if zoomed {
+                assert!(game.wheel_zoom(1.));
+            }
+            game.pointer(900., 450., 960., 540., false).unwrap();
+            assert_eq!(headings(&pump(&mut game, 100.)), 1);
+            let now = close_after_menu_cursor(&mut login, &mut game, close);
+            // The host's per-frame handoff observation once play owns input.
+            game.observe_cursor(100., 100., 960., 540.).unwrap();
+            for t in [40, 80, 120] {
+                let packets = pump(&mut game, f64::from(now + t));
+                assert_eq!(
+                    headings(&packets),
+                    0,
+                    "{close} zoomed {zoomed}: {packets:?}"
+                );
+            }
+            game.pointer(100., 100., 960., 540., false).unwrap();
+            let packets = pump(&mut game, f64::from(now + 160));
+            assert_eq!(headings(&packets), 1, "{close} zoomed {zoomed}");
+        }
+    }
 }

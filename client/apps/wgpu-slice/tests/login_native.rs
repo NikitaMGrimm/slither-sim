@@ -551,7 +551,8 @@ fn windows_process_enter_cannot_insert_payload_or_activate_until_key_up() {
         physical,
         text: Some("uncommitted"),
         state: ElementState::Pressed,
-        repeat: false
+        repeat: false,
+        synthetic: false
     }));
     input(
         &mut login,
@@ -570,7 +571,8 @@ fn windows_process_enter_cannot_insert_payload_or_activate_until_key_up() {
         physical,
         text: None,
         state: ElementState::Released,
-        repeat: false
+        repeat: false,
+        synthetic: false
     }));
     login.prepare([960, 540], true, None).unwrap();
     press(&mut login, egui::Key::Enter, egui::Modifiers::NONE);
@@ -1510,6 +1512,7 @@ fn shared_login_return_enter_keeps_terminal_guard_and_once_only_queue() {
                     text: Some("\r"),
                     state: ElementState::Pressed,
                     repeat,
+                    synthetic: false,
                 },
                 false,
             );

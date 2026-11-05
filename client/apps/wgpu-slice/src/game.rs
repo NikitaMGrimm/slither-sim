@@ -169,6 +169,10 @@ pub struct LocalGame {
     #[cfg(not(target_arch = "wasm32"))]
     stop_requested: bool,
     cursor: Option<Cursor>,
+    /// The in-game menu has owned the pointer since the last admitted gameplay
+    /// move. Its cursor is not a steering target: observations keep the
+    /// admitted source until gameplay admits a new move.
+    cursor_held: bool,
     zoom_pointer_projected: bool,
     policy: GameplayPolicy,
     hud: HudHistory,
@@ -228,6 +232,7 @@ impl LocalGame {
             #[cfg(not(target_arch = "wasm32"))]
             stop_requested: false,
             cursor: None,
+            cursor_held: false,
             zoom_pointer_projected: false,
             policy: GameplayPolicy::new(true, true, true, true, true, false),
             hud: HudHistory::default(),
@@ -431,6 +436,7 @@ impl LocalGame {
             .ok_or("Generation exhausted")?;
         latency::connection(self.generation);
         self.own_death_seen = false;
+        self.cursor_held = false;
         self.login = login;
         self.nickname = nickname.into();
         self.endpoint = endpoint.into();
@@ -627,6 +633,7 @@ impl LocalGame {
             .release_controls(now)
             .map_err(|e| e.to_string())?;
         self.ingame_menu = true;
+        self.cursor_held = true;
         if !release.is_empty() {
             self.enqueue(EffectKind::Send(release), After::None)?;
         }
@@ -1865,6 +1872,9 @@ impl LocalGame {
             x, y, width, height, 1., 0., 0., 0., 0., 0., 1.,
         ])
         .map_err(|e| e.to_string())?;
+        if self.cursor_held {
+            return Ok(());
+        }
         self.cursor = Some(Cursor {
             source: [x, y, width, height],
             stock: self
@@ -1877,6 +1887,7 @@ impl LocalGame {
         if self.controls_captured() {
             return self.observe_cursor(x, y, width, height);
         }
+        self.cursor_held = false;
         latency::generation(self.generation);
         let cursor = [x, y, width, height];
         let (mut stock_args, args) = self.pointer_args(cursor)?;

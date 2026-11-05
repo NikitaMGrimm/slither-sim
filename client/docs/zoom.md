@@ -49,7 +49,8 @@ wheel interpolation, camera corrections and viewport changes. It emits no
 synthetic input event or direct send. The native host retains physical cursor
 positions even when a menu consumes the move, and converts them with current DPR
 at the next gameplay handoff/frame. This observation only seeds zoom's source;
-it never admits a stock pointer event. Returning to factor one restores the last
+it never admits a stock pointer event. From opening the in-game menu until the
+next gameplay pointer move it is ignored, so the menu's cursor never steers. Returning to factor one restores the last
 admitted CSS displacement, including stock's resize/centre quirks. A real pointer
 callback is required to change that stock displacement.
 The CSS dead zone and command cadence are unchanged. No wheel event

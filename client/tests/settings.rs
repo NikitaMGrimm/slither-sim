@@ -300,18 +300,21 @@ fn over_game_open_skips_login_phases_and_dismiss_keeps_preferences() {
     assert!(!m.settings.open_over_game(), "one panel at a time");
     assert!(!m.settings.open(&m.view(true)));
     m.settings.step(200.).unwrap();
-    let intent = m.settings.intent(QUALITY, Some(false), Activation::Space);
+    let low = QUALITY_CHOICES[1].0;
+    let intent = m.settings.intent(low, Some(true), Activation::Space);
     m.settings.activate(intent);
-    assert_eq!(m.settings.preferences().quality, Q::Low);
-    let stale = m.settings.intent(QUALITY, Some(true), Activation::Space);
+    assert_eq!(m.settings.preferences().graphics, GraphicsQuality::Low);
+    let stale = m
+        .settings
+        .intent(QUALITY_CHOICES[0].0, Some(true), Activation::Space);
     m.settings.dismiss();
     assert!(!m.settings.visible() && m.settings.alpha() == 0.);
-    assert_eq!(m.settings.preferences().quality, Q::Low);
-    assert_eq!(m.settings.take_write(), Some("2:0:original"));
+    assert_eq!(m.settings.preferences().graphics, GraphicsQuality::Low);
+    assert_eq!(m.settings.take_write(), Some("3:low:original:auto"));
     // An activation from the dismissed generation stays inert after reopening.
     assert!(m.settings.open_over_game());
     m.settings.activate(stale);
-    assert_eq!(m.settings.preferences().quality, Q::Low);
+    assert_eq!(m.settings.preferences().graphics, GraphicsQuality::Low);
     assert_eq!(m.settings.take_write(), None);
     // Dismissal keeps the clock: the reopened fade still caps its first step.
     m.settings.step(10_000.).unwrap();

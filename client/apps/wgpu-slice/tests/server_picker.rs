@@ -187,6 +187,7 @@ fn offline_tab_finds_shared_server_link_and_paints_its_focus_without_enabling_pl
         text: None,
         state: ElementState::Pressed,
         repeat: false,
+        synthetic: false,
     };
     assert!(login.key(tab.clone(), false).consumed);
     assert_eq!(login.focused(), Some(CHANGE_SKIN));
