@@ -1,0 +1,93 @@
+[
+  {
+    "label": "pilot-borrowed-rtx-far-native-1-baseline",
+    "arm": "baseline",
+    "status": "accepted",
+    "binary_sha256": "1aad6fbd1d25f7031470621fe155174bf0c5c977f1c9a1e9b9a19dd3aa4e3a2a",
+    "wall_ns_p50_ms": 6.543,
+    "wall_ns_p95_ms": 8.6555,
+    "pellet_prepare_p50_ms": 1.8042500000000001,
+    "pellet_prepare_p95_ms": 2.2997,
+    "pellet_math_p50_ms": 1.61165,
+    "pellet_math_p95_ms": 1.8532,
+    "load_p50": 27.405441748683913
+  },
+  {
+    "label": "pilot-borrowed-rtx-far-native-1-borrowed",
+    "arm": "borrowed",
+    "status": "accepted",
+    "binary_sha256": "05a06d5edde32103a09c448d1c8ca8e3d98cbdc2bcd32637232af9425ae258d2",
+    "wall_ns_p50_ms": 6.5082,
+    "wall_ns_p95_ms": 8.9658,
+    "pellet_prepare_p50_ms": 1.87825,
+    "pellet_prepare_p95_ms": 2.3462,
+    "pellet_math_p50_ms": 1.68215,
+    "pellet_math_p95_ms": 1.9993,
+    "load_p50": 26.470588235294112
+  },
+  {
+    "label": "pilot-endpoints-rtx-far-native-1-baseline",
+    "arm": "baseline",
+    "status": "compile_overlap",
+    "binary_sha256": "1aad6fbd1d25f7031470621fe155174bf0c5c977f1c9a1e9b9a19dd3aa4e3a2a",
+    "wall_ns_p50_ms": 6.6758,
+    "wall_ns_p95_ms": 9.0378,
+    "pellet_prepare_p50_ms": 1.86805,
+    "pellet_prepare_p95_ms": 2.3523,
+    "pellet_math_p50_ms": 1.6598000000000002,
+    "pellet_math_p95_ms": 1.957,
+    "load_p50": 37.67190426029963
+  },
+  {
+    "label": "pilot-endpoints-rtx-far-native-1-endpoints",
+    "arm": "endpoints",
+    "status": "compile_overlap",
+    "binary_sha256": "56b05a8d9b666d61564d78db796bb98fe5bd7e798ed3f92c93ff675c5662288f",
+    "wall_ns_p50_ms": 6.43975,
+    "wall_ns_p95_ms": 9.095,
+    "pellet_prepare_p50_ms": 1.6113,
+    "pellet_prepare_p95_ms": 2.0842,
+    "pellet_math_p50_ms": 1.3998,
+    "pellet_math_p95_ms": 1.7351,
+    "load_p50": 37.86764705882353
+  },
+  {
+    "label": "pilot-rtx-far-native-1-baseline",
+    "arm": "baseline",
+    "status": "compile_overlap",
+    "binary_sha256": "1aad6fbd1d25f7031470621fe155174bf0c5c977f1c9a1e9b9a19dd3aa4e3a2a",
+    "wall_ns_p50_ms": 6.73565,
+    "wall_ns_p95_ms": 9.127,
+    "pellet_prepare_p50_ms": 1.8674,
+    "pellet_prepare_p95_ms": 2.4828,
+    "pellet_math_p50_ms": 1.6696,
+    "pellet_math_p95_ms": 1.9732,
+    "load_p50": 26.838235294117652
+  },
+  {
+    "label": "pilot-rtx-far-native-1-candidate",
+    "arm": "candidate",
+    "status": "compile_overlap",
+    "binary_sha256": "2d233edc4774774d9d81ef6b39d5b05ffb767f7007e957ef8f5b6383ff399ad7",
+    "wall_ns_p50_ms": 6.4952,
+    "wall_ns_p95_ms": 8.8261,
+    "pellet_prepare_p50_ms": 1.9236,
+    "pellet_prepare_p95_ms": 2.4872,
+    "pellet_math_p50_ms": 1.7496,
+    "pellet_math_p95_ms": 2.0672,
+    "load_p50": 27.941176470588236
+  },
+  {
+    "label": "profile-rtx-far-native-1-baseline",
+    "arm": "baseline",
+    "status": "accepted",
+    "binary_sha256": "1aad6fbd1d25f7031470621fe155174bf0c5c977f1c9a1e9b9a19dd3aa4e3a2a",
+    "wall_ns_p50_ms": 6.84295,
+    "wall_ns_p95_ms": 9.3761,
+    "pellet_prepare_p50_ms": 1.8285,
+    "pellet_prepare_p95_ms": 2.4482,
+    "pellet_math_p50_ms": 1.63035,
+    "pellet_math_p95_ms": 1.8947,
+    "load_p50": 26.102941176470583
+  }
+]

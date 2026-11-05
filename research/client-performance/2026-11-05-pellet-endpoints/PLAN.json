@@ -1,0 +1,8 @@
+{
+  "purpose": "Reduce settled far-zoom CPU image geometry work while retaining exact pixels and food census",
+  "baseline": "e066bc334e04c7f8159c4c6a4893083fbd284f05",
+  "measurement": "Five accepted interleaved A/B blocks per RTX 4K quality and far/whole view; five AMD 4K Native far guardrail blocks. Each 600 callbacks; art window 120..419. Median of per-run p50/p95; compiler/link overlap excludes both block partners. Keep every attempt; maximum twelve blocks per configuration.",
+  "created_utc": "2026-11-05T01:24:09.2034970Z",
+  "restriction": "Community input is timing only. No community pixels, external servers, restricted art, or visible windows.",
+  "exactness": "Authored 25000-food replay, 600 offscreen RGBA hashes, factor one/0.065/whole-map in Native and Original on RTX/Vulkan and AMD/DX12; active authored canonical digests and census; forced serial and late-worker controls"
+}
