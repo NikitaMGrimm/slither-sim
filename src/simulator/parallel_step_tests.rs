@@ -217,10 +217,11 @@ fn small_worlds_keep_every_phase_serial() {
             .install(|| step_parts(true, snakes))
     };
     for threads in [1, 2, 8] {
-        assert_eq!(parts(threads, 2 * SNAKES_PER_TASK - 1), 1);
+        assert_eq!(parts(threads, MIN_STEP_TASKS * SNAKES_PER_TASK - 1), 1);
     }
     assert_eq!(parts(1, 100_000), 1);
-    assert_eq!(parts(2, 2 * SNAKES_PER_TASK), 2);
+    assert_eq!(parts(2, MIN_STEP_TASKS * SNAKES_PER_TASK), 8);
+    assert_eq!(parts(8, MIN_STEP_TASKS * SNAKES_PER_TASK), MIN_STEP_TASKS);
     assert_eq!(parts(8, 64 * SNAKES_PER_TASK), 32);
     assert_eq!(step_parts(false, 100_000), 1);
 }
@@ -298,7 +299,8 @@ fn official_world_steps_identically_on_any_pool() {
 }
 
 /// Thousands of snakes converge in a dense field: the collision grid, many
-/// simultaneous deaths and death food, at the shipped task size.
+/// simultaneous deaths and death food. Half the shipped task size keeps the
+/// split as deaths take the field below the shipped minimum.
 #[test]
 fn dense_world_steps_identically_on_any_pool() {
     const SIDE: usize = 68;
@@ -318,7 +320,7 @@ fn dense_world_steps_identically_on_any_pool() {
         let heading = (-head.y).atan2(-head.x) + (unit(slot, 3) - 0.5);
         lay(&mut world, slot, head, heading, 4 + slot % 9);
     }
-    let rows = assert_pool_invariant(&world, 24, 8, SNAKES_PER_TASK, steer, |_, _| {});
+    let rows = assert_pool_invariant(&world, 24, 8, SNAKES_PER_TASK / 2, steer, |_, _| {});
     assert!(deaths(&rows) > 500, "{}", deaths(&rows));
 }
 
@@ -330,7 +332,7 @@ fn battledome_world_steps_identically_on_any_pool() {
         world.retire(slot).unwrap();
     }
     band_respawns(&mut world, 0);
-    let rows = assert_pool_invariant(&world, 1500, 10, 4, dome_steer, band_respawns);
+    let rows = assert_pool_invariant(&world, 1500, 10, 2, dome_steer, band_respawns);
     assert!(rows.iter().any(|(_, e)| e.contains("Pit")));
     assert!(deaths(&rows) > 10, "{}", deaths(&rows));
 }

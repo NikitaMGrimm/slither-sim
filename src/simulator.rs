@@ -2890,9 +2890,19 @@ impl std::fmt::Debug for StepBuffers {
 /// Official-500 profiles spend 70-95 µs per tick in each of motion, collision
 /// search and pickup lookup, about 0.15-0.2 µs per snake, and waking pool
 /// threads costs tens of microseconds. A task of this size does about 100 µs
-/// of work, so smaller worlds keep every phase on the calling thread.
+/// of work.
 #[cfg(feature = "parallel")]
 const SNAKES_PER_TASK: usize = 512;
+
+/// Fewest tasks' worth of snakes before a step splits at all: 4,096 snakes at
+/// the shipped task size. Each split phase keeps serial work (index builds, the
+/// boost pass, the resolution walk) and pays a second pass over snake memory
+/// plus pool dispatch. On an AWS c8a.4xlarge (2026-11-05, official density)
+/// splitting 1,024 snakes was about 10% slower than serial on 2-16 threads,
+/// 2,048 broke even on 2 threads, and 4,096 was faster on every pool size
+/// (1.05x on 2 threads, 1.5x on 8); see docs/performance.md#parallel-step.
+#[cfg(feature = "parallel")]
+const MIN_STEP_TASKS: usize = 8;
 
 /// Pool tasks for a step phase over `snakes` items; 1 runs it serially.
 #[inline]
@@ -2903,7 +2913,12 @@ fn step_parts(parallel: bool, snakes: usize) -> usize {
         let per_task = parallel_step_tests::TASK_SNAKES.with(std::cell::Cell::get);
         #[cfg(not(test))]
         let per_task = SNAKES_PER_TASK;
-        return crate::parallel::parts(snakes / per_task);
+        let tasks = snakes / per_task;
+        return if tasks < MIN_STEP_TASKS {
+            1
+        } else {
+            crate::parallel::parts(tasks)
+        };
     }
     let _ = (parallel, snakes);
     1
