@@ -212,6 +212,8 @@ fn full_cosmetics_bank_keeps_essential_menu_and_authored_fallbacks() {
 fn picture(draws: usize) -> PreparedFrame {
     let page = MenuFrame::world_crossfade([1280, 720], 1., 0.5).unwrap();
     PreparedFrame {
+        background_draws: 0,
+        world_draws: 0,
         #[cfg(feature = "frame-bench")]
         food_submission: None,
         frame: Frame {

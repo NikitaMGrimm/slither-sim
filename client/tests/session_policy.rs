@@ -20,6 +20,35 @@ fn connected() -> SessionPolicy {
     p
 }
 #[test]
+fn game_layers_are_exclusive_with_launch_return_and_terminal_menus() {
+    let ready = SessionPolicy::new();
+    assert!(!ready.view().game_hud_visible());
+    assert!(!ready.view().game_world_visible());
+    let mut p = connected();
+    assert!(
+        p.view().game_hud_visible(),
+        "gameplay owns the disabled outgoing login"
+    );
+    p.ui_tick(2000.).unwrap();
+    assert!(p.view().game_hud_visible());
+    assert!(p.view().game_world_visible());
+    for failed in [false, true] {
+        let mut stopped = p.clone();
+        stopped.begin_stop(failed, vec![]);
+        assert!(!stopped.view().game_hud_visible());
+        assert!(!stopped.view().game_world_visible());
+    }
+    p.prepare_controls(&[command(b'v', 0)], 2001.).unwrap();
+    p.commit_controls().unwrap();
+    assert!(!p.view().game_hud_visible());
+    assert!(
+        p.view().game_world_visible(),
+        "death keeps its world crossfade"
+    );
+    p.advance_step(3602., 1., 1.).unwrap();
+    assert!(!p.view().game_hud_visible());
+}
+#[test]
 fn reset_commit_precedes_single_constructor_intent() {
     let mut p = SessionPolicy::new();
     p.subscribe(0).unwrap();

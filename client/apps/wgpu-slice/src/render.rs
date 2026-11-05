@@ -49,11 +49,22 @@ impl From<ClientPresentationError> for PreparationError {
 
 #[derive(Clone)]
 pub struct PreparedFrame {
+    /// Background prefix, retained when terminal reset removes stale entities.
+    pub background_draws: usize,
+    /// Boundary before game HUD when world and UI share one backing frame.
+    pub world_draws: usize,
     pub frame: Frame,
     pub overlay: Option<Frame>,
     pub resources: Vec<Resource>,
     #[cfg(feature = "frame-bench")]
     pub food_submission: Option<FoodSubmission>,
+}
+/// Removed draw storage belongs to the one issued picture until present/retry.
+pub(crate) struct SuppressedLayers {
+    world_draws: usize,
+    hud: Vec<Draw>,
+    overlay: Option<Vec<Draw>>,
+    entities: Option<Frame>,
 }
 /// Successful planner output, carried with the picture through worker/retry paths.
 #[cfg(feature = "frame-bench")]
@@ -95,6 +106,47 @@ fn pressure_census_due() -> bool {
 pub const PANEL_PRODUCER_DRAWS: usize = 96;
 pub const PANEL_CONTROL_DRAWS: usize = 8;
 impl PreparedFrame {
+    pub(crate) fn suppress_layers(&mut self, hide_entities: bool) -> SuppressedLayers {
+        let world_draws = self.world_draws;
+        let hud = self.frame.draws.split_off(world_draws);
+        let overlay = self.overlay.as_mut().map(|f| std::mem::take(&mut f.draws));
+        let entities = hide_entities.then(|| {
+            self.world_draws = self.background_draws;
+            Frame {
+                identity: self.frame.identity,
+                tick: self.frame.tick,
+                extent: self.frame.extent,
+                viewport_scale: self.frame.viewport_scale,
+                draws: self.frame.draws.split_off(self.background_draws),
+                snakes: std::mem::take(&mut self.frame.snakes),
+                food_batch: self.frame.food_batch.take(),
+            }
+        });
+        SuppressedLayers {
+            world_draws,
+            hud,
+            overlay,
+            entities,
+        }
+    }
+    pub(crate) fn restore_layers(&mut self, layers: SuppressedLayers) {
+        if let Some(entities) = layers.entities {
+            self.frame.draws.extend(entities.draws);
+            self.frame.snakes = entities.snakes;
+            self.frame.food_batch = entities.food_batch;
+        }
+        self.frame.draws.extend(layers.hud);
+        if let (Some(frame), Some(draws)) = (&mut self.overlay, layers.overlay) {
+            frame.draws = draws;
+        }
+        self.world_draws = layers.world_draws;
+    }
+    pub fn hide_game_hud(&mut self) {
+        self.frame.draws.truncate(self.world_draws);
+        if let Some(overlay) = &mut self.overlay {
+            overlay.draws.clear();
+        }
+    }
     pub fn pixel_bytes(&self) -> usize {
         self.resources.iter().map(|r| r.image.pixels.len()).sum()
     }
@@ -975,6 +1027,7 @@ fn prepare_composed(
         });
         push_draw(&mut draws, draw)?;
     }
+    let background_draws = draws.len();
     let [early, late] = std::mem::take(&mut bank.food_commands);
     preparation_phase!("background_end", identity);
     let user_zoom = client.camera().user_zoom_factor();
@@ -1546,6 +1599,7 @@ fn prepare_composed(
         snakes,
     };
     let mut resources = bank.resources(&frame)?;
+    let world_draws = frame.draws.len();
     // Reference HUD/minimap are DOM siblings of the capped game canvas.
     // Nicknames have already been submitted into the world frame above.
     let mut overlay = bank.overlay_viewport.map(|(extent, viewport_scale)| Frame {
@@ -1579,6 +1633,8 @@ fn prepare_composed(
     #[cfg(all(feature = "latency-rig", not(target_arch = "wasm32")))]
     crate::latency_rig::commit(rig_sample);
     Ok(PreparedFrame {
+        background_draws,
+        world_draws,
         frame,
         overlay,
         resources,
@@ -1751,6 +1807,8 @@ pub fn finish(frame: Frame, bank: &mut Bank, hud: &str) -> Result<PreparedFrame>
         let resources = bank.resources(&frame)?;
         finish_plan(
             PreparedFrame {
+                background_draws: 0,
+                world_draws: frame.draws.len(),
                 #[cfg(feature = "frame-bench")]
                 food_submission: None,
                 frame,
@@ -1766,10 +1824,13 @@ pub fn finish(frame: Frame, bank: &mut Bank, hud: &str) -> Result<PreparedFrame>
 }
 /// Ordinary native/web gameplay shares this complete Rust projection and composition.
 pub fn finish_hud(
-    prepared: PreparedFrame,
+    mut prepared: PreparedFrame,
     bank: &mut Bank,
     hud: &crate::hud::View,
 ) -> Result<PreparedFrame> {
+    if !hud.playing {
+        prepared.hide_game_hud();
+    }
     let ui = prepared.ui_frame();
     // The native login owns connection messages, with its own layout and fade.
     // Browser adapters continue to use the shared HUD message.
@@ -1899,6 +1960,8 @@ mod text_staging_tests {
                     frame.draws[0].destination.width = f64::NAN;
                     finish_plan(
                         PreparedFrame {
+                            background_draws: 0,
+                            world_draws: 0,
                             #[cfg(feature = "frame-bench")]
                             food_submission: None,
                             overlay: None,
@@ -1916,6 +1979,8 @@ mod text_staging_tests {
                 3 => {
                     frame.draws[0].asset.handle += 1000;
                     bank.resources(&frame).map(|resources| PreparedFrame {
+                        background_draws: 0,
+                        world_draws: 0,
                         #[cfg(feature = "frame-bench")]
                         food_submission: None,
                         frame,
@@ -1927,6 +1992,8 @@ mod text_staging_tests {
                     frame.viewport_scale = f64::NAN;
                     finish_hud(
                         PreparedFrame {
+                            background_draws: 0,
+                            world_draws: 0,
                             #[cfg(feature = "frame-bench")]
                             food_submission: None,
                             overlay: None,

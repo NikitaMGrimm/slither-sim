@@ -34,6 +34,23 @@ steering, zoom and Esc. No egui pass, input translation or drain runs when all
 egui menus and their fades are inactive. Browser DOM menus are unchanged.
 The disabled outgoing controls allow pointer input through to gameplay.
 
+Game HUD visibility comes from `session_policy::View::game_hud_visible`: only
+active Playing sessions may display it. Dead/victory returns, connecting and
+terminal login cannot display retained leaderboard, minimap, readout or record
+announcements. The death world alone keeps its existing hold/crossfade; terminal
+sessions remove stale entities while preserving the background, matching the
+reference's disconnect reset. Native in-game menus also suppress HUD while
+retaining their live world. `LocalGame::take_frame`
+rechecks the policy for queued and retried pictures; the shared HUD projection
+does not discard retained scores or last-life history. Authored transitions and
+the offscreen reproduction live in `tests/menu_hud.rs` and
+`examples/menu_hud_specimens.rs`.
+The desktop host also supplies visible-menu admission at issue. The browser
+issue path applies the shared session fade clock even to Setup flushes and
+retries, so outgoing login suppresses HUD until it is gone on both platforms.
+Hidden draw storage stays with the issued picture and is restored before retry;
+dismissing a panel restores its HUD without requiring a fresh scene update.
+
 During the visible death-return fade, Servers and Settings already accept input;
 Change Skin waits for Login. The panel keeps its own opacity and modal input
 while the session continues the login/world crossfade underneath. Closing before
