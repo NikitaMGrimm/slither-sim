@@ -4,11 +4,28 @@ use super::tape;
 use slither_wgpu_slice::{Result, game::LocalGame};
 
 pub fn world(bots: u16) -> Result<LocalGame> {
+    make_world(bots, false, false)
+}
+
+pub fn far_world(bots: u16) -> Result<LocalGame> {
+    make_world(bots, bots == 500, true)
+}
+
+fn make_world(bots: u16, normal: bool, decorated: bool) -> Result<LocalGame> {
     let mut g = tape::negotiating();
-    let radius = 3584. * (f64::from(bots + 1) / 32.).sqrt();
+    if decorated {
+        g.bank.cosmetics = Some(authored_cosmetics()?);
+    }
+    let radius = if normal {
+        670. * f64::from(bots + 1).sqrt()
+    } else {
+        3584. * (f64::from(bots + 1) / 32.).sqrt()
+    };
+    let sector: u16 = if normal { 200 } else { 100 };
     let center = 16000_u16;
     let mut setup = tape::setup();
     setup[1..4].copy_from_slice(&tape::u24(u32::from(center)));
+    setup[6..8].copy_from_slice(&sector.to_be_bytes());
     setup.extend([0, 0]);
     setup.extend(tape::u24(radius.ceil() as u32));
     // Off-centre own snake, as on the host's spawn band. The whole-map zoom
@@ -19,7 +36,7 @@ pub fn world(bots: u16) -> Result<LocalGame> {
         tape::board(),
         vec![b'M', 0, 8, 64],
     ];
-    // The state owner admits at most 256 live snakes. Larger hosts send
+    // The state owner bounds live snakes. Larger hosts send
     // subscriptions rather than their whole world; stress that largest valid
     // live set without increasing the unrelated admission contract.
     let retained_bots = bots.min(slither_client::state::MAX_SNAKES as u16 - 1);
@@ -27,23 +44,45 @@ pub fn world(bots: u16) -> Result<LocalGame> {
         let angle = f64::from(i) * 2.399963229728653;
         let radial =
             radius * (0.08 + 0.86 * ((f64::from(i) + 0.5) / f64::from(retained_bots)).sqrt());
-        packets.push(snake(100 + i, center, radial, angle, (i % 9) as u8));
+        packets.push(snake(
+            100 + i,
+            center,
+            radial,
+            angle,
+            if decorated && i.is_multiple_of(5) {
+                24 + (i % 2) as u8
+            } else {
+                (i % 9) as u8
+            },
+        ));
     }
     // Constant-density pit food: ~777 pellets at 32 seats. All are retained,
     // including those culled at stock zoom. No private or external artwork.
-    let food_count = (777. * f64::from(bots + 1) / 32.).round() as u32;
+    let target = if normal {
+        (3. * 7. * std::f64::consts::PI * radius * radius / 90_000.).floor() as u32
+    } else {
+        (777. * f64::from(bots + 1) / 32.).round() as u32
+    };
+    // Keep the production ingress cap and represent a subscribed central disk at
+    // the requested 3x density rather than changing the client food contract.
+    let food_count = target.min(65_535);
+    let food_radius = if normal {
+        radius * (f64::from(food_count) / f64::from(target)).sqrt()
+    } else {
+        radius * 0.49
+    };
     for i in 0..food_count {
         let angle = f64::from(i) * 2.399963229728653;
-        let radial = radius * 0.49 * ((f64::from(i) + 0.5) / f64::from(food_count)).sqrt();
+        let radial = food_radius * ((f64::from(i) + 0.5) / f64::from(food_count)).sqrt();
         let x = (f64::from(center) + radial * angle.cos()) as u16;
         let y = (f64::from(center) + radial * angle.sin()) as u16;
         packets.push(vec![
             b'F',
-            (x / 100) as u8,
-            (y / 100) as u8,
+            (x / sector) as u8,
+            (y / sector) as u8,
             (i % 9) as u8,
-            ((x % 100) * 255 / 100) as u8,
-            ((y % 100) * 255 / 100) as u8,
+            ((x % sector) * 255 / sector) as u8,
+            ((y % sector) * 255 / sector) as u8,
             20,
         ]);
     }
@@ -116,4 +155,9 @@ fn snake(id: u16, center: u16, radius: f64, angle: f64, skin: u8) -> Vec<u8> {
         previous = point;
     }
     p
+}
+
+/// Only the built-in procedural face/bulb rasters; no image files are opened.
+pub fn authored_cosmetics() -> Result<slither_wgpu_slice::cosmetics::Cosmetics> {
+    slither_wgpu_slice::cosmetics::Cosmetics::from_images(Default::default(), None)
 }

@@ -212,3 +212,96 @@ impl Renderer {
         results.iter().map(|r| r.get().unwrap().1).sum()
     }
 }
+
+#[cfg(all(test, windows))]
+mod tests {
+    use super::*;
+    use crate::pellet_batch::offscreen;
+
+    #[test]
+    #[ignore = "explicit authored offscreen ordered bundle/direct comparison"]
+    fn partial_chunk_bundles_preserve_pixels_and_call_counts() {
+        for (backend, vendor) in [
+            (wgpu::Backends::VULKAN, 0x10de),
+            (wgpu::Backends::DX12, 0x1002),
+        ] {
+            let adapter = pollster::block_on(super::super::instance().enumerate_adapters(backend))
+                .into_iter()
+                .find(|a| a.get_info().vendor == vendor)
+                .expect("requested hardware adapter");
+            let mut r = pollster::block_on(Renderer::from_adapter_with_max_samples(
+                adapter,
+                wgpu::TextureFormat::Rgba8Unorm,
+                1,
+            ))
+            .unwrap();
+            let (mut frame, _, resources) = offscreen::scene([128, 96]);
+            let template = frame.draws[0].clone();
+            frame.draws = (0..5 * VERTEX_CHUNK_QUADS + 7)
+                .map(|i| {
+                    let mut draw = template.clone();
+                    draw.asset = resources[i % resources.len()].asset;
+                    draw.destination = slither_client::presentation::BodyRect {
+                        x: (i % 127) as f64 + 0.125,
+                        y: (i % 95) as f64 + 0.25,
+                        width: 9.,
+                        height: 7.,
+                    };
+                    draw.effective_alpha = 0.01 * (1 + i % 7) as f64;
+                    draw.blend = if i.is_multiple_of(3) {
+                        slither_client::presentation::BodyBlend::Lighter
+                    } else {
+                        slither_client::presentation::BodyBlend::SourceOver
+                    };
+                    draw
+                })
+                .collect();
+            r.sync_resources(&resources).unwrap();
+            let staging = offscreen::target(&r, frame.extent);
+            r.render(&frame, &staging.create_view(&Default::default()))
+                .unwrap();
+            for range in [
+                0..frame.draws.len(),
+                VERTEX_CHUNK_QUADS - 1..5 * VERTEX_CHUNK_QUADS - 1,
+            ] {
+                let mut images = Vec::new();
+                let mut counts = Vec::new();
+                for bundled in [false, true] {
+                    r.canonical_bundles = bundled;
+                    let target = offscreen::target(&r, frame.extent);
+                    let view = target.create_view(&Default::default());
+                    let mut encoder = r.device.create_command_encoder(&Default::default());
+                    {
+                        let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                            color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                                view: &view,
+                                depth_slice: None,
+                                resolve_target: None,
+                                ops: wgpu::Operations {
+                                    load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
+                                    store: wgpu::StoreOp::Store,
+                                },
+                            })],
+                            ..Default::default()
+                        });
+                        counts.push(r.encode_ordered(&mut pass, range.clone(), 1, None));
+                    }
+                    r.queue.submit([encoder.finish()]);
+                    images.push(offscreen::pixels(&r, &target).unwrap());
+                }
+                assert!(counts[0] > 10_000);
+                assert!(
+                    images[0]
+                        .as_chunks::<4>()
+                        .0
+                        .iter()
+                        .collect::<std::collections::BTreeSet<_>>()
+                        .len()
+                        > 8
+                );
+                assert_eq!(counts[0], counts[1]);
+                assert_eq!(images[0], images[1], "{backend:?} {range:?}");
+            }
+        }
+    }
+}

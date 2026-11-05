@@ -286,3 +286,25 @@ in one mapped buffer and submits one copy encoder, rather than one wgpu
 staging buffer per layer and mip. Wasm and single-layer syncs keep
 `Queue::write_texture`. The [batched-upload study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/client-performance/2026-11-05-batched-uploads/REPORT.md)
 records the AMD/DX12 join timings and exact readback/image controls.
+
+## Steady far-zoom command recording
+
+Native retained-food gameplay uses the ordered per-chunk render bundles already
+used by canonical join pictures. Four or more intersecting vertex chunks can
+record with up to four participants; smaller ranges and Wasm remain serial.
+Primitive order, projections, texture bindings and fragment arithmetic are
+unchanged. See the [far-zoom study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/client-performance/2026-11-05-far-zoom-bundles/REPORT.md).
+
+`FRAME_PERF_FAR_ZOOM=1` specializes `frame_perf --battledome-presented` to authored
+4K controls: 100-bot Battledome and a 500-bot normal map with 3x food density in
+a central subscribed disk, bounded to 65,535 retained foods. Both keep the own
+snake and configure procedural rival antennas. Views are factor one, 0.065 and
+whole map, in Original and Native. `FRAME_PERF_VULKAN=1` selects RTX/Vulkan;
+unset it for AMD/DX12. No file-backed artwork is loaded. Leave other workload,
+trace and history overrides unset. Each cell settles 110 preparations, warms ten
+rendered pictures, measures thirty, and optionally saves full physical PNGs at
+pictures 10, 25 and 39. The separate phase run also measures a menu-only egui
+control without a gameplay HUD. `FRAME_PERF_NO_PNG=1` skips readbacks for timing.
+`FRAME_PERF_FAR_CASE=100:Native:mid` selects one cell for shorter matched pairs.
+Use the shared lane timing lock and interleave retained release executables;
+these synchronized offscreen controls do not establish presented gameplay FPS.
