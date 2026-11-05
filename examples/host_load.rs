@@ -22,7 +22,7 @@ use std::{
 };
 use tungstenite::{Message, connect};
 
-const USAGE: &str = "Usage: host_load [--bots N] [--bot-threads N] [--world-threads N] [--seconds N] [--round-trip-ms N]";
+const USAGE: &str = "Usage: host_load [--bots N] [--bot-threads N] [--world-threads N] [--radius R] [--seconds N] [--round-trip-ms N]";
 /// Excess delays are measured against the smallest within this many frames.
 const WINDOW: usize = 1200;
 
@@ -30,6 +30,8 @@ struct Options {
     bots: usize,
     bot_threads: usize,
     world_threads: usize,
+    /// Fixed arena radius; seat-following official sizing when absent.
+    radius: Option<f64>,
     seconds: f64,
     round_trip: f64,
 }
@@ -39,6 +41,7 @@ fn options() -> Result<Options, String> {
         bots: 500,
         bot_threads: 2,
         world_threads: 1,
+        radius: None,
         seconds: 60.,
         round_trip: 0.04,
     };
@@ -52,6 +55,7 @@ fn options() -> Result<Options, String> {
             "--bots" => options.bots = number(value)? as usize,
             "--bot-threads" => options.bot_threads = number(value)? as usize,
             "--world-threads" => options.world_threads = number(value)? as usize,
+            "--radius" => options.radius = Some(number(value)?),
             "--seconds" => options.seconds = number(value)?,
             "--round-trip-ms" => options.round_trip = number(value)? / 1000.,
             _ => return Err(USAGE.into()),
@@ -69,6 +73,20 @@ fn run(options: Options) -> Result<(), String> {
         "policy=A4-mean parameter_manifest_sha256={}",
         slither_sim::bot::PARAMETER_MANIFEST_SHA256,
     );
+    let mut world = Config::official(options.bots + 1);
+    if let Some(radius) = options.radius {
+        // Protocol 19 caps the arena radius, so worlds past about 2,300 seats
+        // need a fixed radius. Food and prey keep official per-area densities:
+        // 7 pellets and 0.1024 refill attempts per 300-unit sector, one prey
+        // per ten million square units.
+        let area = std::f64::consts::PI * radius * radius;
+        world.radius = radius;
+        world.dynamic_radius = false;
+        world.size_to_population = false;
+        world.food_count = (7.0 * area / 90_000.0) as usize;
+        world.ambient_replenish_per_second = 0.1024 * area / 90_000.0;
+        world.prey.count = (area / 10_000_000.0).round().max(1.0) as usize;
+    }
     let config = HostConfig {
         bind: "127.0.0.1:0".parse().map_err(|_| "bad address")?,
         players: PlayerConfig {
@@ -81,7 +99,7 @@ fn run(options: Options) -> Result<(), String> {
             latency: LatencyConfig::fixed(options.round_trip),
         },
         simulation: SimulationConfig {
-            world: Config::official(options.bots + 1),
+            world,
             ..Default::default()
         },
         world_threads: options.world_threads,
