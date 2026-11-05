@@ -699,7 +699,7 @@ impl ServerPicker {
         add(
             ControlId(7),
             24.,
-            550.,
+            544.,
             370.,
             28.,
             S::HelpText,
@@ -721,7 +721,8 @@ impl ServerPicker {
         add(
             CLOSE,
             400.,
-            578.,
+            // The panel's 24-unit side padding, below as well.
+            558.,
             136.,
             38.,
             S::StudioCancel,
@@ -734,7 +735,7 @@ impl ServerPicker {
         add(
             ControlId(8),
             24.,
-            582.,
+            572.,
             350.,
             28.,
             S::HelpText,

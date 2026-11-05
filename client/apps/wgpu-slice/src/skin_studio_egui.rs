@@ -255,7 +255,7 @@ impl StudioUi {
         let id = widget_id(control.id);
         let focus_ring = |ui: &egui::Ui, response: &egui::Response, radius: f32| {
             if response.has_focus() && self.keyboard_focus {
-                outline(ui, r, radius, tokens);
+                outline(ui, r, radius);
             }
         };
         match &control.kind {

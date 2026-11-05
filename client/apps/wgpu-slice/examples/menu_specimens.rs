@@ -178,13 +178,17 @@ async fn run(output: &Path) -> Result<()> {
         return Err("--studio needs the native login host (not built on Linux or wasm)".into());
     }
     #[cfg(not(any(target_arch = "wasm32", target_os = "linux")))]
+    if std::env::args().nth(2).as_deref() == Some("--polish") {
+        return polish::specimens(&mut renderer, output);
+    }
+    #[cfg(not(any(target_arch = "wasm32", target_os = "linux")))]
     if std::env::args().nth(2).as_deref() == Some("--champion") {
         return champion::specimens(&mut renderer, output);
     }
     if std::env::args().nth(2).as_deref() == Some("--stroke") {
         return stroke_specimens(output);
     }
-    Err("Mode required: --login, --settings, --server-picker, --studio, --builder, --focus, --champion or --stroke".into())
+    Err("Mode required: --login, --settings, --server-picker, --studio, --builder, --focus, --champion, --polish or --stroke".into())
 }
 
 #[cfg(not(any(target_arch = "wasm32", target_os = "linux")))]
@@ -629,6 +633,10 @@ mod server_picker;
 #[cfg(not(any(target_arch = "wasm32", target_os = "linux")))]
 #[path = "menu_specimens/champion.rs"]
 mod champion;
+
+#[cfg(not(any(target_arch = "wasm32", target_os = "linux")))]
+#[path = "menu_specimens/polish.rs"]
+mod polish;
 
 /// The desktop host's layer order without a game world: page, world cover,
 /// egui, then the top layer (the studio preview) above it.
