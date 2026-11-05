@@ -21,6 +21,10 @@ pub(crate) struct RawSimulator {
 }
 
 impl RawSimulator {
+    #[cfg(feature = "parallel")]
+    pub(crate) fn set_parallel(&mut self, parallel: bool) {
+        self.backend.world.set_parallel(parallel);
+    }
     #[cfg(feature = "frame-bench")]
     pub(crate) fn set_frame_bench(&mut self, enabled: bool) {
         self.backend.frame_bench = enabled;

@@ -424,6 +424,7 @@ pub fn benchmark(
             world,
             ..Default::default()
         },
+        ..Default::default()
     })?
     .start()?;
     let executable = std::env::current_exe().map_err(|e| e.to_string())?;

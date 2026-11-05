@@ -130,6 +130,9 @@ pub struct HostConfig {
     /// Stretch overloaded ticks up to this many seconds; `None` keeps fixed ticks.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub max_tick: Option<f64>,
+    /// Threads that step the world, including the simulation thread. Above 1,
+    /// the world gets its own pool of this size; results are unchanged.
+    pub world_threads: usize,
 }
 
 impl Default for HostConfig {
@@ -143,6 +146,7 @@ impl Default for HostConfig {
             bots: BotConfig::default(),
             simulation: SimulationConfig::default(),
             max_tick: None,
+            world_threads: 1,
         }
     }
 }
@@ -211,6 +215,12 @@ impl HostConfig {
             .ok_or("players.max + bots.count must fit in usize")?;
         if self.players.max == 0 {
             return Err("Host needs 1 or more players.max".into());
+        }
+        if self.world_threads == 0 {
+            return Err("worldThreads must be at least 1".into());
+        }
+        if !cfg!(feature = "parallel") && self.world_threads > 1 {
+            return Err("worldThreads above 1 needs the parallel build feature".into());
         }
         if self.bots.count > 0 && self.bots.threads == 0 {
             return Err("Bots need 1 or more bots.threads".into());
@@ -433,6 +443,8 @@ pub struct Host {
     latency: LatencyConfig,
     decision_seconds: f64,
     max_tick: Option<f64>,
+    #[cfg(feature = "parallel")]
+    world_threads: usize,
     #[cfg(feature = "latency-rig")]
     latency_truth: Option<super::latency_truth::Export>,
 }
@@ -451,6 +463,8 @@ impl Host {
         world.set_player_latency(config.players.max, config.players.latency);
         #[cfg(feature = "frame-bench")]
         world.set_frame_bench(config.frame_bench);
+        #[cfg(feature = "parallel")]
+        world.set_parallel(config.world_threads > 1);
         let listener = TcpListener::bind(config.bind).map_err(|e| e.to_string())?;
         listener.set_nonblocking(true).map_err(|e| e.to_string())?;
         Ok(Self {
@@ -463,6 +477,8 @@ impl Host {
             latency,
             decision_seconds,
             max_tick: config.max_tick,
+            #[cfg(feature = "parallel")]
+            world_threads: config.world_threads,
             #[cfg(feature = "latency-rig")]
             latency_truth: None,
         })
@@ -568,6 +584,16 @@ impl Host {
             deliveries: socket_inbox,
         };
         let agents = self.max_clients + self.bots;
+        #[cfg(feature = "parallel")]
+        let pool = (self.world_threads > 1)
+            .then(|| {
+                rayon::ThreadPoolBuilder::new()
+                    .num_threads(self.world_threads)
+                    .thread_name(|i| format!("slither-world-{i}"))
+                    .build()
+            })
+            .transpose()
+            .map_err(|e| e.to_string())?;
         let simulation = Simulation {
             world,
             commands: inbox,
@@ -584,6 +610,18 @@ impl Host {
             ticks: 0,
             deferred: 0,
         };
+        #[cfg(feature = "parallel")]
+        match pool {
+            // Serve from one of the world pool's threads, so each tick's split
+            // phases reach the other threads without a hand-off to the pool.
+            Some(pool) => running.spawn(
+                "slither-simulation",
+                (pool, simulation),
+                |(pool, simulation)| pool.install(|| simulation.run()),
+            )?,
+            None => running.spawn("slither-simulation", simulation, Simulation::run)?,
+        }
+        #[cfg(not(feature = "parallel"))]
         running.spawn("slither-simulation", simulation, Simulation::run)?;
         running.spawn("slither-sockets", gateway, Gateway::run)?;
         Ok(running)
