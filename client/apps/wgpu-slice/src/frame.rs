@@ -337,6 +337,13 @@ fn checked_source(d: &Draw, resident: &BTreeMap<ResourceKey, BodyAsset>) -> Resu
 }
 
 impl Frame {
+    pub(crate) fn project_checked(
+        &self,
+        draw: &Draw,
+        resident: &BTreeMap<ResourceKey, BodyAsset>,
+    ) -> Result<Quad> {
+        self.project(draw, checked_source(draw, resident)?)
+    }
     pub fn draw_count(&self) -> usize {
         self.draws.len() + self.food_batch.as_ref().map_or(0, |b| b.draw_count())
     }
@@ -483,12 +490,20 @@ impl Frame {
         resident: &'a BTreeMap<ResourceKey, BodyAsset>,
     ) -> Result<impl Iterator<Item = Result<Quad>> + 'a> {
         self.check_limits()?;
+        let streamed = self
+            .food_batch
+            .as_ref()
+            .filter(|batch| batch.canonical_submission && !self.extent.contains(&0))
+            .map(|batch| batch.quads(self, resident))
+            .transpose()?;
         // A frame and its resident catalog are immutable for this iterator.
         // Paired pellet draws differ only in alpha; retain the last validated
         // projection rather than repeating resource checks and f64 conversion.
         // Bit comparisons preserve signed-zero distinctions in the input math.
         // Measured scope: research/client-performance/2026-11-02-quad-projection/REPORT.md.
-        let draws = if let Some(batch) = &self.food_batch {
+        let draws = if streamed.is_some() {
+            std::borrow::Cow::Borrowed(&[] as &[Draw])
+        } else if let Some(batch) = &self.food_batch {
             std::borrow::Cow::Owned(batch.canonical(&self.draws)?)
         } else {
             std::borrow::Cow::Borrowed(self.draws.as_slice())
@@ -499,27 +514,30 @@ impl Frame {
         } else {
             draws.len()
         };
-        Ok((0..count).map(move |index| {
-            let d = &draws[index];
-            if let Some((last, projected)) = &previous
-                && same_projection(&draws[*last], d)
-            {
-                if !(0. ..=1.).contains(&d.effective_alpha) {
-                    return Err("unsupported or invalid image rectangle/alpha/transform".into());
+        Ok(streamed
+            .into_iter()
+            .flatten()
+            .chain((0..count).map(move |index| {
+                let d = &draws[index];
+                if let Some((last, projected)) = &previous
+                    && same_projection(&draws[*last], d)
+                {
+                    if !(0. ..=1.).contains(&d.effective_alpha) {
+                        return Err("unsupported or invalid image rectangle/alpha/transform".into());
+                    }
+                    let mut next = projected.clone();
+                    for vertex in &mut next.vertices {
+                        vertex[4] = d.effective_alpha as f32;
+                    }
+                    next.black_effect = d.black_effect;
+                    next.blend = d.blend;
+                    return Ok(next);
                 }
-                let mut next = projected.clone();
-                for vertex in &mut next.vertices {
-                    vertex[4] = d.effective_alpha as f32;
-                }
-                next.black_effect = d.black_effect;
-                next.blend = d.blend;
-                return Ok(next);
-            }
-            let source = checked_source(d, resident)?;
-            let projected = self.project(d, source)?;
-            previous = Some((index, projected.clone()));
-            Ok(projected)
-        }))
+                let source = checked_source(d, resident)?;
+                let projected = self.project(d, source)?;
+                previous = Some((index, projected.clone()));
+                Ok(projected)
+            })))
     }
 }
 

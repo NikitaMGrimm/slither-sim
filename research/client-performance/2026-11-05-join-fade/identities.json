@@ -1,0 +1,46 @@
+{
+  "base_revision": "2a4938cb4bad47fc36ef04bdb3accd084a927b36",
+  "driver_sha256": "506611c9fc50ac9014b316a22796ef037d5615f15052f2bbc4ef22e7dfbcc58e",
+  "build": {
+    "rust": "1.99.0",
+    "profile": "release",
+    "target_directory": "D:/CargoTargets/join-fade",
+    "build_jobs": 2
+  },
+  "arms": {
+    "baseline": {
+      "binary_sha256": "9efdcb1eda19193595c85923d5c6164cb764a0e5103e997efd258abb8c4aedea",
+      "source_archive": {
+        "file": "baseline-source.tar",
+        "sha256": "2267ce9f1b9a6886e6828801398e7bda597d9f17761a07cbf718defa916ff6ae"
+      },
+      "runtime_files_sha256": {
+        "client/apps/wgpu-slice/src/canonical_pellets.rs": null,
+        "client/apps/wgpu-slice/src/frame.rs": "0c3db65b6098b4f4c3c9c8bfe77c56c4e8eae586ebfd5823fdaeb00897e9eeef",
+        "client/apps/wgpu-slice/src/gpu.rs": "94303e94bf72e4e355c50052b0a5573f514d6e349b41f3eb0f469326ecd945ff",
+        "client/apps/wgpu-slice/src/materials.rs": "f8b332598709db89f01a23ad7646bf4b8d572f0760ef0336351ba5d198e91c4a",
+        "client/apps/wgpu-slice/src/menu.rs": "6a1c4a730c1c9fe8fe1d8cc17021fb7ad4e3309e47f58a13aa1aeca9c60e555c",
+        "client/apps/wgpu-slice/src/pellet_batch.rs": "1c90bc04b9997da188ed181754ead16969c8fafaabd2f9c26f2b5dc0fda64c13",
+        "client/apps/wgpu-slice/src/quad_encoder.rs": null
+      },
+      "runtime_inventory_sha256": "f6ce50af2364f3329b261b8832fefb86cce3bd478a1181f54856bc2fe70ce156"
+    },
+    "balanced2": {
+      "binary_sha256": "b78896613b9ccb7af6abf24160fd40e3331827ad3508e34bebfb2f46a90f31f7",
+      "source_archive": {
+        "file": "balanced2-source.tar",
+        "sha256": "a8b53d019dda24ec9a9b4182f2c0ac1da0853790382a8bf77ceeae56a8aab34a"
+      },
+      "runtime_files_sha256": {
+        "client/apps/wgpu-slice/src/canonical_pellets.rs": "c8cb383aa079c5a6680b43d57e12fdeb2c0c4adb4c5e0272188a5391179f56d3",
+        "client/apps/wgpu-slice/src/frame.rs": "ab6c7b589fa773875a4880f9c3fd1d0ccda9da4c3501a6695c191373e94cb735",
+        "client/apps/wgpu-slice/src/gpu.rs": "605cfa01f00186478546a41d1aaa6042ce9ce53ef955c5e4373f19bc37cec420",
+        "client/apps/wgpu-slice/src/materials.rs": "81816281c05b88eaa2cf91edb0a146021159174a7cd67300e9e4350009194a7b",
+        "client/apps/wgpu-slice/src/menu.rs": "1351b71bd2f72ffc8631e88fa636586ee5b1e9c095be1bfa1d4deeb31b6435ea",
+        "client/apps/wgpu-slice/src/pellet_batch.rs": "e8ce9bef5108e42e9ede1e72118fb4fb4db63f279a380e60f8973bb222a4c6a0",
+        "client/apps/wgpu-slice/src/quad_encoder.rs": "e558df06314cbefac7a40ddb170090280247a4b7251e3e05ffe83a4ae1f250cc"
+      },
+      "runtime_inventory_sha256": "91e3e117940f5c8002c5ab454c4b71d70013c5a0db7e7a81fb439772d4a13951"
+    }
+  }
+}

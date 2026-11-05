@@ -105,8 +105,16 @@ maximum. Other geometry can still exhaust the remaining budget.
 A generic/canonical fallback needs up to seven commands per food: 458,745 for
 65,535, already above the picture limit before snakes. World-preparation
 admission rejects the complete picture; native release skips it and leaves the
-previous presentation displayed. A backdrop also requires canonical expansion
-during menu composition. If that composition exceeds its draw quota, the menu
+previous presentation displayed. A menu backdrop also requires the canonical
+outlines and primitive order. Menu composition retains the food inputs and
+streams those primitives at submission, preserving the generic renderer's
+chunking, layers and blending without materializing command/draw vectors.
+Native preparation uses at most four participants, including the caller, for
+independent projection and vertex stores; coverage merges in primitive order.
+Large native command ranges record those same vertex chunks in render bundles
+on up to four threads, then execute the bundles in their original order.
+Wasm and pictures below 2,048 visible foods keep the serial stream.
+It still charges the full seven-command budget. If composition exceeds it, the menu
 overlay is skipped and the original world picture is submitted. No partial
 pellet selection conceals the limit. Canonical food command-limit failures use
 the same recognised draw-quota error, so optional composition takes this fallback

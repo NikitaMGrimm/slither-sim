@@ -19,10 +19,14 @@ use draw_runs::{DrawState, Pipeline, draw_runs};
 #[path = "texture_arrays.rs"]
 mod texture_arrays;
 use texture_arrays::{Group, TextureArray};
+#[path = "canonical_pellets.rs"]
+mod canonical_pellets;
 #[path = "pellet_cpu.rs"]
 mod pellet_cpu;
 #[path = "pellet_gpu.rs"]
 mod pellet_gpu;
+#[path = "quad_encoder.rs"]
+mod quad_encoder;
 #[path = "soft_layers.rs"]
 mod soft_layers;
 use soft_layers::{LayerHistory, covered_area, pays, select_glows};
@@ -233,6 +237,8 @@ pub struct Renderer {
     outline_composite: BTreeMap<u32, wgpu::RenderPipeline>,
     glow_composite: BTreeMap<u32, wgpu::RenderPipeline>,
     glow_composite_single: wgpu::RenderPipeline,
+    #[cfg(not(target_arch = "wasm32"))]
+    canonical_bundles: bool,
     draw_calls: usize,
     pass_count: usize,
     diagnostic_timestamps: Option<wgpu::QuerySet>,
@@ -631,6 +637,8 @@ impl Renderer {
             outline_composite,
             glow_composite,
             glow_composite_single,
+            #[cfg(not(target_arch = "wasm32"))]
+            canonical_bundles: false,
             draw_calls: 0,
             pass_count: 0,
             diagnostic_timestamps,
@@ -988,12 +996,23 @@ impl Renderer {
         samples: u32,
         clear: bool,
     ) -> RenderResult<()> {
+        #[cfg(not(target_arch = "wasm32"))]
+        {
+            self.canonical_bundles = frame
+                .food_batch
+                .as_ref()
+                .is_some_and(|b| b.canonical_submission);
+        }
         if self.lost.load(Ordering::SeqCst) {
             return Err(RenderError::Host(
                 "GPU device lost; no gameplay reset/retry".into(),
             ));
         }
-        if frame.food_batch.is_some() {
+        if frame
+            .food_batch
+            .as_ref()
+            .is_some_and(|b| !b.canonical_submission)
+        {
             frame.check_limits()?;
             if frame.extent.contains(&0) {
                 return Ok(());
@@ -1052,7 +1071,8 @@ impl Renderer {
                 self.anti_aliasing
             },
         )?;
-        let chunk_count = frame.draws.len().div_ceil(VERTEX_CHUNK_QUADS);
+        let draw_count = frame.draw_count();
+        let chunk_count = draw_count.div_ceil(VERTEX_CHUNK_QUADS);
         self.vertices
             .resize_with(chunk_count.max(self.vertices.len()), VertexChunk::default);
         for chunk in &mut self.vertices {
@@ -1078,94 +1098,68 @@ impl Renderer {
         let mut outline_span: Option<std::ops::Range<usize>> = None;
         let mut outline_count = 0;
         let mut unsafe_prefix = None;
-        let mut quads = quads.peekable();
-        let mut uploaded = 0;
-        while let Some(quad) = quads.next() {
-            let quad = quad?;
-            let index = uploaded;
-            uploaded += 1;
-            let mut second_alpha = 0.;
-            let mut paired = false;
-            // UNORM8 is the product's encoded blend domain. Other diagnostic
-            // formats keep separate additions rather than inheriting this quantizer.
-            if encoded_unorm8
-                && let Some(Ok(next)) = quads.peek()
-                && additive_pair(&quad, next)
-            {
-                second_alpha = next.vertices[0][4];
-                paired = true;
-                quads.next();
-            }
-            let mut scale = 0;
-            if soft_layers && self.textures[&quad.key].food_outline {
+        #[cfg(not(target_arch = "wasm32"))]
+        let prepared = if encoded_unorm8 {
+            canonical_pellets::prepare(
+                frame,
+                &self.textures,
+                soft_layers,
+                attachment,
+                &mut self.vertices,
+            )?
+        } else {
+            None
+        };
+        let serial = || -> Box<dyn Iterator<Item = Result<canonical_pellets::Info>> + '_> {
+            Box::new(
+                canonical_pellets::pack(
+                    quads,
+                    &self.textures,
+                    encoded_unorm8,
+                    soft_layers,
+                    attachment,
+                )
+                .enumerate()
+                .map(|(index, p)| {
+                    p.map(|p| {
+                        canonical_pellets::store(
+                            p,
+                            &mut self.vertices[index / VERTEX_CHUNK_QUADS],
+                            (draw_count - index).min(VERTEX_CHUNK_QUADS),
+                        )
+                    })
+                }),
+            )
+        };
+        #[cfg(not(target_arch = "wasm32"))]
+        let packed: Box<dyn Iterator<Item = Result<canonical_pellets::Info>>> =
+            if let Some(info) = prepared {
+                Box::new(info.into_iter().map(Ok))
+            } else {
+                serial()
+            };
+        #[cfg(target_arch = "wasm32")]
+        let packed = serial();
+        for (index, packed) in packed.enumerate() {
+            let packed = packed?;
+            if packed.outline {
                 outline_span.get_or_insert(index..index).end = index + 1;
                 outline_count += 1;
-                outline_coverage += covered_area(&quad.vertices);
-            } else {
-                let covers = quad.vertices[0][0] <= -1.
-                    && quad.vertices[0][1] >= 1.
-                    && quad.vertices[1][0] >= 1.
-                    && quad.vertices[1][1] >= 1.
-                    && quad.vertices[2][0] >= 1.
-                    && quad.vertices[2][1] <= -1.
-                    && quad.vertices[5][0] <= -1.
-                    && quad.vertices[5][1] <= -1.;
-                if !covers {
-                    unsafe_prefix.get_or_insert(index);
-                }
+                outline_coverage += packed.area;
+            } else if packed.unsafe_prefix {
+                unsafe_prefix.get_or_insert(index);
             }
-            if soft_layers
-                && self.textures[&quad.key].food_glow
-                && quad.blend == slither_client::presentation::BodyBlend::Lighter
-            {
-                scale = glow_bin(&quad, second_alpha, attachment);
+            if packed.glow {
+                let scale = packed.scale;
                 if scale > 0 {
-                    glow_coverage[scale as usize] += covered_area(&quad.vertices);
+                    glow_coverage[scale as usize] += packed.area;
                 }
                 glow_span.get_or_insert(index..index).end = index + 1;
                 glow_count += 1;
             }
-            let chunk = &mut self.vertices[index / VERTEX_CHUNK_QUADS];
-            if chunk.states.is_empty() {
-                let count = (frame.draws.len() - index).min(VERTEX_CHUNK_QUADS);
-                if chunk.bytes.capacity() < count * QUAD_VERTEX_BYTES {
-                    chunk.bytes.reserve_exact(count * QUAD_VERTEX_BYTES);
-                }
-                if chunk.states.capacity() < count {
-                    chunk.states.reserve_exact(count);
-                }
-            }
-            let texture = &self.textures[&quad.key];
-            // Only the opaque black world clear is known here. Black source-over
-            // cannot change it (including fs_black's clamped subtraction). A
-            // loaded overlay or a later shadow must retain its ordinary draw.
-            if soft_layers
-                && index == black_prefix
-                && texture.black
-                && quad.blend == slither_client::presentation::BodyBlend::SourceOver
-            {
+            if index == black_prefix && packed.black_prefix {
                 black_prefix += 1;
             }
-            for vertex in [
-                quad.vertices[0],
-                quad.vertices[1],
-                quad.vertices[2],
-                quad.vertices[5],
-            ] {
-                for value in vertex {
-                    chunk.bytes.extend_from_slice(&value.to_le_bytes());
-                }
-                chunk.bytes.extend_from_slice(&second_alpha.to_le_bytes());
-                chunk.bytes.extend_from_slice(&texture.layer.to_le_bytes());
-            }
-            let mut state = DrawState::new(&quad, self.textures[&quad.key].black);
-            state.glow_scale = scale;
-            if paired {
-                state.noop = zero_pair(quad.vertices[0][4], second_alpha);
-                state.pipeline = Pipeline::PairLighter;
-            }
-            state.key = texture.array.key;
-            chunk.states.push(state);
         }
         let glow_bins = select_glows(glow_coverage, samples, previous);
         let glow_span = glow_span.filter(|span| {
@@ -1511,7 +1505,7 @@ impl Renderer {
                     samples,
                     load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
                     before: Some(start..span.start),
-                    range: span.end..frame.draws.len(),
+                    range: span.end..draw_count,
                     queries: query(0),
                     coarse: coarse.map(|g| &g.bind),
                     fine: [half.map(|g| &g.bind), fine.map(|g| &g.bind)],
@@ -1534,7 +1528,7 @@ impl Renderer {
                         wgpu::LoadOp::Clear(wgpu::Color::BLACK)
                     },
                     before: None,
-                    range: start..frame.draws.len(),
+                    range: start..draw_count,
                     queries: query(0),
                     coarse: None,
                     fine: [None; 2],
@@ -1598,82 +1592,7 @@ impl Renderer {
         samples: u32,
         filter: Option<u8>,
     ) -> usize {
-        let mut draw_calls = 0;
-        let mut previous: Option<DrawState> = None;
-        pass.set_index_buffer(self.indices.slice(..), wgpu::IndexFormat::Uint16);
-        for (i, chunk) in self.vertices.iter().enumerate() {
-            let base = i * VERTEX_CHUNK_QUADS;
-            let start = range.start.saturating_sub(base).min(chunk.states.len());
-            let end = range.end.saturating_sub(base).min(chunk.states.len());
-            if start >= end {
-                continue;
-            }
-            pass.set_vertex_buffer(0, chunk.buffer.as_ref().expect("vertex buffer").slice(..));
-            for (state, vertices) in draw_runs(chunk.states[start..end].iter().copied()) {
-                if state.noop {
-                    continue;
-                }
-                if filter.is_some_and(|coarse| coarse != state.glow_scale) {
-                    continue;
-                }
-                if previous.is_none_or(|p| p.pipeline != state.pipeline) {
-                    pass.set_pipeline(match state.pipeline {
-                        Pipeline::BlackOver => {
-                            if samples == 1 {
-                                &self.overlay_black_over
-                            } else {
-                                &self.black_over[&samples]
-                            }
-                        }
-                        Pipeline::PairLighter => {
-                            if let Some(scale) = filter.filter(|&s| s > 0) {
-                                &self.glow_pair_lighter[scale as usize - 1]
-                            } else if samples == 1 {
-                                &self.overlay_pair_lighter
-                            } else {
-                                &self.pair_lighter[&samples]
-                            }
-                        }
-                        Pipeline::Lighter => {
-                            if let Some(scale) = filter.filter(|&s| s > 0) {
-                                &self.glow_lighter[scale as usize - 1]
-                            } else if samples == 1 {
-                                &self.overlay_lighter
-                            } else {
-                                &self.lighter[&samples]
-                            }
-                        }
-                        Pipeline::Over => {
-                            if samples == 1 {
-                                &self.overlay_over
-                            } else {
-                                &self.over[&samples]
-                            }
-                        }
-                    });
-                }
-                if previous.is_none_or(|p| (p.key, p.repeat) != (state.key, state.repeat)) {
-                    let texture = &self.bindings[&state.key];
-                    pass.set_bind_group(
-                        0,
-                        if state.repeat {
-                            &texture.repeat_bind
-                        } else {
-                            &texture.bind
-                        },
-                        &[],
-                    );
-                }
-                pass.draw_indexed(
-                    vertices.start + start as u32 * 6..vertices.end + start as u32 * 6,
-                    0,
-                    0..1,
-                );
-                draw_calls += 1;
-                previous = Some(state);
-            }
-        }
-        draw_calls
+        self.encode_ordered(pass, range, samples, filter)
     }
     fn encode_pass(&self, encoder: &mut wgpu::CommandEncoder, plan: PaintPass<'_>) -> usize {
         let PaintPass {

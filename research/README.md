@@ -7,6 +7,7 @@ archive integrity establishes neither scientific rules nor product adoption.
 
 | Topic | Study | Scope and decision |
 | --- | --- | --- |
+| Client performance | [Exact join fades](client-performance/2026-11-05-join-fade/REPORT.md) | Retain canonical food inputs through menu composition, prepare exact vertex chunks and ordered native command bundles, and index spinner scanlines; authored full-frame identity controls and interleaved 4K join timing. |
 | Client graphics | [Graphics presets and world AA](client-performance/2026-11-05-graphics-settings/REPORT.md) | Opt-in presets and format-aware 1/2/4-sample settings; exact authored default controls, qualified RTX DX12 repeatability, interleaved RTX/AMD cost matrix and CPU tradeoffs. |
 | Client performance | [Pellet rectangle endpoints](client-performance/2026-11-05-pellet-endpoints/REPORT.md) | Reuse axis endpoints within each projection; exact authored 4K images/census and matched CPU preparation measurements, retaining rejected geometry-cache pilots and cold-spike limits. |
 | Client performance | [Cold join resources across threads](client-performance/2026-11-05-cold-resources/REPORT.md) | Prefetch shared HUD faces and spread cold sprite/minimap rasters over up to four threads; interleaved RTX/Vulkan and AMD/DX12 4K join pairs cut the first gameplay callback from about 80 to 18-24 ms, with exact authored image/census/canonical controls. The menu-crossfade tail remains the largest join hitch. |
