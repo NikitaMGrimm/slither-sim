@@ -305,27 +305,40 @@ fn disabled_shared_buttons_and_checkboxes_keep_aa_text() {
                     output = Some(frame);
                 }
                 let mut text = None;
+                let mut fills = Vec::new();
                 for shape in &output.unwrap().shapes {
-                    visit(&shape.shape, &mut |shape| {
-                        if let egui::Shape::Text(t) = shape
-                            && t.galley.job.text == "Test"
-                        {
+                    visit(&shape.shape, &mut |shape| match shape {
+                        egui::Shape::Text(t) if t.galley.job.text == "Test" => {
                             text = Some(text_color(t));
                         }
+                        egui::Shape::Mesh(mesh) => {
+                            // The single pill's interior excludes its transparent feather.
+                            let alpha = mesh.vertices.iter().map(|v| v.color.a()).max().unwrap();
+                            fills.extend(
+                                mesh.vertices
+                                    .iter()
+                                    .filter(|v| v.color.a() == alpha)
+                                    .map(|v| v.color),
+                            );
+                        }
+                        _ => {}
                     });
+                }
+                assert!(!fills.is_empty(), "missing disabled pill fill");
+                let disabled_alpha = Color32::WHITE
+                    .gamma_multiply(ctx.style_of(egui::Theme::Dark).visuals.disabled_alpha)
+                    .a();
+                assert!(disabled_alpha > 0 && disabled_alpha < 255);
+                for fill in &fills {
+                    assert_eq!(fill.a(), disabled_alpha, "surface still fades");
                 }
                 let primary = primary && !checkbox;
                 for bg in [
                     slither_client::menu_theme::MenuTheme::default().field,
                     slither_client::menu_theme::MenuTheme::default().backdrop,
                 ] {
-                    for fill in pill_palette(primary, PillState::Idle).0 {
-                        let fill = over(
-                            fill.gamma_multiply(
-                                ctx.style_of(egui::Theme::Dark).visuals.disabled_alpha,
-                            ),
-                            theme::ink(bg),
-                        );
+                    for fill in &fills {
+                        let fill = over(*fill, theme::ink(bg));
                         let ratio = contrast(over(text.unwrap(), fill), fill);
                         println!(
                             "disabled primary {primary} checkbox {checkbox} checked {checked}: {ratio:.2}:1"
