@@ -1,4 +1,6 @@
 //! Theme pill labels keep WCAG AA text contrast in every enabled state.
+// `egui_theme` is compiled only for the native desktop host (see `lib.rs`).
+#![cfg(not(any(target_arch = "wasm32", target_os = "linux")))]
 use egui::Color32;
 use slither_wgpu_slice::egui_theme::{PillState, pill_palette};
 
