@@ -190,16 +190,12 @@ mod desktop {
         }
         fn edit_effects(&mut self, effects: Vec<slither_client::menu_input::HostEditEffect>) {
             use slither_client::menu_input::HostEditEffect;
-            let effects = self
-                .login
-                .input
-                .execute(effects, &mut WindowEditHost(&self.window));
             let admission = self.game.can_play() && self.preparation.is_none() && self.can_play();
-            let effects =
-                self.login
-                    .input
-                    .state
-                    .commit_menu(effects, &mut self.login.state, admission);
+            let effects = self.login.commit_edit_effects(
+                effects,
+                &mut WindowEditHost(&self.window),
+                admission,
+            );
             for effect in effects {
                 match effect {
                     HostEditEffect::Gameplay { key, pressed } => {

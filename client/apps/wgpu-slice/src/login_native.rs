@@ -715,6 +715,19 @@ impl NativeLogin {
     pub fn take_egui_effects(&mut self) -> Vec<HostEditEffect> {
         std::mem::take(&mut self.egui_effects)
     }
+    /// The desktop host's commit after every routed event: platform effects,
+    /// then the legacy adapter's menu commit, which writes its nickname copy.
+    pub fn commit_edit_effects(
+        &mut self,
+        effects: Vec<HostEditEffect>,
+        host: &mut impl crate::menu_input_native::EditHost,
+        admission: bool,
+    ) -> Vec<HostEditEffect> {
+        let effects = self.input.execute(effects, host);
+        self.input
+            .state
+            .commit_menu(effects, &mut self.state, admission)
+    }
     fn settings_frame(&mut self) {
         let open = self.state.settings.is_open();
         let settings = self.state.settings.visible();
@@ -855,6 +868,14 @@ impl NativeLogin {
         if !self.login_ui.composing && !settings {
             self.state
                 .edit_nickname(&self.login_ui.nickname.encode_utf16().collect::<Vec<_>>());
+            // egui owns the field, but the host still commits every event
+            // through the legacy adapter, whose commit_menu writes its own
+            // nickname copy back. Keep that copy current or edits revert.
+            let view = self.state.view(true);
+            if !view.disabled {
+                let effects = self.input.state.sync_menu(&view, &[]);
+                self.egui_effects.extend(effects);
+            }
         }
         if let Some((id, enter)) = action {
             self.activate_login(id, enter);
