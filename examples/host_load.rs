@@ -22,14 +22,14 @@ use std::{
 };
 use tungstenite::{Message, connect};
 
-const USAGE: &str =
-    "Usage: host_load [--bots N] [--bot-threads N] [--seconds N] [--round-trip-ms N]";
+const USAGE: &str = "Usage: host_load [--bots N] [--bot-threads N] [--world-threads N] [--seconds N] [--round-trip-ms N]";
 /// Excess delays are measured against the smallest within this many frames.
 const WINDOW: usize = 1200;
 
 struct Options {
     bots: usize,
     bot_threads: usize,
+    world_threads: usize,
     seconds: f64,
     round_trip: f64,
 }
@@ -38,6 +38,7 @@ fn options() -> Result<Options, String> {
     let mut options = Options {
         bots: 500,
         bot_threads: 2,
+        world_threads: 1,
         seconds: 60.,
         round_trip: 0.04,
     };
@@ -50,6 +51,7 @@ fn options() -> Result<Options, String> {
         match flag.as_str() {
             "--bots" => options.bots = number(value)? as usize,
             "--bot-threads" => options.bot_threads = number(value)? as usize,
+            "--world-threads" => options.world_threads = number(value)? as usize,
             "--seconds" => options.seconds = number(value)?,
             "--round-trip-ms" => options.round_trip = number(value)? / 1000.,
             _ => return Err(USAGE.into()),
@@ -82,6 +84,7 @@ fn run(options: Options) -> Result<(), String> {
             world: Config::official(options.bots + 1),
             ..Default::default()
         },
+        world_threads: options.world_threads,
         ..Default::default()
     };
     let host = Host::bind(config)?.start()?;
@@ -134,7 +137,8 @@ fn run(options: Options) -> Result<(), String> {
     }
     let ticks = host.ticks();
     let deferred = host.deferred_ticks();
-    let load = host.simulation_seconds() / start.elapsed().as_secs_f64();
+    let busy_seconds = host.simulation_seconds();
+    let load = busy_seconds / start.elapsed().as_secs_f64();
     host.stop()?;
     let mut relative: Vec<f64> = excess
         .chunks(WINDOW)
@@ -148,10 +152,12 @@ fn run(options: Options) -> Result<(), String> {
         return Err("The watcher received no frames".into());
     }
     println!(
-        "bots={} frames={} ticks={ticks} deferred={deferred} simulation load={:.0}%",
+        "bots={} world_threads={} frames={} ticks={ticks} deferred={deferred} simulation load={:.0}% busy per tick ms={:.3}",
         options.bots,
+        options.world_threads,
         relative.len(),
-        load * 100.
+        load * 100.,
+        busy_seconds * 1000. / ticks.max(1) as f64
     );
     println!(
         "excess delay ms: p50={:.2} p90={:.2} p99={:.2} max={:.2}",
