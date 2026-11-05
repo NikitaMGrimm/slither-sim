@@ -1,0 +1,47 @@
+{
+  "baseline_revision": "1921f44c1b12968b42fc683d47927637572d5a29",
+  "toolchain": "rustc 1.99.0 (b940084d7 2026-09-28)",
+  "profile": "release (thin LTO, one codegen unit)",
+  "cargo_target_dir": "D:/CargoTargets/first-egui",
+  "cargo_build_jobs": 2,
+  "baseline_runtime": {
+    "client/apps/wgpu-slice/src/egui_native.rs": "13279d3ef864d31eb88bd04582efdf49012bdbb432e89771f9fa37f4e3b0359d",
+    "client/apps/wgpu-slice/src/gpu.rs": "605cfa01f00186478546a41d1aaa6042ce9ce53ef955c5e4373f19bc37cec420"
+  },
+  "candidate_measured_runtime": {
+    "client/apps/wgpu-slice/src/egui_native.rs": "ac2a24865fa0bca38b4cbc6228644e65d878fd418f47fd01a51e053d354f6e37",
+    "client/apps/wgpu-slice/src/gpu.rs": "0aced8ae136a25dff16fcdae84f54a3e57145863437a52cc2eaa62e5aa3c443a"
+  },
+  "candidate_delivered_runtime": {
+    "client/apps/wgpu-slice/src/egui_native.rs": "12242b05117c3eb1dcdafdd69856288143affafd6587489a62cd149c7e32d813",
+    "client/apps/wgpu-slice/src/gpu.rs": "0aced8ae136a25dff16fcdae84f54a3e57145863437a52cc2eaa62e5aa3c443a"
+  },
+  "candidate_difference": "Only the study-reference comment was expanded to its canonical URL after the measured build; executable code is unchanged.",
+  "shared_harness": {
+    "client/apps/wgpu-slice/examples/menu_specimens.rs": "c42997b6bf46b33fe6805ee4dea374ccea8fa073769ccf36f5330528b787e52a",
+    "client/apps/wgpu-slice/examples/menu_specimens/first_egui.rs": "74939de49827f1bc10ed284fd1f405111ceb690ab195047fcc11114b7d1b82fe"
+  },
+  "executables": {
+    "menu-baseline.exe": "bd722a3bfff24446dd1d32869ef1e0994ec2f80065d5ac34e0a13060bd19e160",
+    "menu-candidate.exe": "401b6cc386ac177ed3ad9e6c15da46ef7bfcd69e34ded6d156fdfe387f8a57c7",
+    "ingame-baseline.exe": "637f7e4e0ff124aca35ed8bb2567a13612d6931e43dda6b8d2c46478c6c53c56",
+    "ingame-candidate.exe": "c6b38564abccfbb2226fbdc3daa52e09caa5d60c40abc2b0b948e4894936dbdd",
+    "menu-baseline-early.exe": "4ed1ef9f85bf71404d67baa44132c505f9ed88078ebd4586292a77c2bb5a7216",
+    "menu-profile.exe": "e36cfe66f9eb702a749df20078fb4a9bfb3387bc07cb72d2065cac9f5c16b6a5"
+  },
+  "raw_drivers": {
+    "run.py": "7f4b9873116d7c87dcb1451aa596c8bfefd32f19f22ff79c083660b26f7fafab",
+    "capture.py": "09fb3c562eb076c33c7b06bced90064088f9ce5dca50935fc9a53d92bdb19eb7",
+    "export.py": "bfe192dd2f60df48c2c67a9e046b17a8546c3fb3f468fb94c24d0a0fb5cdbe66"
+  },
+  "png_controls": {
+    "baseline_menu_executable": "menu-baseline-early.exe",
+    "baseline_ingame_executable": "ingame-baseline.exe",
+    "candidate_menu_executable": "menu-candidate.exe",
+    "candidate_ingame_executable": "ingame-candidate.exe"
+  },
+  "valid_timing_prefix": "timing2-",
+  "invalid_timing_prefix": "timing-",
+  "cpu_log_interval_ms": 250,
+  "scope": "Authored menus only, native initial viewport 960x540 DPR 1; no windows, outside servers or official art."
+}

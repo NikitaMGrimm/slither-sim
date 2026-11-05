@@ -144,6 +144,10 @@ fn synthetic_icon(color: [u8; 4]) -> Result<Vec<u8>> {
 async fn run(output: &Path) -> Result<()> {
     std::fs::create_dir(output).map_err(|e| e.to_string())?;
     #[cfg(not(any(target_arch = "wasm32", target_os = "linux")))]
+    if std::env::args().nth(2).as_deref() == Some("--first-egui") {
+        return first_egui::run(output).await;
+    }
+    #[cfg(not(any(target_arch = "wasm32", target_os = "linux")))]
     let mut renderer = Renderer::new(&instance(), None, wgpu::TextureFormat::Rgba8Unorm).await?;
     #[cfg(not(any(target_arch = "wasm32", target_os = "linux")))]
     if std::env::args().nth(2).as_deref() == Some("--focus") {
@@ -637,6 +641,10 @@ mod champion;
 #[cfg(not(any(target_arch = "wasm32", target_os = "linux")))]
 #[path = "menu_specimens/polish.rs"]
 mod polish;
+
+#[cfg(not(any(target_arch = "wasm32", target_os = "linux")))]
+#[path = "menu_specimens/first_egui.rs"]
+mod first_egui;
 
 /// The desktop host's layer order without a game world: page, world cover,
 /// egui, then the top layer (the studio preview) above it.

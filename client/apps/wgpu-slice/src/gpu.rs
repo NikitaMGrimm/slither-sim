@@ -207,6 +207,8 @@ pub struct Renderer {
     pub device: wgpu::Device,
     pub queue: wgpu::Queue,
     pub adapter_info: wgpu::AdapterInfo,
+    #[cfg(not(any(target_arch = "wasm32", target_os = "linux")))]
+    pub(crate) egui_renderer: crate::egui_native::RendererPreparation,
     layout: wgpu::BindGroupLayout,
     over: BTreeMap<u32, wgpu::RenderPipeline>,
     overlay_over: wgpu::RenderPipeline,
@@ -447,6 +449,8 @@ impl Renderer {
         device.set_device_lost_callback(move |_, _| {
             flag.store(true, Ordering::SeqCst);
         });
+        #[cfg(not(any(target_arch = "wasm32", target_os = "linux")))]
+        let egui_renderer = crate::egui_native::RendererPreparation::start(&device, format);
         let layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
             label: Some("source"),
             entries: &[
@@ -607,6 +611,8 @@ impl Renderer {
             device,
             queue,
             adapter_info: info,
+            #[cfg(not(any(target_arch = "wasm32", target_os = "linux")))]
+            egui_renderer,
             layout,
             over,
             overlay_over,

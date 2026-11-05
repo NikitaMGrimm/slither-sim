@@ -13,6 +13,42 @@ use winit::{
 
 const ACTION_KEYS: [Key; 4] = [Key::Tab, Key::Enter, Key::Space, Key::Escape];
 
+fn renderer(device: &wgpu::Device, format: wgpu::TextureFormat) -> egui_wgpu::Renderer {
+    egui_wgpu::Renderer::new(
+        device,
+        format,
+        egui_wgpu::RendererOptions {
+            dithering: false,
+            ..Default::default()
+        },
+    )
+}
+
+/// Compile the first menu pipeline while the world pipelines are being built.
+/// Keep the actual renderer: compiling and discarding a duplicate would still
+/// leave validation and resource creation on the first paint.
+/// See https://github.com/NikitaMGrimm/slither-sim/blob/main/research/client-performance/2026-11-05-first-egui/REPORT.md.
+pub(crate) struct RendererPreparation(Mutex<Option<std::thread::JoinHandle<egui_wgpu::Renderer>>>);
+
+impl RendererPreparation {
+    pub(crate) fn start(device: &wgpu::Device, format: wgpu::TextureFormat) -> Self {
+        let device = device.clone();
+        Self(Mutex::new(
+            std::thread::Builder::new()
+                .name("egui-pipeline".into())
+                .spawn(move || renderer(&device, format))
+                .ok(),
+        ))
+    }
+
+    fn take(&self, device: &wgpu::Device, format: wgpu::TextureFormat) -> egui_wgpu::Renderer {
+        let pending = self.0.lock().unwrap().take();
+        // Thread creation failure or another host on the same device keeps the
+        // original serial path. Input/context state is never prepared off-thread.
+        pending.map_or_else(|| renderer(device, format), |job| job.join().unwrap())
+    }
+}
+
 /// Input the owning menu consumes at once, in order. Deferred to the next
 /// frame, it would land after directory or session updates and reach egui as
 /// one unsplit batch, so a press could act on a newer panel generation.
@@ -661,16 +697,9 @@ impl NativeEguiHost {
         if let Some((shapes, pixels_per_point)) = s.shapes.take() {
             s.meshes = s.context.tessellate(shapes, pixels_per_point);
         }
-        let renderer = s.renderer.get_or_insert_with(|| {
-            egui_wgpu::Renderer::new(
-                &gpu.device,
-                gpu.format,
-                egui_wgpu::RendererOptions {
-                    dithering: false,
-                    ..Default::default()
-                },
-            )
-        });
+        let renderer = s
+            .renderer
+            .get_or_insert_with(|| gpu.egui_renderer.take(&gpu.device, gpu.format));
         for (id, deltas) in &s.textures.set {
             for delta in deltas {
                 renderer.update_texture(&gpu.device, &gpu.queue, *id, delta);
