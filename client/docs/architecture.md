@@ -87,6 +87,9 @@ Native login, Settings, the server picker and the in-game menu use one lazy
 `egui_native::NativeEguiHost`. It owns
 the context, egui-winit adapter, ordered input, texture deltas, meshes and
 egui-wgpu renderer.
+Device initialization prepares that first renderer on a helper thread alongside
+the world pipelines; the first menu paint takes ownership of it. Contexts,
+font atlases, layout and input retain their lazy, serial path.
 Closed screens bypass translation, draining and context mutation. Window cursor,
 DPI, focus, modifier and held-key bookkeeping precedes input ownership; activation
 synchronizes the adapter from that state. Repeated key-down events are filtered

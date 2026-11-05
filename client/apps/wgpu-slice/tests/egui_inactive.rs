@@ -165,3 +165,69 @@ fn shared_context_uploads_resizes_and_reopens_without_gpu_errors() {
     drop(host);
     assert!(pollster::block_on(validation.pop()).is_none());
 }
+
+#[test]
+#[ignore = "explicit finite offscreen hardware-GPU exactness check"]
+fn prefetched_and_serial_renderers_have_identical_pixels_and_separate_contexts() {
+    #[allow(dead_code)]
+    #[path = "../examples/support/offscreen.rs"]
+    mod offscreen;
+    use slither_wgpu_slice::{
+        egui_theme,
+        gpu::{Renderer, instance},
+    };
+    let gpu = pollster::block_on(Renderer::new(
+        &instance(),
+        None,
+        wgpu::TextureFormat::Rgba8Unorm,
+    ))
+    .unwrap();
+    let validation = gpu.device.push_error_scope(wgpu::ErrorFilter::Validation);
+    let mut hosts = [NativeEguiHost::default(), NativeEguiHost::default()];
+    let marker = egui::Id::unique("prefetch-context-isolation");
+    for (extent, dpr) in [([960, 540], 1.), ([720, 1280], 2.), ([960, 540], 1.)] {
+        let mut pictures = Vec::new();
+        // The first host takes the prepared renderer. The second must construct
+        // its own serial renderer, including its own texture namespace.
+        for (index, host) in hosts.iter_mut().enumerate() {
+            host.set_active(true);
+            if index == 0 {
+                host.context()
+                    .unwrap()
+                    .data_mut(|data| data.insert_temp(marker, 42_u32));
+            } else {
+                assert_eq!(
+                    host.context()
+                        .unwrap()
+                        .data(|data| data.get_temp::<u32>(marker)),
+                    None
+                );
+            }
+            for _ in 0..2 {
+                host.frame(extent, dpr, &[], |ctx, _| {
+                    egui::Area::new(egui::Id::unique("authored-menu-control")).show(ctx, |ui| {
+                        egui_theme::panel_frame().show(ui, |ui| {
+                            egui_theme::title(ui, "Authored menu");
+                            egui_theme::pill_button(
+                                ui,
+                                egui::Id::unique("resume"),
+                                "Resume",
+                                200.,
+                                true,
+                            );
+                        });
+                    });
+                });
+            }
+            host.check_error().unwrap();
+            let target = offscreen::target(&gpu, extent);
+            host.paint(&gpu, &target.create_view(&Default::default()));
+            pictures.push(offscreen::pixels(&gpu, &target).unwrap());
+            host.set_active(false);
+        }
+        assert_eq!(pictures[0], pictures[1]);
+        assert!(pictures[0].iter().any(|&byte| byte != 0));
+    }
+    drop(hosts);
+    assert!(pollster::block_on(validation.pop()).is_none());
+}
