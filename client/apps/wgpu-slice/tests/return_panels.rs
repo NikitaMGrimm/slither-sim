@@ -264,10 +264,15 @@ fn closing_panel_enter_and_space_never_create_a_replay_request() {
             for _ in 0..26 {
                 trial.pending_close_frame(&close);
             }
-            let quality = trial.login.state.settings.preferences().quality;
+            let quality = trial.login.state.settings.preferences().quality();
+            if panel == E::Settings {
+                trial
+                    .login
+                    .focus(slither_client::settings::QUALITY_CHOICES[1].0);
+            }
             trial.key(key);
             if panel == E::Settings {
-                assert_ne!(trial.login.state.settings.preferences().quality, quality);
+                assert_ne!(trial.login.state.settings.preferences().quality(), quality);
             }
             trial
                 .game
@@ -473,8 +478,13 @@ fn return_panels_keep_modal_play_routing_and_queued_play_remains_once_only() {
         let mut trial = Trial::new();
         trial.until(3308);
         trial.click(button);
+        if button == E::Settings {
+            trial
+                .login
+                .focus(slither_client::settings::QUALITY_CHOICES[1].0);
+        }
         trial.login.activate(false); // Enter belongs to the panel, as on settled Login.
-        let quality = trial.login.state.settings.preferences().quality;
+        let quality = trial.login.state.settings.preferences().quality();
         if button == E::Settings {
             assert_eq!(quality, slither_client::menu_preferences::MenuQuality::Low);
         }

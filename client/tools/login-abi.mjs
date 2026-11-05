@@ -33,15 +33,24 @@ for(const base of ['dist/web/slither_client','dist/wgpu-slice/pkg/slither_wgpu_s
     const migrated=new wasm.LoginMenu('en','1');
     migrated.restore_settings(record,legacy);
     assert.equal(migrated.step(0,960,540,36,true,false).quality,quality);
-    assert.equal(migrated.settings_record(),`2:${quality==='low'?'0':'1'}:${record?.endsWith(':native')?'native':'original'}`);
+    assert.equal(migrated.settings_record(),`3:${quality==='low'?'low':'auto'}:${record?.endsWith(':native')?'native':'original'}:auto`);
     assert.equal(migrated.world_resolution(),record?.endsWith(':native')?'native':'original');
     migrated.action('quality',false,true);
     assert.equal(migrated.world_resolution(),record?.endsWith(':native')?'native':'original');
-    assert.equal(migrated.settings_record(),`2:${quality==='low'?'1':'0'}:${record?.endsWith(':native')?'native':'original'}`);
+    assert.equal(migrated.settings_record(),`3:${quality==='low'?'auto':'low'}:${record?.endsWith(':native')?'native':'original'}:auto`);
     migrated.action('quality',false,true);
     migrated.action('play',false,true);
     assert.equal(migrated.step(16,960,540,36,true,false).requested_quality,quality);
     migrated.free();
+  }
+  for (const preset of ['auto','low','medium','high']) for (const aa of ['auto','off','2','4']) {
+    const parsed=new wasm.LoginMenu('en','1');
+    parsed.restore_settings(`3:${preset}:native:${aa}`,'0');
+    assert.equal(parsed.graphics_quality(),preset);
+    assert.equal(parsed.anti_aliasing(),aa);
+    assert.equal(parsed.world_resolution(),'native');
+    assert.equal(parsed.settings_record(),`3:${preset}:native:${aa}`);
+    parsed.free();
   }
   const menu=new wasm.LoginMenu('fr','0');
   assert.equal(menu.edit('A😀\u007f'),'A  \u007f');

@@ -203,6 +203,7 @@ pub struct StartMenuState {
     spinner_alpha: f64,
     spinner_progress: f64,
     pending_play: Option<(String, MenuQuality)>,
+    play_graphics: crate::settings::GraphicsQuality,
     focus_pending: bool,
     return_play: bool,
     return_enter_enabled: bool,
@@ -218,7 +219,11 @@ impl StartMenuState {
             phase: MenuPhase::Login,
             nickname: String::new(),
             settings: crate::settings::SettingsState::new(crate::settings::SettingsPreferences {
-                quality,
+                graphics: if quality == MenuQuality::Low {
+                    crate::settings::GraphicsQuality::Low
+                } else {
+                    crate::settings::GraphicsQuality::Auto
+                },
                 ..Default::default()
             }),
             last_capture: None,
@@ -244,6 +249,7 @@ impl StartMenuState {
             spinner_alpha: 0.,
             spinner_progress: 0.,
             pending_play: None,
+            play_graphics: Default::default(),
             focus_pending: true,
             return_play: false,
             return_enter_enabled: false,
@@ -293,7 +299,9 @@ impl StartMenuState {
             self.return_play = returning;
             self.phase = MenuPhase::Connecting;
             self.focus_pending = false;
-            self.pending_play = Some((self.nickname.clone(), self.settings.preferences().quality));
+            self.pending_play =
+                Some((self.nickname.clone(), self.settings.preferences().quality()));
+            self.play_graphics = self.settings.preferences().graphics;
             self.spinner_visible = true;
             return None;
         }
@@ -313,6 +321,11 @@ impl StartMenuState {
             )),
             _ => None,
         }
+    }
+
+    /// Graphics preset frozen at the latest accepted Play click.
+    pub fn play_graphics(&self) -> crate::settings::GraphicsQuality {
+        self.play_graphics
     }
 
     /// Begin the outgoing login clock only after accepted gameplay, not a click.
@@ -692,7 +705,7 @@ impl StartMenuState {
                     * 100_000.)
                 .round()
                 / 100_000.,
-            quality: self.settings.preferences().quality,
+            quality: self.settings.preferences().quality(),
         }
     }
 }

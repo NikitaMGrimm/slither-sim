@@ -144,8 +144,9 @@ impl Sweep<'_> {
         }
         login.open_settings(true);
         for (name, id) in [
-            ("settings-toggle", settings::QUALITY),
+            ("settings-quality", settings::QUALITY_CHOICES[0].0),
             ("settings-resolution", settings::RESOLUTION),
+            ("settings-aa", settings::AA_CHOICES[0].0),
             ("settings-done", settings::DONE),
         ] {
             self.sample(&mut login, &mut art, name, Some(id))?;

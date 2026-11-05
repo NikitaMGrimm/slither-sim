@@ -99,6 +99,28 @@ pub fn pill_button(
 ) -> egui::Response {
     pill(ui, id, label, None, width, primary)
 }
+/// Preset choices keep the existing pill treatment and expose radio checked state.
+pub fn radio_choice(
+    ui: &mut egui::Ui,
+    id: Id,
+    label: &str,
+    selected: bool,
+    width: f32,
+) -> egui::Response {
+    let (slot, _) = ui.allocate_exact_size(vec2(width, 52.), Sense::hover());
+    let rect = Rect::from_center_size(slot.center(), vec2((slot.width() - 12.).max(1.), 40.));
+    painted_pill(
+        ui,
+        id,
+        label,
+        Some(selected),
+        rect,
+        false,
+        20.,
+        true,
+        egui::Role::RadioButton,
+    )
+}
 pub fn checkbox_row(
     ui: &mut egui::Ui,
     id: Id,
@@ -124,7 +146,17 @@ fn pill(
     // Reserve the complete focus/shadow footprint inside scroll clipping.
     let (slot, _) = ui.allocate_exact_size(vec2(width, 52.), Sense::hover());
     let rect = Rect::from_center_size(slot.center(), vec2((slot.width() - 12.).max(1.), 40.));
-    painted_pill(ui, id, label, checked, rect, primary, 20., true)
+    painted_pill(
+        ui,
+        id,
+        label,
+        checked,
+        rect,
+        primary,
+        20.,
+        true,
+        egui::Role::CheckBox,
+    )
 }
 
 pub fn pill_at(
@@ -136,7 +168,17 @@ pub fn pill_at(
     font_size: f32,
     focus_visible: bool,
 ) -> egui::Response {
-    painted_pill(ui, id, label, None, rect, primary, font_size, focus_visible)
+    painted_pill(
+        ui,
+        id,
+        label,
+        None,
+        rect,
+        primary,
+        font_size,
+        focus_visible,
+        egui::Role::Button,
+    )
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -149,11 +191,12 @@ fn painted_pill(
     primary: bool,
     font_size: f32,
     focus_visible: bool,
+    role: egui::Role,
 ) -> egui::Response {
     let response = ui.interact(rect, id, Sense::click());
     response.widget_info(|| {
         if let Some(checked) = checked {
-            egui::WidgetInfo::selected(egui::Role::CheckBox, ui.is_enabled(), checked, label)
+            egui::WidgetInfo::selected(role, ui.is_enabled(), checked, label)
         } else {
             egui::WidgetInfo::labeled(egui::Role::Button, ui.is_enabled(), label)
         }

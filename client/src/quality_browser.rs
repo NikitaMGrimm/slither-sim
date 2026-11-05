@@ -90,6 +90,8 @@ impl DesktopQuality {
         let requested = match state.requested {
             QualityMode::Low => 0,
             QualityMode::High => 1,
+            QualityMode::Medium => 2,
+            QualityMode::FixedHigh => 3,
         };
         format!(
             "{{\"requested\":{},\"highQuality\":{},\"qualityBlend\":{},\"qualityScale\":{},\"lowFpsCounter\":{},\"lastStatisticsMs\":{}}}",

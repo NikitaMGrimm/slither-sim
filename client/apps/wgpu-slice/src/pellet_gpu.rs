@@ -63,8 +63,8 @@ pub(super) struct Pellets {
     source_layout: wgpu::BindGroupLayout,
     frame_buffer: wgpu::Buffer,
     frame_bind: wgpu::BindGroup,
-    body: [wgpu::RenderPipeline; 2],
-    full: [wgpu::RenderPipeline; 2],
+    body: std::collections::BTreeMap<u32, wgpu::RenderPipeline>,
+    full: std::collections::BTreeMap<u32, wgpu::RenderPipeline>,
     reduced: [wgpu::RenderPipeline; 3],
     flags: Option<wgpu::Buffer>,
     dynamic: Option<wgpu::Buffer>,
@@ -104,7 +104,7 @@ impl Pellets {
         device: &wgpu::Device,
         source: &wgpu::BindGroupLayout,
         format: wgpu::TextureFormat,
-        samples: u32,
+        samples: &[u32],
     ) -> Self {
         let uniform_layout = || {
             device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
@@ -195,14 +195,14 @@ impl Pellets {
                 cache: None,
             })
         };
-        let body = [
-            make("vs_pellet_body", "fs_pair", 1),
-            make("vs_pellet_body", "fs_pair", samples),
-        ];
-        let full = [
-            make("vs_pellet_full", "fs_pair", 1),
-            make("vs_pellet_full", "fs_pair", samples),
-        ];
+        let body = samples
+            .iter()
+            .map(|&n| (n, make("vs_pellet_body", "fs_pair", n)))
+            .collect();
+        let full = samples
+            .iter()
+            .map(|&n| (n, make("vs_pellet_full", "fs_pair", n)))
+            .collect();
         let reduced = [
             make("vs_pellet_half", "fs_pair2", 1),
             make("vs_pellet_fine", "fs_pair4", 1),
@@ -569,7 +569,7 @@ impl Pellets {
                 ..Default::default()
             });
             calls += r.encode_draws(&mut pass, 0..barriers[0], samples, None);
-            pass.set_pipeline(&self.body[usize::from(samples > 1)]);
+            pass.set_pipeline(&self.body[&samples]);
             calls += self.encode(r, &mut pass, b, 0..1);
             calls += r.encode_draws(&mut pass, barriers[0]..barriers[1], samples, None);
             for i in 0..3 {
@@ -578,19 +578,19 @@ impl Pellets {
                         if samples == 1 {
                             &r.glow_composite_single
                         } else {
-                            &r.glow_composite
+                            &r.glow_composite[&samples]
                         }
                     } else if samples == 1 {
                         &r.fine_composite_single
                     } else {
-                        &r.outline_composite
+                        &r.outline_composite[&samples]
                     });
                     pass.set_bind_group(0, &layers[i].as_ref().expect("admitted layer").1, &[]);
                     pass.draw(0..3, 0..1);
                     calls += 1;
                 }
             }
-            pass.set_pipeline(&self.full[usize::from(samples > 1)]);
+            pass.set_pipeline(&self.full[&samples]);
             calls += self.encode(r, &mut pass, b, 1..3);
             calls += r.encode_draws(&mut pass, barriers[1]..usize::MAX, samples, None);
         }

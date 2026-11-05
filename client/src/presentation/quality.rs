@@ -9,6 +9,10 @@ pub enum QualityMode {
     Low,
     /// Begin connections in high quality, allowing low-frame-count fallback.
     High,
+    /// Reduced glow and body detail, without frame-count fallback.
+    Medium,
+    /// Full graphics without adaptive degradation.
+    FixedHigh,
 }
 
 /// A copied view of desktop quality state; no rendering or asset ownership.
@@ -16,6 +20,8 @@ pub enum QualityMode {
 pub struct QualitySnapshot {
     /// Stored preference; changing it alone does not reset runtime quality.
     pub requested: QualityMode,
+    /// Effect preset applied at the last connection/preview boundary.
+    pub applied_mode: QualityMode,
     /// Whether runtime updates currently target high quality.
     pub high_quality: bool,
     /// High-quality contribution, between zero and one.
@@ -41,6 +47,7 @@ impl QualityState {
         Ok(Self {
             snapshot: QualitySnapshot {
                 requested,
+                applied_mode: QualityMode::High,
                 high_quality: true,
                 quality_blend: 1.,
                 quality_scale: 1.,
@@ -59,16 +66,20 @@ impl QualityState {
     /// The ongoing statistics interval is preserved.
     pub fn begin_connection(&mut self) {
         self.begin_skin_preview();
+        self.snapshot.applied_mode = self.snapshot.requested;
         if self.snapshot.requested == QualityMode::Low {
             self.snapshot.high_quality = false;
             self.snapshot.quality_blend = 0.;
             self.snapshot.quality_scale = 1.7;
+        } else if self.snapshot.requested == QualityMode::Medium {
+            self.snapshot.quality_scale = 1.35;
         }
     }
 
     /// Start skin preview in high quality regardless of the stored preference.
     /// Subsequent playing updates and statistics still use the normal rules.
     pub fn begin_skin_preview(&mut self) {
+        self.snapshot.applied_mode = QualityMode::High;
         self.snapshot.high_quality = true;
         self.snapshot.quality_blend = 1.;
         self.snapshot.quality_scale = 1.;
@@ -89,8 +100,13 @@ impl QualityState {
                 if state.quality_blend < 1. {
                     state.quality_blend = (state.quality_blend + step.delta * 0.0075).min(1.);
                 }
-                if state.quality_scale > 1. {
-                    state.quality_scale = (state.quality_scale - step.delta * 4E-5).max(1.);
+                let floor = if state.applied_mode == QualityMode::Medium {
+                    1.35
+                } else {
+                    1.
+                };
+                if state.quality_scale > floor {
+                    state.quality_scale = (state.quality_scale - step.delta * 4E-5).max(floor);
                 }
             } else {
                 if state.quality_blend > 0. {

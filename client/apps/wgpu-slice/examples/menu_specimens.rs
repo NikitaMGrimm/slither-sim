@@ -192,8 +192,16 @@ fn settings_trial(output: &Path, renderer: &mut Renderer) -> Result<()> {
     use slither_wgpu_slice::login_native::NativeLogin;
     use std::time::Instant;
     let mut rows = Vec::new();
-    for extent in [[960, 540], [360, 640]] {
+    for extent in [[960, 540], [360, 640], [1920, 1080], [3840, 2160]] {
         let mut login = NativeLogin::new("Player")?;
+        // Match native's safe-picture preflight before projecting the AA status.
+        let projection = slither_wgpu_slice::render::backing_size(extent.map(f64::from))?;
+        let plan = renderer.world_plan(
+            login.state.settings.preferences().resolution,
+            projection,
+            extent,
+        )?;
+        login.state.settings.effective_samples(plan.samples);
         for now in (0..=9600).step_by(16) {
             login.step(now as f64, true, false)?;
         }
