@@ -110,6 +110,122 @@ fn client() -> AnimatedClient {
     client
 }
 
+// Authored packet transitions: wheel projection must not become an
+// appearance-owned spacing value that takes thousands of draws to recover.
+#[test]
+fn wheel_zoom_does_not_change_retained_body_spacing_across_rejoin() {
+    for notches in [-1000., -17., 1000.] {
+        for reset in [false, true] {
+            let mut stock = client();
+            let mut zoomed = stock.clone();
+            zoomed.wheel_zoom(notches);
+            for _ in 0..120 {
+                stock.prepare_draw(800, 600).unwrap();
+                zoomed.prepare_draw(800, 600).unwrap();
+            }
+            if reset {
+                for c in [&mut stock, &mut zoomed] {
+                    apply(c, &[remove(7, 1)]);
+                    c.reset();
+                    apply(c, &[setup(), appearance(7, 2000, 12)]);
+                    c.prepare_draw(800, 600).unwrap();
+                }
+            }
+            assert_ne!(zoomed.camera().zoom(), stock.camera().zoom());
+            for command in [
+                appearance(8, 2050, 4),
+                anchor(Some(8), 2056, 1000, true),
+                tail(8),
+                anchor(Some(7), 2006, 1000, true),
+                tail(7),
+            ] {
+                apply(&mut stock, std::slice::from_ref(&command));
+                apply(&mut zoomed, &[command]);
+                for id in [7, 8] {
+                    let spacing = |c: &AnimatedClient| {
+                        c.snake(id).map(|s| {
+                            let m = s.metrics();
+                            (m.point_spacing, m.target_point_spacing)
+                        })
+                    };
+                    assert_eq!(spacing(&zoomed), spacing(&stock));
+                    assert_eq!(
+                        zoomed.snake(id),
+                        stock.snake(id),
+                        "retained snake {id}, notches {notches}, rejoin {reset}"
+                    );
+                }
+            }
+            // Return through the opposite endpoint. Geometry must agree even
+            // before any later packet can refresh a stale spacing target.
+            zoomed.wheel_zoom(-notches * 2.);
+            for _ in 0..120 {
+                let a = stock.prepare_draw_with_style(800, 600, 1., false).unwrap();
+                let b = zoomed.prepare_draw_with_style(800, 600, 1., false).unwrap();
+                assert_eq!(a.len(), b.len());
+                for (a, b) in a.iter().zip(&b) {
+                    assert_eq!(a.metrics, b.metrics);
+                    assert_eq!(a.curve, b.curve);
+                }
+            }
+        }
+    }
+}
+
+fn assert_wheel_independent_spacing_update(command: Vec<u8>) {
+    let mut stock = client();
+    let mut zoomed = stock.clone();
+    zoomed.wheel_zoom(-1000.);
+    for _ in 0..120 {
+        stock.prepare_draw(800, 600).unwrap();
+        zoomed.prepare_draw(800, 600).unwrap();
+    }
+    apply(&mut stock, std::slice::from_ref(&command));
+    apply(&mut zoomed, &[command]);
+    let metrics = |c: &AnimatedClient| c.own_snake().unwrap().metrics();
+    assert_eq!(
+        metrics(&zoomed).target_point_spacing,
+        metrics(&stock).target_point_spacing
+    );
+    assert_eq!(zoomed.own_snake(), stock.own_snake());
+}
+
+#[test]
+fn wheel_zoom_does_not_change_anchor_spacing_target() {
+    for grew in [false, true] {
+        assert_wheel_independent_spacing_update(anchor(Some(7), 2006, 1000, grew));
+    }
+}
+
+#[test]
+fn wheel_zoom_does_not_change_single_anchor_spacing_target() {
+    let mut stock = client();
+    let mut zoomed = stock.clone();
+    zoomed.wheel_zoom(-1000.);
+    for _ in 0..120 {
+        stock.prepare_draw(800, 600).unwrap();
+        zoomed.prepare_draw(800, 600).unwrap();
+    }
+    let command = anchor(Some(7), 2006, 1000, false);
+    apply(&mut stock, std::slice::from_ref(&command));
+    assert!(
+        zoomed
+            .try_apply_single_anchor(&bundle(&[command]), ElapsedHeader::Absent)
+            .unwrap()
+            .is_some()
+    );
+    assert_eq!(
+        zoomed.own_snake().unwrap().metrics().target_point_spacing,
+        stock.own_snake().unwrap().metrics().target_point_spacing
+    );
+    assert_eq!(zoomed.own_snake(), stock.own_snake());
+}
+
+#[test]
+fn wheel_zoom_does_not_change_tail_spacing_target() {
+    assert_wheel_independent_spacing_update(tail(7));
+}
+
 fn eye_style(travel: f64) -> StandardEyeGeometry {
     StandardEyeGeometry {
         pupil_travel: travel,
