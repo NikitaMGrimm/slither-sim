@@ -19,6 +19,15 @@ records the ranked CPU/offscreen GPU profile, restricted replay and authored
 30,000-pellet/40-snake workloads, exact output controls, alternating runs and
 rejected texture-array/composition-cache trials. It does not establish gameplay FPS.
 
+## Cold join resources
+
+Native text shares decoded installed faces process-wide; the HUD's Arial
+regular and bold decode on a helper thread when the first rasterizer exists.
+Cold sprite recipes and the minimap background's rows run on up to four
+threads, including the caller, and are admitted in their serial order. Wasm
+stays serial. The [cold-resource study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/client-performance/2026-11-05-cold-resources/REPORT.md)
+records the join timings, exact image controls and the remaining menu-tail cost.
+
 ## Battledome zoom-out matrix
 
 The finite headless `frame_perf --battledome NEW_DIRECTORY` driver uses authored
