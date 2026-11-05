@@ -808,6 +808,7 @@ impl Renderer {
         let max_layers = self.device.limits().max_texture_array_layers as usize;
         let mut arrays = BTreeMap::new();
         let mut textures = BTreeMap::new();
+        let mut writes = Vec::new();
         for ((width, height, mips), members) in sizes {
             let members: Vec<_> = members.into_iter().collect();
             for (index, chunk) in members.chunks(max_layers).enumerate() {
@@ -828,7 +829,7 @@ impl Renderer {
                 let mut keys = Vec::with_capacity(chunk.len());
                 for (layer, &(key, r)) in chunk.iter().enumerate() {
                     if previous.is_none_or(|g| g.keys[layer] != key) {
-                        array.write(&self.queue, layer as u32, r);
+                        writes.push((array.clone(), layer as u32, r));
                     }
                     let black = self.textures.get(&key).map_or_else(
                         || {
@@ -857,6 +858,10 @@ impl Renderer {
                 arrays.insert(group_key, Group { array, keys });
             }
         }
+        // Every new array exists before any layer is staged; nothing is
+        // uploaded if an earlier group fails.
+        let writes: Vec<_> = writes.iter().map(|(a, l, r)| (a, *l, *r)).collect();
+        TextureArray::write_batch(&self.device, &self.queue, &writes);
         self.arrays = arrays;
         self.textures = textures;
         self.refresh_bindings();
@@ -2014,6 +2019,153 @@ impl SurfaceHost {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[cfg(not(target_arch = "wasm32"))]
+    fn read_layer(r: &Renderer, texture: &wgpu::Texture, layer: u32, level: u32) -> Vec<u8> {
+        let (width, height) = (
+            (texture.width() >> level).max(1),
+            (texture.height() >> level).max(1),
+        );
+        let pitch = (width * 4).next_multiple_of(wgpu::COPY_BYTES_PER_ROW_ALIGNMENT);
+        let read = r.device.create_buffer(&wgpu::BufferDescriptor {
+            label: None,
+            size: u64::from(pitch * height),
+            usage: wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::MAP_READ,
+            mapped_at_creation: false,
+        });
+        let mut encoder = r.device.create_command_encoder(&Default::default());
+        encoder.copy_texture_to_buffer(
+            wgpu::TexelCopyTextureInfo {
+                texture,
+                mip_level: level,
+                origin: wgpu::Origin3d {
+                    x: 0,
+                    y: 0,
+                    z: layer,
+                },
+                aspect: wgpu::TextureAspect::All,
+            },
+            wgpu::TexelCopyBufferInfo {
+                buffer: &read,
+                layout: wgpu::TexelCopyBufferLayout {
+                    offset: 0,
+                    bytes_per_row: Some(pitch),
+                    rows_per_image: Some(height),
+                },
+            },
+            wgpu::Extent3d {
+                width,
+                height,
+                depth_or_array_layers: 1,
+            },
+        );
+        r.queue.submit([encoder.finish()]);
+        read.slice(..)
+            .map_async(wgpu::MapMode::Read, |r| r.unwrap());
+        r.device
+            .poll(wgpu::PollType::Wait {
+                submission_index: None,
+                timeout: None,
+            })
+            .unwrap();
+        let bytes = read.slice(..).get_mapped_range().unwrap();
+        bytes
+            .chunks(pitch as usize)
+            .flat_map(|row| &row[..width as usize * 4])
+            .copied()
+            .collect()
+    }
+
+    // Authored random texels; no game art. Odd, aligned and one-pixel widths
+    // cover row padding, whole-level copies and every mip of each chain.
+    #[cfg(not(target_arch = "wasm32"))]
+    #[test]
+    #[ignore = "explicit finite offscreen GPU check"]
+    fn batched_layer_uploads_match_per_call_writes() {
+        let adapter = pollster::block_on(instance().request_adapter(&Default::default())).unwrap();
+        let mut r = pollster::block_on(Renderer::from_adapter_with_max_samples(
+            adapter,
+            wgpu::TextureFormat::Rgba8Unorm,
+            1,
+        ))
+        .unwrap();
+        let scope = r.device.push_error_scope(wgpu::ErrorFilter::Validation);
+        let mut seed = 0x9e37_79b9_u32;
+        for (width, height, full_chain) in [
+            (1, 1, true),
+            (37, 11, true),
+            (64, 64, true),
+            (130, 3, false),
+            (5, 96, true),
+        ] {
+            let mut bytes = 0;
+            let (mut w, mut h) = (width, height);
+            let levels = if full_chain {
+                u32::max(width, height).ilog2() + 1
+            } else {
+                2
+            };
+            for _ in 0..levels {
+                bytes += w as usize * h as usize * 4;
+                (w, h) = ((w / 2).max(1), (h / 2).max(1));
+            }
+            let resources: Vec<Resource> = (0..3)
+                .map(|i| {
+                    let pixels = (0..bytes)
+                        .map(|_| {
+                            seed ^= seed << 13;
+                            seed ^= seed >> 17;
+                            seed ^= seed << 5;
+                            seed as u8
+                        })
+                        .collect();
+                    Resource {
+                        food_glow: false,
+                        food_outline: false,
+                        asset: BodyAsset {
+                            handle: 1 + i,
+                            revision: 1,
+                            width,
+                            height,
+                            status: BodyAssetStatus::Ready,
+                        },
+                        image: crate::materials::RgbaImage {
+                            width,
+                            height,
+                            pixels,
+                        }
+                        .into(),
+                    }
+                })
+                .collect();
+            let mips = resources[0].image.mip_level_count().unwrap();
+            assert_eq!(mips, levels);
+            let batched = r.new_array([width, height], 3, mips).unwrap();
+            let serial = r.new_array([width, height], 3, mips).unwrap();
+            let writes: Vec<_> = resources
+                .iter()
+                .enumerate()
+                .map(|(i, x)| (&batched, i as u32, x))
+                .collect();
+            TextureArray::write_batch(&r.device, &r.queue, &writes);
+            for (i, x) in resources.iter().enumerate() {
+                serial.write(&r.queue, i as u32, x);
+            }
+            for layer in 0..3 {
+                let mut offset = 0;
+                for level in 0..mips {
+                    let expected = read_layer(&r, &serial.texture, layer, level);
+                    assert_eq!(
+                        expected,
+                        resources[layer as usize].image.pixels[offset..offset + expected.len()]
+                    );
+                    assert_eq!(read_layer(&r, &batched.texture, layer, level), expected);
+                    offset += expected.len();
+                }
+            }
+        }
+        assert!(pollster::block_on(scope.pop()).is_none());
+    }
 
     #[cfg(not(target_arch = "wasm32"))]
     #[test]
