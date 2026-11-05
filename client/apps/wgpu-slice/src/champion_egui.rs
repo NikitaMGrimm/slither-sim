@@ -170,7 +170,8 @@ impl ChampionUi {
                             ui.visuals_mut().disabled_alpha = 1.;
                             ui.multiply_opacity(control.alpha as f32);
                             if !enabled && !matches!(control.kind, ControlKind::Label { .. }) {
-                                ui.multiply_opacity(tokens.disabled_opacity(control.style) as f32);
+                                ui.visuals_mut().disabled_alpha =
+                                    tokens.disabled_opacity(control.style) as f32;
                             }
                             if !enabled {
                                 ui.disable();
@@ -284,6 +285,7 @@ impl ChampionUi {
                 self.keyboard_focus,
                 Some(self.fade.map(|v| v as f32)),
                 tokens,
+                None,
             )),
             _ => None,
         }

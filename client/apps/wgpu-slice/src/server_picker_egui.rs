@@ -243,7 +243,8 @@ impl PickerUi {
                                         | ControlKind::ListRow { .. }
                                 )
                             {
-                                ui.multiply_opacity(tokens.disabled_opacity(control.style) as f32);
+                                ui.visuals_mut().disabled_alpha =
+                                    tokens.disabled_opacity(control.style) as f32;
                             }
                             if !interactive || !enabled {
                                 ui.disable();
@@ -354,6 +355,10 @@ impl PickerUi {
                 self.keyboard_focus,
                 None,
                 tokens,
+                Some(matches!(
+                    control.style,
+                    ControlStyle::StudioSave | ControlStyle::PrimaryButton
+                )),
             )),
             ControlKind::ListRow {
                 label: name,
