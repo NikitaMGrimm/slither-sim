@@ -9,8 +9,13 @@ AA Auto → Off → 2× → 4× → Done;
 Enter/Space activates the focused control. Done and Escape close and restore
 Settings focus after Login has settled. Closing during return leaves nickname
 focus to the existing return-completion intent. Outside clicks close on matching release. During play, Escape
-opens the single-action Leave game overlay; it still cancels a pending connection.
-Settings shares the native egui 0.37 host with that overlay. Other native
+opens the in-game menu (Resume, Settings, Leave game); it still cancels a pending connection.
+Settings opened there uses the same panel, controls and keyboard rules over the
+dimmed, still-running game, without its own darker backdrop. Done, Escape and
+outside clicks return to the menu with focus on its Settings button once the exit
+fade finishes. A death or close under it removes both at once
+(`SettingsState::dismiss`); preferences and pending writes are kept.
+Settings shares the native egui 0.37 host with that menu. Other native
 menus retain their adapters until ported, and browser hosts retain DOM controls. Settings uses the
 shared picker transition timing: 400 ms in, 320 ms out, with a 40 ms step cap.
 The outgoing panel keeps input until its fade finishes. Keyboard zoom is disabled;

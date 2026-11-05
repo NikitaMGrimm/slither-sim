@@ -70,6 +70,7 @@ fn key(
             ElementState::Released
         },
         repeat,
+        synthetic: false,
     })
 }
 fn character(

@@ -454,6 +454,7 @@ fn cosmetics_arrow_focus_uses_shared_modality() {
                 text: None,
                 state: ElementState::Pressed,
                 repeat: false,
+                synthetic: false,
             },
             true,
         );

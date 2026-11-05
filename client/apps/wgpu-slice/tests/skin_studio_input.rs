@@ -23,6 +23,7 @@ fn key_admitted(login: &mut NativeLogin, named: NamedKey, admission: bool) {
             text: None,
             state: ElementState::Pressed,
             repeat: false,
+            synthetic: false,
         },
         admission,
     );

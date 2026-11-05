@@ -24,7 +24,16 @@ A blur, touch cancel, disable, screen replacement or moved list window cancels
 the press. Those limits stay global because text selection needs them. Settings
 and the in-game menu keep them through `owned_click`, and scrolling a held Settings
 toggle cancels its press. The in-game backdrop dismisses only when the press and
-the release are both outside the panel. On every screen, only a primary press on
+the release are both outside the panel.
+
+The in-game menu opens with focus on Resume. Tab/Shift+Tab wrap Resume →
+Settings → Leave game, Up/Down move between them, Enter/Space activate, and a
+press on the panel or backdrop keeps the focused control. Short windows scroll
+the list and Tab reveals the focused button. The world below is dimmed and the
+game HUD is hidden through `LocalGame`'s captured-controls gate while the menu or
+its Settings is visible. `examples/ingame_menu_specimens.rs` renders the live
+control, the menu and Settings over the game at 1080p and 4K, Original and
+Native, offscreen from an authored tape. On every screen, only a primary press on
 the widget counts: another mouse button can't hand one over. Two clicks within 0.5 s, the
 Windows default, select a word on every platform; a custom OS double-click
 setting is not read.

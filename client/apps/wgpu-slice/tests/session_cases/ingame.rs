@@ -4,7 +4,7 @@ use egui::{Event, Key, Modifiers, PointerButton, RawInput, Rect, pos2, vec2};
 use slither_client::{session_policy::Phase, start_page::MenuPhase};
 use slither_wgpu_slice::{
     game::{EffectKind, LocalGame},
-    ingame_egui::leave_id,
+    ingame_egui::{Control, widget_id},
     login_native::NativeLogin,
     menu_input_native::KeyInput,
 };
@@ -60,6 +60,7 @@ fn escape(login: &mut NativeLogin, game: &mut LocalGame, repeat: bool) -> bool {
                     text: None,
                     state: ElementState::Pressed,
                     repeat,
+                    synthetic: false,
                 },
                 30.,
             )
@@ -72,6 +73,16 @@ fn release_escape(login: &mut NativeLogin, game: &mut LocalGame) {
         .window
         .key(&NativeKey::Named(NamedKey::Escape), ElementState::Released);
     input(login, game, vec![key_event(Key::Escape, false, false)]);
+}
+fn focused(login: &NativeLogin) -> Option<egui::Id> {
+    login.egui.context().unwrap().memory(|m| m.focused())
+}
+fn tab(login: &mut NativeLogin, game: &mut LocalGame, shift: bool) {
+    let mut press = key_event(Key::Tab, true, false);
+    if let Event::Key { modifiers, .. } = &mut press {
+        modifiers.shift = shift;
+    }
+    input(login, game, vec![press, key_event(Key::Tab, false, false)]);
 }
 fn click(login: &mut NativeLogin, game: &mut LocalGame, point: egui::Pos2) {
     input(
@@ -107,11 +118,8 @@ fn esc_toggle_repeat_outside_click_and_single_keyboard_focus() {
     assert!(game.ingame_menu_open());
     assert!(login.egui.active());
     assert!(login.blocks_gameplay());
-    assert!(login.ingame_ui.focused);
-    assert_eq!(
-        login.egui.context().unwrap().memory(|m| m.focused()),
-        Some(leave_id())
-    );
+    assert_eq!(login.ingame_ui.focused(), Some(Control::Resume));
+    assert_eq!(focused(&login), Some(widget_id(Control::Resume)));
     assert_eq!(login.input.state.focus(), None);
     input(
         &mut login,
@@ -120,7 +128,7 @@ fn esc_toggle_repeat_outside_click_and_single_keyboard_focus() {
     );
     assert!(
         game.ingame_menu_open(),
-        "a held boost key cannot activate Leave on entry"
+        "a held boost key cannot activate Resume on entry"
     );
     input(
         &mut login,
@@ -133,30 +141,38 @@ fn esc_toggle_repeat_outside_click_and_single_keyboard_focus() {
         "held Esc cannot immediately close the menu"
     );
     release_escape(&mut login, &mut game);
-    for shift in [false, true] {
-        let modifiers = Modifiers {
-            shift,
-            ..Modifiers::NONE
-        };
-        let mut tab = key_event(Key::Tab, true, false);
-        if let Event::Key { modifiers: m, .. } = &mut tab {
-            *m = modifiers;
-        }
+    // Tab and Shift+Tab wrap through Resume, Settings and Leave game.
+    for (shift, expected) in [
+        (false, Control::Settings),
+        (false, Control::Leave),
+        (false, Control::Resume),
+        (true, Control::Leave),
+        (true, Control::Settings),
+        (true, Control::Resume),
+    ] {
+        tab(&mut login, &mut game, shift);
+        assert_eq!(login.ingame_ui.focused(), Some(expected));
+        assert_eq!(focused(&login), Some(widget_id(expected)));
+    }
+    // Up/Down move between the stacked buttons.
+    for (key, expected) in [
+        (Key::ArrowDown, Control::Settings),
+        (Key::ArrowDown, Control::Leave),
+        (Key::ArrowUp, Control::Settings),
+        (Key::ArrowUp, Control::Resume),
+    ] {
         input(
             &mut login,
             &mut game,
-            vec![tab, key_event(Key::Tab, false, false)],
+            vec![key_event(key, true, false), key_event(key, false, false)],
         );
-        assert!(login.ingame_ui.focused);
-        assert_eq!(
-            login.egui.context().unwrap().memory(|m| m.focused()),
-            Some(leave_id())
-        );
+        assert_eq!(login.ingame_ui.focused(), Some(expected), "{key:?}");
     }
-    // Panel padding consumes clicks without dismissal or activation.
+    // Panel padding consumes clicks without dismissal, activation or focus loss.
     let padding = login.ingame_ui.panel_rect.min + vec2(3., 3.);
     click(&mut login, &mut game, padding);
     assert!(game.ingame_menu_open());
+    assert_eq!(login.ingame_ui.focused(), Some(Control::Resume));
     escape(&mut login, &mut game, false);
     assert!(!game.ingame_menu_open());
     assert_eq!(login.egui.active(), login.state.view(true).visible);
@@ -170,7 +186,7 @@ fn esc_toggle_repeat_outside_click_and_single_keyboard_focus() {
 }
 
 #[test]
-fn overlay_geometry_is_centred_bounded_and_has_one_control_across_dpi() {
+fn menu_geometry_is_centred_bounded_and_reaches_every_control_across_dpi() {
     for extent in [
         [320, 240],
         [640, 120],
@@ -190,19 +206,26 @@ fn overlay_geometry_is_centred_bounded_and_has_one_control_across_dpi() {
                 vec2(extent[0] as f32 / dpr as f32, extent[1] as f32 / dpr as f32),
             );
             let panel = login.ingame_ui.panel_rect;
-            let control = login.ingame_ui.leave_rect;
             assert!(
                 viewport.contains_rect(panel),
                 "{extent:?} DPR {dpr}: {panel:?}"
             );
-            assert!(panel.contains_rect(control));
             assert!((panel.center() - viewport.center()).length() <= 1.);
-            assert!(panel.width() <= 257. && panel.height() <= 85.);
-            assert!(login.ingame_ui.focused);
-            assert_eq!(
-                login.egui.context().unwrap().memory(|m| m.focused()),
-                Some(leave_id())
-            );
+            assert!(panel.width() <= 257. && panel.height() <= 197.);
+            assert_eq!(login.ingame_ui.focused(), Some(Control::Resume));
+            // Short windows scroll the list; Tab reveals each focused control.
+            for control in [Control::Resume, Control::Settings, Control::Leave] {
+                assert_eq!(login.ingame_ui.focused(), Some(control));
+                let rect = login.ingame_ui.rect(control);
+                assert!(rect.is_positive(), "{extent:?} DPR {dpr}: {control:?}");
+                assert!(panel.contains_rect(rect), "{extent:?} DPR {dpr}: {rect:?}");
+                tab(&mut login, &mut game, false);
+            }
+            if extent[1] as f64 / dpr >= 197. {
+                let rects = [Control::Resume, Control::Settings, Control::Leave]
+                    .map(|c| login.ingame_ui.rect(c));
+                assert!(rects.windows(2).all(|w| w[0].bottom() <= w[1].top()));
+            }
         }
     }
 }
@@ -279,6 +302,7 @@ fn outgoing_login_keeps_drawing_while_gameplay_owns_keys_pointer_zoom_and_esc() 
             text: None,
             state: ElementState::Pressed,
             repeat: false,
+            synthetic: false,
         },
         false,
     );
@@ -384,18 +408,21 @@ fn open_releases_boost_immediately_freezes_heading_and_keeps_pinging() {
     release_escape(&mut login, &mut game);
     escape(&mut login, &mut game, false);
     let packets = pump(&mut game, 1040.);
-    assert_eq!(
-        packets
-            .iter()
-            .filter(|p| p.len() == 1 && p[0] < 251)
-            .count(),
-        1
-    );
+    assert_eq!(headings(&packets), 0, "the menu's cursor does not steer");
+    game.pointer(100., 100., 960., 540., false).unwrap();
+    let packets = pump(&mut game, 1080.);
+    assert_eq!(headings(&packets), 1);
     assert!(packets.iter().all(|p| p.len() == 1 && p[0] <= 251));
     assert!(
-        pump(&mut game, 1041.).is_empty(),
+        pump(&mut game, 1081.).is_empty(),
         "no turn debt or heading catch-up"
     );
+}
+fn headings(packets: &[Vec<u8>]) -> usize {
+    packets
+        .iter()
+        .filter(|p| p.len() == 1 && p[0] < 251)
+        .count()
 }
 
 #[test]
@@ -424,7 +451,7 @@ fn a_release_away_from_leave_does_not_leave_with_another_button_down() {
         let mut login = login(&game);
         escape(&mut login, &mut game, false);
         release_escape(&mut login, &mut game);
-        let leave = login.ingame_ui.leave_rect.center();
+        let leave = login.ingame_ui.rect(Control::Leave).center();
         let away = egui::pos2(2., 2.);
         for (pos, button, pressed) in [
             (leave, Primary, true),
@@ -493,7 +520,7 @@ fn the_backdrop_dismisses_only_for_a_press_and_release_on_it() {
     assert!(game.ingame_menu_open());
     // A press on Leave, with another button seeding egui's click on the backdrop.
     let (mut game, mut login, outside, _) = opened();
-    let leave = login.ingame_ui.leave_rect.center();
+    let leave = login.ingame_ui.rect(Control::Leave).center();
     button(&mut login, &mut game, leave, true);
     input(&mut login, &mut game, vec![Event::PointerMoved(outside)]);
     login.prepare_ingame(&mut game, [960, 720], 1.).unwrap();
@@ -525,13 +552,14 @@ fn leave_by_mouse_enter_and_space_returns_to_login_and_can_play_again() {
         escape(&mut login, &mut game, false);
         release_escape(&mut login, &mut game);
         if let Some(key) = key {
+            tab(&mut login, &mut game, true);
             input(
                 &mut login,
                 &mut game,
                 vec![key_event(key, true, false), key_event(key, false, false)],
             );
         } else {
-            let point = login.ingame_ui.leave_rect.center();
+            let point = login.ingame_ui.rect(Control::Leave).center();
             click(&mut login, &mut game, point);
         }
         assert_eq!(game.phase(), Phase::Playing);
@@ -578,7 +606,7 @@ fn leave_by_mouse_enter_and_space_returns_to_login_and_can_play_again() {
 }
 
 #[test]
-fn dismissal_retains_heading_cadence_and_samples_the_current_pointer() {
+fn dismissal_retains_heading_cadence() {
     let mut game = playing();
     let mut login = login(&game);
     game.pointer(480., 0., 960., 540., false).unwrap();
@@ -591,6 +619,7 @@ fn dismissal_retains_heading_cadence_and_samples_the_current_pointer() {
     let _ = login.egui.route_window_event(&event, 1., |_| ());
     escape(&mut login, &mut game, false);
     assert!(!game.ingame_menu_open());
+    game.pointer(900., 450., 960., 540., false).unwrap();
     assert!(
         pump(&mut game, 110.).is_empty(),
         "closing does not reset the 33 ms heading gate"
@@ -623,6 +652,7 @@ fn esc_does_not_open_on_login_picker_settings_connecting_dead_or_terminal() {
                     text: None,
                     state: ElementState::Pressed,
                     repeat: false,
+                    synthetic: false,
                 },
                 30.
             )
@@ -709,6 +739,7 @@ fn unadmitted_playing_escape_uses_the_same_pending_close_and_retains_replay() {
                     text: None,
                     state: ElementState::Pressed,
                     repeat: false,
+                    synthetic: false,
                 },
                 51.
             )
@@ -745,6 +776,7 @@ fn replay_during_close_waits_for_the_existing_death_return_admission() {
                     text: None,
                     state: ElementState::Pressed,
                     repeat: false,
+                    synthetic: false,
                 },
                 31.
             )
@@ -904,6 +936,7 @@ fn loopback_leave_waits_for_normal_close_ack_keeps_frames_and_starts_second_game
         let mut login = login(&game);
         escape(&mut login, &mut game, false);
         release_escape(&mut login, &mut game);
+        tab(&mut login, &mut game, true);
         input(
             &mut login,
             &mut game,
@@ -939,6 +972,7 @@ fn loopback_leave_waits_for_normal_close_ack_keeps_frames_and_starts_second_game
                             text: None,
                             state: ElementState::Pressed,
                             repeat: false,
+                            synthetic: false,
                         },
                         100.
                     )
@@ -972,4 +1006,348 @@ fn loopback_leave_waits_for_normal_close_ack_keeps_frames_and_starts_second_game
         }
     }
     peer.join().unwrap();
+}
+
+/// Advance the shared clock as the desktop host does: step, then the in-game pass.
+fn settle(login: &mut NativeLogin, game: &mut LocalGame, from: u32, to: u32) {
+    for now in (from..=to).step_by(16) {
+        pump(game, f64::from(now));
+        login.observe_game(game).unwrap();
+        login.step(f64::from(now), false, true).unwrap();
+        login.prepare_ingame(game, [960, 540], 1.).unwrap();
+    }
+}
+fn open_settings(login: &mut NativeLogin, game: &mut LocalGame) {
+    escape(login, game, false);
+    release_escape(login, game);
+    tab(login, game, false);
+    assert_eq!(login.ingame_ui.focused(), Some(Control::Settings));
+    input(login, game, vec![key_event(Key::Enter, true, false)]);
+    assert!(login.state.settings.is_open());
+}
+
+#[test]
+fn settings_round_trip_returns_focus_to_the_menu_and_keeps_gameplay_out() {
+    use slither_client::settings::{
+        self, AA_CHOICES, AntiAliasing, GraphicsQuality, QUALITY_CHOICES, WorldResolution,
+    };
+    use slither_wgpu_slice::settings_egui::{control_order, widget_id as settings_id};
+    let mut game = playing();
+    let mut login = login(&game);
+    open_settings(&mut login, &mut game);
+    assert!(game.ingame_menu_open(), "the menu stays under Settings");
+    assert!(login.egui_owns_input() && login.blocks_gameplay());
+    assert!(!login.zoom_input_available());
+    assert_eq!(focused(&login), Some(settings_id(QUALITY_CHOICES[0].0)));
+    // The held Enter that opened Settings cannot select the focused preset.
+    let before = login.state.settings.preferences();
+    input(
+        &mut login,
+        &mut game,
+        vec![key_event(Key::Enter, true, false)],
+    );
+    assert_eq!(login.state.settings.preferences(), before);
+    input(
+        &mut login,
+        &mut game,
+        vec![key_event(Key::Enter, false, false)],
+    );
+    // Settings has the same controls and Tab wrap as on the login.
+    let order = control_order();
+    for expected in order.iter().cycle().skip(1).take(order.len()) {
+        tab(&mut login, &mut game, false);
+        assert_eq!(focused(&login), Some(settings_id(*expected)));
+    }
+    let press = |login: &mut NativeLogin, game: &mut LocalGame| {
+        input(
+            login,
+            game,
+            vec![
+                key_event(Key::Space, true, false),
+                key_event(Key::Space, false, false),
+            ],
+        );
+    };
+    // Each Graphics selector applies from over the game: preset, resolution, AA.
+    for (control, steps) in [
+        (QUALITY_CHOICES[1].0, 1),
+        (settings::RESOLUTION, 3),
+        (AA_CHOICES[1].0, 2),
+    ] {
+        for _ in 0..steps {
+            tab(&mut login, &mut game, false);
+        }
+        assert_eq!(focused(&login), Some(settings_id(control)));
+        press(&mut login, &mut game);
+    }
+    let preferences = login.state.settings.preferences();
+    assert_eq!(preferences.graphics, GraphicsQuality::Low);
+    assert_eq!(preferences.resolution, WorldResolution::Native);
+    assert_eq!(preferences.anti_aliasing, AntiAliasing::Off);
+    // Gameplay stays captured: no steering, boost or zoom reaches the snake.
+    assert!(!game.key("Space", true));
+    assert!(!game.key("ArrowLeft", true));
+    assert!(!game.wheel_zoom(1.));
+    let packets = pump(&mut game, 200.);
+    assert!(
+        packets.iter().all(|p| p == &[251]),
+        "unexpected control: {packets:?}"
+    );
+    // Escape closes Settings only, then input returns to the menu's opener.
+    escape(&mut login, &mut game, false);
+    assert!(!login.state.settings.is_open());
+    assert!(game.ingame_menu_open());
+    release_escape(&mut login, &mut game);
+    settle(&mut login, &mut game, 216, 900);
+    assert!(!login.state.settings.visible());
+    assert!(game.ingame_menu_open());
+    assert_eq!(login.ingame_ui.focused(), Some(Control::Settings));
+    assert_eq!(focused(&login), Some(widget_id(Control::Settings)));
+    escape(&mut login, &mut game, false);
+    assert!(!game.ingame_menu_open());
+    assert_eq!(game.phase(), Phase::Playing);
+}
+
+#[test]
+fn settings_done_and_outside_click_close_to_the_menu_not_the_game() {
+    for close in ["done", "outside"] {
+        let mut game = playing();
+        let mut login = login(&game);
+        open_settings(&mut login, &mut game);
+        input(
+            &mut login,
+            &mut game,
+            vec![key_event(Key::Enter, false, false)],
+        );
+        settle(&mut login, &mut game, 40, 600);
+        let point = if close == "done" {
+            login
+                .settings_ui
+                .controls
+                .iter()
+                .find(|c| c.0 == slither_client::settings::DONE)
+                .unwrap()
+                .1
+                .center()
+        } else {
+            pos2(2., 2.)
+        };
+        click(&mut login, &mut game, point);
+        assert!(!login.state.settings.is_open(), "{close}");
+        assert!(game.ingame_menu_open(), "{close}");
+        // The outgoing panel keeps input: a click on Resume's spot is inert.
+        let resume = login.ingame_ui.rect(Control::Resume).center();
+        click(&mut login, &mut game, resume);
+        assert!(game.ingame_menu_open(), "{close}");
+        settle(&mut login, &mut game, 616, 1200);
+        assert_eq!(login.ingame_ui.focused(), Some(Control::Settings));
+        click(&mut login, &mut game, resume);
+        assert!(!game.ingame_menu_open(), "{close}");
+        assert_eq!(game.phase(), Phase::Playing);
+    }
+}
+
+#[test]
+fn death_under_settings_retires_both_and_login_settings_still_opens() {
+    let mut game = playing();
+    let mut login = login(&game);
+    open_settings(&mut login, &mut game);
+    game.receive(game.generation(), &[b'v', 0], 31.).unwrap();
+    // Stray adapter input before the next observation cannot run a login pass.
+    let passes = login.egui.context().unwrap().cumulative_pass_nr();
+    login.settings_input(RawInput {
+        events: vec![key_event(Key::Space, true, false)],
+        ..Default::default()
+    });
+    assert_eq!(login.egui.context().unwrap().cumulative_pass_nr(), passes);
+    login.observe_game(&game).unwrap();
+    assert_eq!(game.phase(), Phase::Dead);
+    assert!(!game.ingame_menu_open());
+    assert!(
+        !login.state.settings.visible(),
+        "no Settings over the death hold"
+    );
+    assert!(!login.settings_ui.over_game);
+    // Settings opens from the visible death return as before.
+    for now in (40..=4000).step_by(40) {
+        pump(&mut game, f64::from(now));
+        login.observe_game(&game).unwrap();
+        login.step(f64::from(now), game.can_play(), false).unwrap();
+        if login.state.view(true).phase == MenuPhase::Returning {
+            break;
+        }
+    }
+    assert_eq!(login.state.view(true).phase, MenuPhase::Returning);
+    login.open_settings(true);
+    assert!(login.state.settings.is_open());
+    assert!(
+        !login.settings_ui.over_game,
+        "the login keeps its own backdrop"
+    );
+}
+
+#[test]
+fn keys_held_through_the_menu_need_a_fresh_press_after_resume() {
+    use slither_client::menu_input::{GameplayKey, HostEditEffect};
+    let space = NativeKey::Named(NamedKey::Space);
+    let press = |repeat| KeyInput {
+        logical: &space,
+        physical: PhysicalKey::Code(KeyCode::Space),
+        text: Some(" "),
+        state: ElementState::Pressed,
+        repeat,
+        synthetic: false,
+    };
+    let mut game = playing();
+    let mut login = login(&game);
+    settle(&mut login, &mut game, 40, 1200);
+    assert!(!login.egui_owns_input());
+    escape(&mut login, &mut game, false);
+    release_escape(&mut login, &mut game);
+    // Space activates the focused Resume and stays held.
+    login
+        .egui
+        .window
+        .key(&NativeKey::Named(NamedKey::Space), ElementState::Pressed);
+    input(
+        &mut login,
+        &mut game,
+        vec![key_event(Key::Space, true, false)],
+    );
+    assert!(!game.ingame_menu_open());
+    assert!(!login.egui_owns_input());
+    let boost = HostEditEffect::Gameplay {
+        key: GameplayKey::Space,
+        pressed: true,
+    };
+    let result = login.key(press(true), false);
+    assert!(result.consumed && result.effects.is_empty(), "auto-repeat");
+    let result = login.key(
+        KeyInput {
+            state: ElementState::Released,
+            ..press(false)
+        },
+        false,
+    );
+    assert!(!result.effects.contains(&boost));
+    assert!(login.key(press(false), false).effects.contains(&boost));
+    assert!(
+        login.key(press(true), false).effects.contains(&boost),
+        "a fresh hold repeats as before"
+    );
+}
+
+#[test]
+fn a_hold_restored_on_refocus_is_not_a_fresh_press() {
+    use slither_client::menu_input::{GameplayKey, HostEditEffect};
+    let space = NativeKey::Named(NamedKey::Space);
+    let event = |state, repeat, synthetic| KeyInput {
+        logical: &space,
+        physical: PhysicalKey::Code(KeyCode::Space),
+        text: Some(" "),
+        state,
+        repeat,
+        synthetic,
+    };
+    let boost = HostEditEffect::Gameplay {
+        key: GameplayKey::Space,
+        pressed: true,
+    };
+    let mut game = playing();
+    let mut login = login(&game);
+    settle(&mut login, &mut game, 40, 1200);
+    escape(&mut login, &mut game, false);
+    release_escape(&mut login, &mut game);
+    // Space activates Resume and stays held through a blur and refocus, which
+    // winit reports as a synthetic release and a synthetic press.
+    login.egui.window.key(&space, ElementState::Pressed);
+    input(
+        &mut login,
+        &mut game,
+        vec![key_event(Key::Space, true, false)],
+    );
+    assert!(!game.ingame_menu_open());
+    login.key(event(ElementState::Released, false, true), false);
+    let result = login.key(event(ElementState::Pressed, false, true), false);
+    assert!(result.consumed && result.effects.is_empty(), "refocus");
+    let result = login.key(event(ElementState::Pressed, true, false), false);
+    assert!(result.consumed && result.effects.is_empty(), "auto-repeat");
+    // The user's own release and press end the barrier.
+    login.key(event(ElementState::Released, false, false), false);
+    let result = login.key(event(ElementState::Pressed, false, false), false);
+    assert!(result.effects.contains(&boost));
+}
+
+/// Open the menu, move the pointer over it, then close it by `close`.
+/// Returns the time the menu closed.
+fn close_after_menu_cursor(login: &mut NativeLogin, game: &mut LocalGame, close: &str) -> u32 {
+    assert!(login.open_ingame_menu(game, 101.).unwrap());
+    settle(login, game, 102, 150);
+    let event = WindowEvent::CursorMoved {
+        device_id: DeviceId::dummy(),
+        position: PhysicalPosition::new(100., 100.),
+    };
+    let _ = login.egui.route_window_event(&event, 1., |_| ());
+    input(login, game, vec![Event::PointerMoved(pos2(100., 100.))]);
+    let now = match close {
+        "escape" => {
+            escape(login, game, false);
+            166
+        }
+        "resume" => {
+            let resume = login.ingame_ui.rect(Control::Resume).center();
+            click(login, game, resume);
+            166
+        }
+        _ => {
+            tab(login, game, false);
+            assert_eq!(login.ingame_ui.focused(), Some(Control::Settings));
+            input(
+                login,
+                game,
+                vec![
+                    key_event(Key::Enter, true, false),
+                    key_event(Key::Enter, false, false),
+                ],
+            );
+            assert!(login.state.settings.is_open());
+            escape(login, game, false);
+            release_escape(login, game);
+            settle(login, game, 166, 900);
+            assert!(game.ingame_menu_open() && !login.state.settings.visible());
+            escape(login, game, false);
+            916
+        }
+    };
+    assert!(!game.ingame_menu_open(), "{close}");
+    now
+}
+
+#[test]
+fn closing_keeps_the_admitted_heading_until_a_gameplay_pointer_move() {
+    for zoomed in [false, true] {
+        for close in ["escape", "resume", "settings"] {
+            let mut game = playing();
+            let mut login = login(&game);
+            if zoomed {
+                assert!(game.wheel_zoom(1.));
+            }
+            game.pointer(900., 450., 960., 540., false).unwrap();
+            assert_eq!(headings(&pump(&mut game, 100.)), 1);
+            let now = close_after_menu_cursor(&mut login, &mut game, close);
+            // The host's per-frame handoff observation once play owns input.
+            game.observe_cursor(100., 100., 960., 540.).unwrap();
+            for t in [40, 80, 120] {
+                let packets = pump(&mut game, f64::from(now + t));
+                assert_eq!(
+                    headings(&packets),
+                    0,
+                    "{close} zoomed {zoomed}: {packets:?}"
+                );
+            }
+            game.pointer(100., 100., 960., 540., false).unwrap();
+            let packets = pump(&mut game, f64::from(now + 160));
+            assert_eq!(headings(&packets), 1, "{close} zoomed {zoomed}");
+        }
+    }
 }

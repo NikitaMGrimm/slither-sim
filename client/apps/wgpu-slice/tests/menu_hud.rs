@@ -404,3 +404,90 @@ fn reset_during_death_hold_keeps_background_art_but_no_entities_or_hud() {
     present(&mut game, picture);
     assert!(backgrounds > 0);
 }
+
+#[test]
+fn in_game_menu_and_its_settings_never_emit_game_hud() {
+    use egui::{Event, Key, Modifiers, RawInput};
+    let key = |key, pressed, shift| Event::Key {
+        key,
+        physical_key: None,
+        pressed,
+        repeat: false,
+        modifiers: Modifiers {
+            shift,
+            ..Modifiers::NONE
+        },
+    };
+    let send = |login: &mut NativeLogin, game: &mut LocalGame, events| {
+        login
+            .ingame_input(
+                game,
+                RawInput {
+                    events,
+                    ..Default::default()
+                },
+            )
+            .unwrap();
+    };
+    let (mut game, mut login) = playing();
+    let mut emitted = Vec::new();
+    let mut settings_frames = 0;
+    for now in (1024..=2400).step_by(16) {
+        let now = f64::from(now);
+        match now as u32 {
+            1040 => assert!(login.open_ingame_menu(&mut game, now).unwrap()),
+            1104 => send(
+                &mut login,
+                &mut game,
+                vec![
+                    key(Key::Tab, true, false),
+                    key(Key::Tab, false, false),
+                    key(Key::Enter, true, false),
+                    key(Key::Enter, false, false),
+                ],
+            ),
+            1600 => send(
+                &mut login,
+                &mut game,
+                vec![
+                    key(Key::Escape, true, false),
+                    key(Key::Escape, false, false),
+                ],
+            ),
+            2048 => send(
+                &mut login,
+                &mut game,
+                vec![
+                    key(Key::Escape, true, false),
+                    key(Key::Escape, false, false),
+                ],
+            ),
+            _ => {}
+        }
+        game.receive(game.generation(), &tape::bundle(&[vec![b'p']]), now)
+            .unwrap();
+        login.observe_game(&game).unwrap();
+        login.step(now, false, true).unwrap();
+        login.prepare_ingame(&mut game, [960, 720], 1.).unwrap();
+        let picture = frame(&mut game, now);
+        let hud = picture.overlay.as_ref().unwrap().draws.len();
+        if login.state.settings.visible() {
+            settings_frames += 1;
+        }
+        if game.ingame_menu_open() {
+            emitted.push((now, hud));
+        } else if now > 2048. {
+            assert!(hud > 0, "Resume restores the HUD at {now}");
+        }
+        present(&mut game, picture);
+    }
+    assert!(
+        settings_frames > 20,
+        "Settings was open and fading over the game"
+    );
+    assert!(emitted.len() > 60);
+    assert!(
+        emitted.iter().all(|(_, hud)| *hud == 0),
+        "HUD drawn under a visible menu: {emitted:?}"
+    );
+}
