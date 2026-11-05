@@ -1671,6 +1671,8 @@ impl Simulator {
             scales,
             #[cfg(feature = "parallel")]
             strikes,
+            #[cfg(all(test, feature = "parallel"))]
+            collision_grid_used,
             dead,
             fallen,
             eaters,
@@ -1866,6 +1868,10 @@ impl Simulator {
                     .map(|grid| (grid, 3.666 * collision_distance(longest, longest)))
             })
             .flatten();
+        #[cfg(all(test, feature = "parallel"))]
+        {
+            *collision_grid_used = grid.is_some();
+        }
         // Small worlds test every pair faster than they build an index.
         let index = (grid.is_none() && order.len() >= 32).then(|| {
             let bounds: Vec<Bounds> = order
@@ -2851,6 +2857,8 @@ struct StepBuffers {
     /// Parallel step only: each head's first strike, by collision order position.
     #[cfg(feature = "parallel")]
     strikes: Vec<Option<usize>>,
+    #[cfg(all(test, feature = "parallel"))]
+    collision_grid_used: bool,
     dead: Vec<(usize, Option<usize>, DeathReason)>,
     fallen: Vec<bool>,
     eaters: Vec<(usize, Point, f64, Bounds)>,

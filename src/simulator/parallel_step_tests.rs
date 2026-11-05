@@ -366,9 +366,13 @@ fn collision_order(world: &Simulator) -> Vec<usize> {
     order
 }
 
-/// Rebuild the grid from the retained geometry of the actual step, guarding
-/// against a fixture silently taking BoundsIndex or the full-scan fallback.
+/// Rebuild the grid for query checks, after verifying that the actual step
+/// selected it rather than BoundsIndex or the full-scan fallback.
 fn retained_grid(world: &Simulator) -> (CollisionGrid, f64) {
+    assert!(
+        world.buffers.collision_grid_used,
+        "step must select the grid"
+    );
     let order = collision_order(world);
     assert!(order.len() > 4096);
     let longest = order
@@ -552,7 +556,19 @@ fn kiosk_shrink_and_recovery_invalidate_cached_bodies_in_a_split_step() {
 #[test]
 fn equal_distance_food_tie_uses_lexical_id_during_split_pickup() {
     let mut world = world(empty_config(), 16);
-    spread(&mut world, 4);
+    // Keep padding inside the dense eater grid's 4,096-cell budget.
+    for slot in 0..world.snakes.len() {
+        lay(
+            &mut world,
+            slot,
+            Point {
+                x: -1500.0 + (slot % 4) as f64 * 1000.0,
+                y: -1500.0 + (slot / 4) as f64 * 1000.0,
+            },
+            0.0,
+            4,
+        );
+    }
     lay(&mut world, 2, Point { x: 0.0, y: -25.0 }, 0.0, 4);
     lay(&mut world, 10, Point { x: 0.0, y: 25.0 }, 0.0, 4);
     let pellet = Food {
@@ -592,7 +608,7 @@ fn boundary_death_precedes_a_body_strike_in_the_same_split_step() {
         &mut world,
         0,
         Point {
-            x: 19_980.0,
+            x: 19_985.0,
             y: 0.0,
         },
         0.0,
