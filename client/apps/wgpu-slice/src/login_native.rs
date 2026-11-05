@@ -23,6 +23,8 @@ pub struct NativeLogin {
     connection_error: Option<String>,
     pub ingame_ui: crate::ingame_egui::InGameUi,
     ingame_visible: bool,
+    /// Settings was opened from the in-game menu and returns to it.
+    ingame_settings: bool,
     ingame_viewport: ([u32; 2], f64),
     replay_after_close: bool,
     closing: bool,
@@ -142,6 +144,7 @@ impl NativeLogin {
             connection_error: None,
             ingame_ui: Default::default(),
             ingame_visible: false,
+            ingame_settings: false,
             ingame_viewport: ([960, 540], 1.),
             replay_after_close: false,
             closing: false,
@@ -213,7 +216,7 @@ impl NativeLogin {
             .state
             .sync_menu(&self.state.view(admission), &intents);
         effects.extend(self.input.state.apply(EditIntent::Focus(None)));
-        if settings_visible && !self.state.settings.visible() {
+        if settings_visible && !self.state.settings.visible() && !self.ingame_settings {
             effects.extend(self.input.state.apply(EditIntent::Modal(false)));
             if self.state.view(true).phase == slither_client::start_page::MenuPhase::Login {
                 effects.extend(self.focus(SETTINGS));
@@ -262,11 +265,27 @@ impl NativeLogin {
         self.connection_error.clone_from(&game.failure);
         self.closing = game.stopping();
         let opened = game.ingame_menu_open() && !self.ingame_visible;
+        let closed = !game.ingame_menu_open() && self.ingame_visible;
         self.ingame_visible = game.ingame_menu_open();
+        if closed {
+            // A death or close can retire the menu under its Settings panel,
+            // which must not survive into the death hold or login.
+            if std::mem::take(&mut self.ingame_settings) {
+                self.state.settings.dismiss();
+                self.settings_ui.over_game = false;
+            }
+            // Keys held through the menu need a fresh press to steer or boost.
+            self.input.require_fresh_presses();
+        }
         self.refresh_egui();
         if opened {
             self.egui.begin_screen();
-            self.egui.focus(crate::ingame_egui::leave_id());
+            self.ingame_ui = Default::default();
+            self.ingame_ui
+                .request_focus(crate::ingame_egui::Control::Resume);
+            self.egui.focus(crate::ingame_egui::widget_id(
+                crate::ingame_egui::Control::Resume,
+            ));
         }
         // A closing socket still owns admission. Keep the current screen until
         // its Close effect completes; Enter is retained by ingame_key meanwhile.
@@ -358,25 +377,58 @@ impl NativeLogin {
         self.ingame_frame(game)
     }
     fn ingame_frame(&mut self, game: &mut crate::game::LocalGame) -> Result<()> {
+        use crate::ingame_egui::{Control, widget_id};
         if !game.ingame_menu_open() {
             return Ok(());
         }
+        let settings = self.state.settings.visible();
+        if self.ingame_settings && !settings {
+            // Settings keeps input through its exit fade, then returns it to
+            // its opener, like Settings on the login. Queued input (such as
+            // the release of the key that closed it) still belongs here.
+            self.ingame_settings = false;
+            self.settings_ui.over_game = false;
+            self.ingame_ui.request_focus(Control::Settings);
+            self.egui.focus(widget_id(Control::Settings));
+        }
+        let order = if settings {
+            crate::settings_egui::focus_order().to_vec()
+        } else {
+            crate::ingame_egui::focus_order().to_vec()
+        };
+        let opacity = 1. - self.state.settings.alpha() as f32;
         let mut action = None;
         let (extent, dpr) = self.ingame_viewport;
-        self.egui
-            .frame(extent, dpr, &[crate::ingame_egui::leave_id()], |ctx, _| {
-                action = self.ingame_ui.show(ctx)
-            });
+        self.egui.frame(extent, dpr, &order, |ctx, reveal| {
+            action = self.ingame_ui.show(ctx, !settings, opacity, reveal);
+            if settings {
+                self.settings_ui.show(ctx, &mut self.state.settings, reveal);
+            }
+        });
         self.egui.check_error()?;
         match action {
-            Some(crate::ingame_egui::Action::Leave) => game.request_stop(),
-            Some(crate::ingame_egui::Action::Dismiss) => {
+            Some(Control::Leave) => game.request_stop(),
+            Some(Control::Resume) => {
                 game.close_ingame_menu();
                 let cursor = self.egui.window.cursor();
                 let area = extent.map(|n| f64::from(n) / dpr);
                 game.pointer(cursor[0], cursor[1], area[0], area[1], false)?;
             }
-            None => {}
+            Some(Control::Settings) if self.state.settings.open_over_game() => {
+                self.ingame_settings = true;
+                self.settings_ui.over_game = true;
+                self.egui.begin_screen();
+                self.settings_ui
+                    .request_focus(slither_client::settings::QUALITY);
+                self.egui.focus(crate::settings_egui::widget_id(
+                    slither_client::settings::QUALITY,
+                ));
+                // egui's initial Area sizing pass must settle before input
+                // reaches the panel, as on the login.
+                self.ingame_frame(game)?;
+                self.ingame_frame(game)?;
+            }
+            Some(Control::Settings) | None => {}
         }
         self.observe_game(game)
     }
@@ -543,6 +595,7 @@ impl NativeLogin {
         }
         let view = self.state.view(admission);
         if self.state.settings.open(&view) {
+            self.settings_ui.over_game = false;
             self.refresh_egui();
             self.egui.begin_screen();
             self.settings_ui
@@ -839,7 +892,9 @@ impl NativeLogin {
     }
     /// Authored input and the native egui-winit adapter feed the same widget tree.
     pub fn settings_input(&mut self, mut input: egui::RawInput) {
-        if !self.egui.active() {
+        // In-game Settings belongs to the in-game frame. If the game retired
+        // the menu, the next observe_game dismisses it; drop input until then.
+        if !self.egui.active() || self.ingame_settings {
             return;
         }
         if self.egui.take_ime_cancellation() {
@@ -1482,11 +1537,12 @@ impl NativeLogin {
             self.studio.state.reveal_control(focus, area);
         }
         let champion = self.champion.policy.visible();
-        if self.login_owns_input()
-            || self.state.settings.visible()
-            || self.picker.policy.visible()
-            || studio
-            || champion
+        if !self.ingame_visible
+            && (self.login_owns_input()
+                || self.state.settings.visible()
+                || self.picker.policy.visible()
+                || studio
+                || champion)
         {
             self.egui_pass(cosmetics)?;
             if champion && !view.visible {

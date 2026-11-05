@@ -303,9 +303,26 @@ impl SettingsState {
         self.generation = self.generation.wrapping_add(1);
         true
     }
+    /// Mount over a live game. The native in-game menu has already admitted
+    /// this through its own session gate; login phases do not apply.
+    pub fn open_over_game(&mut self) -> bool {
+        if self.visible() {
+            return false;
+        }
+        self.open = true;
+        self.generation = self.generation.wrapping_add(1);
+        true
+    }
     /// Done and Escape have identical immediate-apply semantics.
     pub fn close(&mut self) {
         self.open = false;
+    }
+    /// Remove the panel without its exit fade, when the screen it was opened
+    /// over has gone (a death or close retires the in-game menu). Preferences
+    /// and any pending write are kept.
+    pub fn dismiss(&mut self) {
+        self.open = false;
+        self.alpha = 0.;
     }
     /// A generation-bound activation produces an explicit Set, never a blind toggle.
     pub fn activate(&mut self, intent: ControlIntent) {

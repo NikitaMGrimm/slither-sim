@@ -10,6 +10,8 @@ pub struct SettingsUi {
     pub controls: Vec<(ControlId, Rect, bool)>,
     pub panel_rect: Rect,
     pub scroll_id: Option<Id>,
+    /// Over a live game the in-game menu's lighter dim stays below instead.
+    pub over_game: bool,
     request_focus: Option<ControlId>,
     scroll_offset: f32,
 }
@@ -19,6 +21,7 @@ impl Default for SettingsUi {
             controls: Vec::new(),
             panel_rect: Rect::NOTHING,
             scroll_id: None,
+            over_game: false,
             request_focus: None,
             scroll_offset: 0.,
         }
@@ -73,12 +76,14 @@ impl SettingsUi {
             .show(ctx, |ui| {
                 let rect = Rect::from_min_size(pos2(0., 0.), area);
                 let response = ui.allocate_rect(rect, Sense::click());
-                ui.painter().rect_filled(
-                    rect,
-                    0.,
-                    theme::ink(slither_client::menu_theme::MenuTheme::default().backdrop)
-                        .gamma_multiply(0.88 * alpha),
-                );
+                if !self.over_game {
+                    ui.painter().rect_filled(
+                        rect,
+                        0.,
+                        theme::ink(slither_client::menu_theme::MenuTheme::default().backdrop)
+                            .gamma_multiply(0.88 * alpha),
+                    );
+                }
                 if crate::egui_panel::owned_click(&response) && interactive {
                     actions.push((settings::DONE, None));
                 }

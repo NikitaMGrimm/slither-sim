@@ -39,6 +39,9 @@ impl<'a> From<&'a KeyEvent> for KeyInput<'a> {
 pub struct NativeMenuInput {
     pub state: MenuInputState,
     modifiers: ModifiersState,
+    /// Gameplay keys (Left, Right, Up, Space) whose auto-repeat must not
+    /// count as a press, because a modal consumed the original one.
+    stale: [bool; 4],
 }
 /// Copied result. Consumed keyboard events must not reach Play/Stop/gameplay again.
 #[derive(Default)]
@@ -51,6 +54,12 @@ impl NativeMenuInput {
     /// Update modifiers explicitly (also used by the synthetic event tests).
     pub fn modifiers(&mut self, modifiers: ModifiersState) {
         self.modifiers = modifiers;
+    }
+    /// A modal that owned the keyboard is closing. A gameplay key still held
+    /// from it steers or boosts again only after a fresh press: winit's
+    /// auto-repeat of that key is not one.
+    pub fn require_fresh_presses(&mut self) {
+        self.stale = [true; 4];
     }
     /// Shared modifier snapshot, retained while this panel is inactive.
     pub fn shift_key(&self) -> bool {
@@ -69,6 +78,16 @@ impl NativeMenuInput {
             PhysicalKey::Code(KeyCode::Space) => Some(GameplayKey::Space),
             _ => None,
         };
+        if let Some(key) = gameplay {
+            let stale = &mut self.stale[key as usize];
+            if pressed && event.repeat && *stale && !editing {
+                return NativeInputResult {
+                    consumed: true,
+                    effects: Vec::new(),
+                };
+            }
+            *stale = false;
+        }
         let mut intents = Vec::new();
         let process = matches!(event.logical, Key::Named(NamedKey::Process));
         if let Some(key) = gameplay.filter(|_| !pressed || !process) {

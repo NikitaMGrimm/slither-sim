@@ -102,9 +102,11 @@ Play and menu entry points, including the after-death result. Adjacent IME
 preedit updates wait for redraw; commits and discrete actions retain order.
 `StartMenuState` and session policy retain normalization, persistence boundaries
 and transition/admission rules. `ingame_egui.rs` owns
-the single Leave game button and outside-click dismissal. `LocalGame` gates
-native steering while the overlay is open, releases held boost/turn debt at entry,
-and keeps the existing ping/presentation flow running. Leave and an unadmitted
+the in-game menu's Resume, Settings and Leave game buttons and outside-click
+dismissal; Settings opens the shared panel over it. `LocalGame` gates
+native steering while the menu is open, releases held boost/turn debt at entry,
+and keeps the existing ping/presentation flow running. After it closes, a turn
+or boost key still held from the menu acts again only on a fresh press. Leave and an unadmitted
 Esc queue the existing Close effect through `request_stop()`. The native effect
 owner reuses `begin_close()` and its five-second deadline before acknowledging
 that effect and running the existing session teardown/login return. Frames keep
