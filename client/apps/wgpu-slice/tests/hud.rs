@@ -51,6 +51,7 @@ fn finish(v: &View, bank: &mut Bank, frame: Frame) -> render::PreparedFrame {
     let resources = bank.resources(&frame).unwrap();
     render::finish_hud(
         render::PreparedFrame {
+            background_draws: 0,
             world_draws: 0,
             #[cfg(feature = "frame-bench")]
             food_submission: None,
@@ -218,6 +219,7 @@ fn a_full_or_nearly_full_frame_never_overruns_the_draw_limit() {
         assert_eq!(
             render::finish_hud(
                 render::PreparedFrame {
+                    background_draws: 0,
                     world_draws: 0,
                     #[cfg(feature = "frame-bench")]
                     food_submission: None,

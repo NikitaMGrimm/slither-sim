@@ -185,7 +185,7 @@ impl View {
     pub fn game_hud_visible(&self) -> bool {
         self.phase == Phase::Playing && self.playing
     }
-    /// Death may retain the world for its stock hold/crossfade; terminal sockets do not.
+    /// Whether live entities may be retained; backgrounds have an independent layer.
     pub fn game_world_visible(&self) -> bool {
         self.connected && matches!(self.phase, Phase::Playing | Phase::Dead | Phase::Victory)
     }

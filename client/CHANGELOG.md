@@ -2,8 +2,9 @@
 
 ## Unreleased
 
-- Hide retained game HUD and terminal world pictures on menus after any session
-  close or failure; keep the death world fade without HUD over interactive menus.
+- Hide retained game HUD and stale entities on menus after any session close or
+  failure; preserve backgrounds, restore HUD after menu dismissal on retries,
+  and exclude the browser's outgoing login fade as well as native menus.
 
 - Keep pellets, glows, snake detail and names continuous while zooming out,
   using area-weighted physical-pixel floors and size fades without subpixel

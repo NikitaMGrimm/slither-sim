@@ -88,7 +88,7 @@ impl LocalGameplay {
     }
     fn pictures(&mut self) -> crate::Result<()> {
         for _ in 0..16 {
-            let Some(p) = self.game.take_frame() else {
+            let Some(p) = self.game.take_browser_frame() else {
                 return Ok(());
             };
             let presented = match &mut self.host {

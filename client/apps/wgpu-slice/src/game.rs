@@ -3,7 +3,7 @@ use crate::latency;
 use crate::{
     Result,
     bank::Bank,
-    render::{self, PreparedFrame},
+    render::{self, PreparedFrame, SuppressedLayers},
 };
 use slither_client::{
     challenge::solve_challenge,
@@ -185,6 +185,7 @@ pub struct LocalGame {
     work: Option<Work>,
     packet_frames: VecDeque<Picture<PreparedFrame>>,
     inflight: u8,
+    suppressed_layers: Option<SuppressedLayers>,
     deferred: VecDeque<(u32, Vec<u8>, f64, u64)>,
     deferred_bytes: usize,
     own: Option<SnakeObjectToken>,
@@ -243,6 +244,7 @@ impl LocalGame {
             work: None,
             packet_frames: VecDeque::new(),
             inflight: 0,
+            suppressed_layers: None,
             deferred: VecDeque::new(),
             deferred_bytes: 0,
             own: None,
@@ -589,6 +591,7 @@ impl LocalGame {
         self.input.leave_tick();
         self.packet_frames.clear();
         self.inflight = 0;
+        self.suppressed_layers = None;
         self.deferred.clear();
         self.deferred_bytes = 0;
         let _ = self.enqueue(EffectKind::Close, After::Stopped);
@@ -674,6 +677,7 @@ impl LocalGame {
         self.input.leave_tick();
         self.packet_frames.clear();
         self.inflight = 0;
+        self.suppressed_layers = None;
         self.deferred.clear();
         self.deferred_bytes = 0;
         self.session.stop_actions();
@@ -715,6 +719,7 @@ impl LocalGame {
             self.work = None;
             self.input.leave_tick();
             self.inflight = 0;
+            self.suppressed_layers = None;
         }
         self.release_stalled_presentation()?;
         self.service_ingress()
@@ -1562,6 +1567,11 @@ impl LocalGame {
     pub fn take_frame(&mut self) -> Option<PreparedFrame> {
         self.take_frame_with_menu(false)
     }
+    /// Browser DOM login follows the shared session return clock, including Setup flushes.
+    pub fn take_browser_frame(&mut self) -> Option<PreparedFrame> {
+        let session = self.session.view();
+        self.take_frame_with_menu(session.playing && session.return_fraction < 1.)
+    }
     /// Native menu visibility can lead/lag the session's gameplay handoff.
     pub fn take_frame_with_menu(&mut self, menu_visible: bool) -> Option<PreparedFrame> {
         latency::generation(self.generation);
@@ -1588,15 +1598,14 @@ impl LocalGame {
         }
         Some(prepared.value)
     }
-    fn apply_layer_visibility(&self, picture: &mut PreparedFrame, menu_visible: bool) {
+    fn apply_layer_visibility(&mut self, picture: &mut PreparedFrame, menu_visible: bool) {
         let view = self.session.view();
         // Gate at issue as well as projection: queued Setup/retry pictures may
         // predate a death, terminal event, or the native in-game menu opening.
-        if !view.game_world_visible() {
-            picture.hide_game_world();
-        } else if menu_visible || !view.game_hud_visible() || self.controls_captured() {
-            picture.hide_game_hud();
-        }
+        let hide_entities = !view.game_world_visible();
+        self.suppressed_layers =
+            (hide_entities || menu_visible || !view.game_hud_visible() || self.controls_captured())
+                .then(|| picture.suppress_layers(hide_entities));
     }
     /// Non-consuming drain-boundary query: never issue an extra unacknowledged picture.
     pub fn has_frame(&self) -> bool {
@@ -1606,6 +1615,7 @@ impl LocalGame {
                 || self.work.as_ref().is_some_and(|w| w.prepared.is_some()))
     }
     pub fn presented(&mut self, success: bool) -> Result<()> {
+        self.suppressed_layers = None;
         let kind = std::mem::replace(&mut self.inflight, 0);
         if kind == 0 {
             return Err("No issued frame".into());
@@ -1627,6 +1637,7 @@ impl LocalGame {
     }
     /// Retire rejected pixels without losing the issued model/control transaction.
     pub fn skip_frame(&mut self) -> Result<()> {
+        self.suppressed_layers = None;
         latency::picture("skipped");
         let kind = std::mem::replace(&mut self.inflight, 0);
         if kind == 0 {
@@ -1739,7 +1750,12 @@ impl LocalGame {
         }
         Ok(())
     }
-    pub fn retry_frame(&mut self, frame: PreparedFrame) -> Result<()> {
+    pub fn retry_frame(&mut self, mut frame: PreparedFrame) -> Result<()> {
+        // Filtering is an issue-time view. Restore the retained input before
+        // requeueing, so dismissal restores HUD without another scene update.
+        if let Some(layers) = self.suppressed_layers.take() {
+            frame.restore_layers(layers);
+        }
         latency::build("retried", frame.frame.identity);
         let frame = Picture {
             value: frame,

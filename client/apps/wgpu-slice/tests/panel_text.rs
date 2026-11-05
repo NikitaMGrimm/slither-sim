@@ -190,6 +190,7 @@ fn panels_replace_slots_preserve_other_groups_and_old_prepared_resources_at_dpr_
         let draws = out.iter().flatten().map(|p| p.0.clone()).collect();
         let resources = out.into_iter().flatten().map(|p| p.1).collect();
         let p = PreparedFrame {
+            background_draws: 0,
             world_draws: 0,
             #[cfg(feature = "frame-bench")]
             food_submission: None,

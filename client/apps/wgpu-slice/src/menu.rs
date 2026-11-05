@@ -157,6 +157,7 @@ impl MenuFrame {
             })
         };
         let mut composed = PreparedFrame {
+            background_draws: picture.background_draws,
             world_draws: picture.world_draws,
             #[cfg(feature = "frame-bench")]
             food_submission: picture.food_submission,
@@ -239,6 +240,7 @@ impl MenuFrame {
             };
             picture.frame.draws.insert(0, backdrop);
             picture.world_draws += 1;
+            picture.background_draws += 1;
         }
         if let Some(cover) = self.world_cover {
             if let Some(overlay) = &mut picture.overlay {

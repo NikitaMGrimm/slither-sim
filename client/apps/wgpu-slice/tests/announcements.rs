@@ -509,6 +509,7 @@ fn near_budget_world_long_record_ten_row_hud_and_maximal_minimap_compose_in_orde
         assert_eq!(g.hud_view().rows.len(), 10);
         let out = render::finish_hud(
             render::PreparedFrame {
+                background_draws: 0,
                 world_draws: 0,
                 #[cfg(feature = "frame-bench")]
                 food_submission: None,
