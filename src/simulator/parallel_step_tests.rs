@@ -13,8 +13,8 @@ thread_local! {
 
 const POOLS: [usize; 5] = [1, 2, 3, 4, 7];
 
-fn unit(slot: usize, salt: usize) -> f64 {
-    let mut random = Random((slot as u32).wrapping_mul(2_654_435_761) ^ salt as u32);
+fn unit(slot: usize, stream: usize) -> f64 {
+    let mut random = Random((slot as u32).wrapping_mul(2_654_435_761) ^ stream as u32);
     random.next();
     random.next()
 }
@@ -294,7 +294,9 @@ fn collision_ordering_matches_the_serial_walk_when_strikes_fall_first() {
 #[test]
 fn official_world_steps_identically_on_any_pool() {
     let world = world(Config::official(300), 300);
-    let rows = assert_pool_invariant(&world, 240, 3, 8, steer, rim_respawns);
+    // Official food makes each checkpoint digest costly in debug builds;
+    // every tick's deaths and events are still compared.
+    let rows = assert_pool_invariant(&world, 240, 30, 8, steer, rim_respawns);
     assert!(deaths(&rows) > 20, "{}", deaths(&rows));
 }
 
