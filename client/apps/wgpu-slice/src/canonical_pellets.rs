@@ -273,6 +273,44 @@ pub(super) fn prepare(
         let (q, second) = b.project_pair(frame, f, part)?;
         Ok(Packed::new(&q, second, texture, soft, attachment))
     };
+    // The generic packer merges adjacent coincident Lighter quads into one
+    // quantized PairLighter draw. Distinct Low foods can coincide, so any such
+    // adjacency, including across chunks, falls back to that packer.
+    let bodies = if skip_outlines { ends[0] } else { ends[0] + n }..early_end;
+    let coincident = std::sync::atomic::AtomicBool::new(false);
+    let body_shape = |index: usize, bytes: Option<&[u8; 96]>| -> Result<(ResourceKey, [f32; 6])> {
+        let food = visible[index - bodies.start];
+        let slot = b.sources.slots[food];
+        let projected;
+        let bytes = match bytes {
+            Some(bytes) => bytes,
+            None => {
+                projected = super::pellet_cpu::project(
+                    frame,
+                    super::pellet_cpu::Input {
+                        slot,
+                        animation: b.world.foods()[food].paint_state(),
+                        detailed: false,
+                    },
+                    &b.sources,
+                    b.view,
+                    b.user_zoom,
+                    b.physical_pixels_per_unit,
+                    attachment,
+                )?;
+                &projected.bytes
+            }
+        };
+        let get = |i: usize| f32::from_le_bytes(bytes[i..i + 4].try_into().unwrap());
+        Ok((
+            b.sources.groups[b.sources.slot_groups[slot]]
+                .sources
+                .body
+                .asset()
+                .into(),
+            [get(0), get(4), get(8), get(12), get(72), get(76)],
+        ))
+    };
     let compute = |chunks: &mut [VertexChunk], first: usize| -> Result<Vec<Info>> {
         let count = total
             .saturating_sub(first * VERTEX_CHUNK_QUADS)
@@ -285,44 +323,55 @@ pub(super) fn prepare(
             let end = (start + VERTEX_CHUNK_QUADS).min(total);
             chunk.bytes.clear();
             chunk.states.clear();
+            let mut previous = if b.detailed || !bodies.contains(&start.wrapping_sub(1)) {
+                None
+            } else {
+                Some(body_shape(start - 1, None)?)
+            };
             for index in start..end {
-                if skip_outlines && (ends[0]..early_end).contains(&index) {
-                    let food = visible[index - ends[0]];
-                    let slot = b.sources.slots[food];
-                    let texture = source_textures[b.sources.slot_groups[slot]]
-                        .as_ref()
-                        .expect("visible source group")[1];
-                    if !texture.food_outline && !texture.food_glow {
-                        // Project and store each body in its chunk claimant,
-                        // without an intermediate record pass.
-                        let body = super::pellet_cpu::project(
-                            frame,
-                            super::pellet_cpu::Input {
-                                slot,
-                                animation: b.world.foods()[food].paint_state(),
-                                detailed: false,
-                            },
-                            &b.sources,
-                            b.view,
-                            b.user_zoom,
-                            b.physical_pixels_per_unit,
-                            attachment,
-                        )?;
-                        info.push(Packed::store_body(
-                            &body.bytes,
-                            texture,
-                            chunk,
-                            (total - index).min(VERTEX_CHUNK_QUADS),
-                        ));
-                        continue;
-                    }
+                if coincident.load(std::sync::atomic::Ordering::Relaxed) {
+                    return Ok(info);
                 }
-                let packed = packed_at(index)?;
-                info.push(store(
-                    packed,
-                    chunk,
-                    (total - index).min(VERTEX_CHUNK_QUADS),
-                ));
+                let count = (total - index).min(VERTEX_CHUNK_QUADS);
+                if b.detailed || !bodies.contains(&index) {
+                    previous = None;
+                    info.push(store(packed_at(index)?, chunk, count));
+                    continue;
+                }
+                let food = visible[index - bodies.start];
+                let slot = b.sources.slots[food];
+                let texture = source_textures[b.sources.slot_groups[slot]]
+                    .as_ref()
+                    .expect("visible source group")[1];
+                // Project and store ordinary gameplay bodies in their chunk
+                // claimant, without an intermediate record pass.
+                let body = if skip_outlines && !texture.food_outline && !texture.food_glow {
+                    Some(super::pellet_cpu::project(
+                        frame,
+                        super::pellet_cpu::Input {
+                            slot,
+                            animation: b.world.foods()[food].paint_state(),
+                            detailed: false,
+                        },
+                        &b.sources,
+                        b.view,
+                        b.user_zoom,
+                        b.physical_pixels_per_unit,
+                        attachment,
+                    )?)
+                } else {
+                    None
+                };
+                let shape = body_shape(index, body.as_ref().map(|body| &body.bytes))?;
+                if previous == Some(shape) {
+                    coincident.store(true, std::sync::atomic::Ordering::Relaxed);
+                    return Ok(info);
+                }
+                previous = Some(shape);
+                info.push(match body {
+                    Some(body) => Packed::store_body(&body.bytes, texture, chunk, count),
+                    None => store(packed_at(index)?, chunk, count),
+                });
             }
         }
         Ok(info)
@@ -332,8 +381,20 @@ pub(super) fn prepare(
     // serial pass: menu backdrops and fewer than 8,192 bodies stay serial.
     // Measured 4K crossover (~8k–12k bodies), not a visual limit:
     // https://github.com/NikitaMGrimm/slither-sim/blob/main/research/client-performance/2026-11-05-low-preset/REPORT.md.
+    let fallback = |vertices: &mut [VertexChunk]| {
+        for chunk in vertices {
+            chunk.bytes.clear();
+            chunk.states.clear();
+        }
+        None
+    };
     if !b.detailed && (!skip_outlines || n < 8192) {
-        return compute(&mut vertices[..chunk_count], 0).map(Some);
+        let info = compute(&mut vertices[..chunk_count], 0)?;
+        return Ok(if coincident.into_inner() {
+            fallback(vertices)
+        } else {
+            Some(info)
+        });
     }
     use std::sync::{
         Mutex, OnceLock,
@@ -375,6 +436,9 @@ pub(super) fn prepare(
         }
     });
     drop(jobs);
+    if coincident.into_inner() {
+        return Ok(fallback(vertices));
+    }
     let mut result = Vec::new();
     result
         .try_reserve_exact(total)
@@ -383,11 +447,7 @@ pub(super) fn prepare(
         if let Some(Ok(info)) = value.into_inner() {
             result.extend(info);
         } else {
-            for chunk in vertices {
-                chunk.bytes.clear();
-                chunk.states.clear();
-            }
-            return Ok(None);
+            return Ok(fallback(vertices));
         }
     }
     Ok(Some(result))
@@ -436,6 +496,10 @@ mod tests {
             tests::{batch, rectangle, step, view},
         },
         render::PreparedFrame,
+    };
+    use slither_client::{
+        presentation::{FoodSpawn, FoodWorld},
+        state::Point,
     };
 
     #[test]
@@ -615,6 +679,124 @@ mod tests {
                 crate::pellet_batch::offscreen::pixels(&r, &target).unwrap(),
                 crate::pellet_batch::offscreen::pixels(&r, &reference).unwrap()
             );
+        }
+    }
+
+    /// Authored foods sharing `id` coincide exactly: same position, color,
+    /// factory units and spawn time.
+    fn coincident(bank: &Bank, count: usize, id: impl Fn(usize) -> usize) -> FoodWorld {
+        let mut world = FoodWorld::new();
+        for i in 0..count {
+            let j = id(i);
+            world
+                .spawn(
+                    FoodSpawn {
+                        key: i as u32,
+                        sector: (0, 0),
+                        position: Point {
+                            x: 16_000. + (j % 200) as f64 * 2.,
+                            y: 16_000. + (j / 200) as f64 * 2.,
+                        },
+                        base_size: 0.2,
+                        raw_color: (j % 10) as u8,
+                        rapid: true,
+                    },
+                    bank.food((j % 10) as u8, [0.25, 0.5]).input(1.),
+                )
+                .unwrap();
+        }
+        for _ in 0..12 {
+            world.advance(step(5.), |_| unreachable!()).unwrap();
+        }
+        world
+    }
+
+    #[test]
+    #[ignore = "explicit authored offscreen catalog and canonical packing comparison"]
+    fn coincident_low_bodies_keep_the_generic_pair_packer() {
+        let adapter = pollster::block_on(instance().enumerate_adapters(wgpu::Backends::VULKAN))
+            .into_iter()
+            .find(|a| a.get_info().device_type == wgpu::DeviceType::DiscreteGpu)
+            .unwrap();
+        let mut r = pollster::block_on(Renderer::from_adapter_with_max_samples(
+            adapter,
+            wgpu::TextureFormat::Rgba8Unorm,
+            4,
+        ))
+        .unwrap();
+        let mut bank = Bank::new().unwrap();
+        // Serial and scoped duplicate pairs, plus one pair whose bodies straddle
+        // the first chunk boundary (body order is reverse world order).
+        let boundary = 8_200 - VERTEX_CHUNK_QUADS;
+        let cases = [
+            (4_096, coincident(&bank, 4_096, |i| i / 2), true),
+            (8_194, coincident(&bank, 8_194, |i| i / 2), true),
+            (
+                8_200,
+                coincident(&bank, 8_200, |i| if i == boundary { i - 1 } else { i }),
+                true,
+            ),
+            (8_200, coincident(&bank, 8_200, |i| i), false),
+        ];
+        for (count, world, paired) in cases {
+            for menu in [false, true] {
+                let mut b = batch(&mut Cache::default(), &mut bank, &world, view());
+                assert_eq!(b.visible_count, count);
+                b.detailed = false;
+                b.canonical_submission = true;
+                let frame = Frame {
+                    identity: 1,
+                    extent: [3840, 2160],
+                    viewport_scale: 1.,
+                    tick: 0,
+                    draws: Vec::new(),
+                    food_batch: Some(b),
+                    snakes: Vec::new(),
+                };
+                let mut picture = PreparedFrame {
+                    background_draws: 0,
+                    world_draws: 0,
+                    #[cfg(feature = "frame-bench")]
+                    food_submission: None,
+                    resources: bank.resources(&frame).unwrap(),
+                    frame,
+                    overlay: None,
+                };
+                if menu {
+                    MenuFrame::world_crossfade([3840, 2160], 1., 0.4)
+                        .unwrap()
+                        .append_to(&mut picture)
+                        .unwrap();
+                }
+                r.sync_resources(&picture.resources).unwrap();
+                let resident = r.textures.iter().map(|(k, t)| (*k, t.asset)).collect();
+                let quads = picture.frame.canonical().unwrap().quads(&resident).unwrap();
+                let pairs = quads
+                    .windows(2)
+                    .filter(|q| super::super::additive_pair(&q[0], &q[1]))
+                    .count();
+                assert_eq!(pairs > 0, paired);
+                let mut vertices: Vec<_> =
+                    (0..picture.frame.draw_count().div_ceil(VERTEX_CHUNK_QUADS))
+                        .map(|_| VertexChunk::default())
+                        .collect();
+                let prepared = prepare(
+                    &picture.frame,
+                    &r.textures,
+                    true,
+                    [3840, 2160],
+                    &mut vertices,
+                )
+                .unwrap();
+                assert_eq!(prepared.is_none(), paired, "{count} bodies, menu {menu}");
+                if paired {
+                    assert!(
+                        vertices
+                            .iter()
+                            .all(|c| c.bytes.is_empty() && c.states.is_empty())
+                    );
+                }
+            }
         }
     }
 }
