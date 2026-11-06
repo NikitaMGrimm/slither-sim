@@ -110,8 +110,9 @@ def recompute():
         auto = values(adapter, mode, zoom, "candidate", "auto")
         medium = values(adapter, mode, zoom, "candidate", "medium")
         assert len(before) == len(low) == len(auto) == len(medium) == 5
-        assert statistics.median(low) <= statistics.median(medium), (adapter, mode, zoom, "medium")
-        assert statistics.median(low) <= statistics.median(auto), (adapter, mode, zoom, "auto")
+        # The result claims a strict lead ("below"), so a tie must fail.
+        assert statistics.median(low) < statistics.median(medium), (adapter, mode, zoom, "medium")
+        assert statistics.median(low) < statistics.median(auto), (adapter, mode, zoom, "auto")
         (stock if zoom == "stock" else lead).append(statistics.median(auto) - statistics.median(low))
         table.append(f"| {adapter} / {mode} / {zoom} | {cell(before)} | {cell(low)} | {cell(auto)} | {cell(medium)} |")
     before = statistics.median(values("rtx", "Native", "far", "baseline", "low"))

@@ -7,9 +7,9 @@ Low RTX/Vulkan Native 4K at factor 0.065: CPU preparation, resource sync and sub
 <!-- /RESULT -->
 
 At stock zoom Low's lead over Auto is small, 0.027–0.059 ms (3–7%), but it
-holds in all four stock cells. No compiler or linker ran during any
-measured run. These results cover the authored rectangle and measured CPU
-stages below.
+holds in all four stock cells. No compiler or linker appeared in the
+five-second process samples of any measured run. These results cover the
+authored rectangle and measured CPU stages below.
 They do not establish a bound for arbitrary worlds, hardware or every individual
 frame under competing system load.
 
@@ -66,7 +66,8 @@ All of these are retained outside Git with their binaries, sources and logs.
 - **Unpaired coincident bodies (`bed9a259`).** An independent review found that
   the direct stream drew coincident adjacent bodies as two `Lighter` draws
   instead of the generic `PairLighter` pair. On authored coincident pairs this
-  changed up to 2,561 pixels by at most 4/255 at RTX/Vulkan Native, and up to
+  changed up to 2,561 pixels by at most 4/255 with 4,096 foods and up to 4,710
+  pixels by at most 6/255 with 8,192 foods at RTX/Vulkan Native, and up to
   10,108 pixels by at most 6/255 with 8,192 foods on Original
   (`coincident-controls.json`).
 - **Whole-frame fallback for coincident bodies (`f8695b43`).** The first fix
