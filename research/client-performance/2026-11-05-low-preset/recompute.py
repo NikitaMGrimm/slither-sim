@@ -63,6 +63,20 @@ def recompute():
     assert palette_keys == set(itertools.product(
         ["rtx", "amd"], ["stock", "far", "whole"], ["Native", "Original"], [1, 12, 240],
     ))
+    coincident = json.loads((ROOT / "coincident-controls.json").read_text())
+    assert coincident["before"] and all(
+        not c["identical"] and c["changed_pixels"] > 0 and c["revision"] == "bed9a259"
+        for c in coincident["before"])
+    after_keys = set()
+    for c in coincident["after"]:
+        key = (c["adapter"], c["foods"], c["mode"])
+        assert key not in after_keys and c["identical"] and c["retained"]
+        assert c["rgba_bytes"] == 3840 * 2160 * 4 and c["eligible_pairs"] == c["foods"] // 2
+        assert c["samples"] == (1 if c["mode"] == "Native" else 4)
+        after_keys.add(key)
+    assert after_keys == set(itertools.product(["rtx", "amd"], [4096, 8192], ["Native", "Original"]))
+    assert coincident["regression_test"]["bed9a259"] == "failed"
+    assert coincident["regression_test"]["candidate"] == "passed"
     rejected = json.loads((ROOT / "rejected-grouping.json").read_text())
     assert rejected["status"] == "rejected"
     assert rejected["changed_pixels"] == 10606 and rejected["changed_channels"] == 12062
@@ -79,27 +93,49 @@ def recompute():
 
     table = ["| Adapter / world / zoom | Low main (ms) | Low candidate (ms) | Auto candidate (ms) | Medium candidate (ms) |",
              "| --- | ---: | ---: | ---: | ---: |"]
+    stock, lead = [], []
     for adapter, mode, zoom in itertools.product(["rtx", "amd"], ["Native", "Original"], ["stock", "far", "whole"]):
         before = values(adapter, mode, zoom, "baseline", "low")
         low = values(adapter, mode, zoom, "candidate", "low")
         auto = values(adapter, mode, zoom, "candidate", "auto")
         medium = values(adapter, mode, zoom, "candidate", "medium")
         assert len(before) == len(low) == len(auto) == len(medium) == 5
-        assert statistics.median(low) <= statistics.median(auto), (adapter, mode, zoom, "auto")
         assert statistics.median(low) <= statistics.median(medium), (adapter, mode, zoom, "medium")
+        if zoom == "stock":
+            # Stock zoom is a tie: report the median difference, and require it
+            # to stay inside both arms' run ranges rather than claim a lead.
+            assert min(low) <= max(auto) and min(auto) <= max(low), (adapter, mode, zoom, "auto")
+            stock.append(statistics.median(low) - statistics.median(auto))
+        else:
+            assert statistics.median(low) <= statistics.median(auto), (adapter, mode, zoom, "auto")
+            lead.append(statistics.median(auto) - statistics.median(low))
         table.append(f"| {adapter} / {mode} / {zoom} | {cell(before)} | {cell(low)} | {cell(auto)} | {cell(medium)} |")
     before = statistics.median(values("rtx", "Native", "far", "baseline", "low"))
     after = statistics.median(values("rtx", "Native", "far", "candidate", "low"))
     result = (f"Low RTX/Vulkan Native 4K at factor 0.065: CPU preparation, resource sync and submission fall from "
               f"{before:.3f} to {after:.3f} ms ({100 * (1 - after / before):.1f}% lower) against main `7cb5ec37`, "
               "medians of five runs. "
-              "Low's candidate median is no greater than Auto or Medium in all 12 hardware/world/zoom cells. "
-              "All 144 full-frame RGBA SHA-256 pairs are identical.")
+              f"At far and whole-map zoom Low's median is {min(lead):.3f}–{max(lead):.3f} ms below Auto in all 8 cells; "
+              f"at stock zoom Low and Auto tie, with Low's median {min(stock):+.3f} to {max(stock):+.3f} ms from Auto's, "
+              "inside both run ranges. Low is below Medium in all 12 cells. "
+              "All 144 full-frame RGBA SHA-256 pairs are identical, and all 8 coincident-pair controls "
+              "match the canonical renderer.")
     unique_runs = {(r["round"], r["adapter"], r["arm"]): r for r in rows}
     assert len(unique_runs) == 20
     overlap = sum(r["compiler_observed"] == "True" for r in unique_runs.values())
+    clean = sorted(n for n in {k[0] for k in unique_runs}
+                   if all(r["compiler_observed"] == "False" for k, r in unique_runs.items() if k[0] == n))
+    clean_rows = [r for r in rows if r["round"] in clean and r["arm"] == "candidate"]
+
+    def clean_value(adapter, mode, zoom, preset):
+        return statistics.median(float(r["cpu_p50_ms"]) for r in clean_rows if
+                                 (r["adapter"], r["mode"], r["zoom"], r["preset"]) == (adapter, mode, zoom, preset))
+    cells = list(itertools.product(["rtx", "amd"], ["Native", "Original"], ["stock", "far", "whole"]))
+    clean_wins = sum(clean_value(*c, "low") <= clean_value(*c, "auto") for c in cells) if clean else 0
     summary = (f"20 interleaved runs; {sum(int(r['frames']) for r in rows):,} measured frames, each cell visited forward and reversed; "
-               f"{overlap} runs with an observed compiler/linker. "
+               f"{overlap} of 20 runs observed a compiler/linker from unrelated work despite a quiet gate; "
+               f"only round {', '.join(clean)} had none in all four runs, and there Low is at or below Auto in "
+               f"{clean_wins} of 12 cells. "
                f"Per-run median machine CPU load: {min(float(r['load_median_pct']) for r in rows):.1f}"
                f"–{max(float(r['load_median_pct']) for r in rows):.1f}%; "
                f"all sampled load: {min(float(r['load_min_pct']) for r in rows):.1f}"

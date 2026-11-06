@@ -1,0 +1,169 @@
+{
+  "fixture": "authored protocol-13 coincident pairs: food 2j and 2j+1 share color j%10, raw position (1200+j%200, 1050+j/200), size 1 and factory units [0.25, 0.5]; Low, factor 1, 12 animation updates, 4K; retained picture versus frame.canonical() through the same WorldPresenter",
+  "before_source": "independent review of bed9a259 (GPT 6.1 Sol via Codex)",
+  "before": [
+    {
+      "revision": "bed9a259",
+      "adapter": "amd",
+      "foods": 4096,
+      "mode": "Native",
+      "identical": false,
+      "changed_pixels": 1542,
+      "changed_channels": 1797,
+      "maximum_difference": 4
+    },
+    {
+      "revision": "bed9a259",
+      "adapter": "amd",
+      "foods": 4096,
+      "mode": "Original",
+      "identical": false,
+      "changed_pixels": 1505,
+      "changed_channels": 1668,
+      "maximum_difference": 3
+    },
+    {
+      "revision": "bed9a259",
+      "adapter": "rtx",
+      "foods": 8192,
+      "mode": "Native",
+      "identical": false,
+      "changed_pixels": 4710,
+      "changed_channels": 5658,
+      "maximum_difference": 6
+    },
+    {
+      "revision": "bed9a259",
+      "adapter": "rtx",
+      "foods": 8192,
+      "mode": "Original",
+      "identical": false,
+      "changed_pixels": 10108,
+      "changed_channels": 11468,
+      "maximum_difference": 6
+    },
+    {
+      "revision": "bed9a259",
+      "adapter": "rtx",
+      "foods": 4096,
+      "mode": "Native",
+      "identical": false,
+      "changed_pixels": 2561,
+      "changed_channels": 3130,
+      "maximum_difference": 4
+    },
+    {
+      "revision": "bed9a259",
+      "adapter": "rtx",
+      "foods": 4096,
+      "mode": "Original",
+      "identical": false,
+      "changed_pixels": 4968,
+      "changed_channels": 5659,
+      "maximum_difference": 6
+    }
+  ],
+  "after": [
+    {
+      "revision": "candidate",
+      "adapter": "amd",
+      "foods": 8192,
+      "mode": "Native",
+      "identical": true,
+      "eligible_pairs": 4096,
+      "rgba_bytes": 33177600,
+      "draws": 16399,
+      "retained": true,
+      "samples": 1
+    },
+    {
+      "revision": "candidate",
+      "adapter": "amd",
+      "foods": 8192,
+      "mode": "Original",
+      "identical": true,
+      "eligible_pairs": 4096,
+      "rgba_bytes": 33177600,
+      "draws": 16399,
+      "retained": true,
+      "samples": 4
+    },
+    {
+      "revision": "candidate",
+      "adapter": "amd",
+      "foods": 4096,
+      "mode": "Native",
+      "identical": true,
+      "eligible_pairs": 2048,
+      "rgba_bytes": 33177600,
+      "draws": 8207,
+      "retained": true,
+      "samples": 1
+    },
+    {
+      "revision": "candidate",
+      "adapter": "amd",
+      "foods": 4096,
+      "mode": "Original",
+      "identical": true,
+      "eligible_pairs": 2048,
+      "rgba_bytes": 33177600,
+      "draws": 8207,
+      "retained": true,
+      "samples": 4
+    },
+    {
+      "revision": "candidate",
+      "adapter": "rtx",
+      "foods": 8192,
+      "mode": "Native",
+      "identical": true,
+      "eligible_pairs": 4096,
+      "rgba_bytes": 33177600,
+      "draws": 16399,
+      "retained": true,
+      "samples": 1
+    },
+    {
+      "revision": "candidate",
+      "adapter": "rtx",
+      "foods": 8192,
+      "mode": "Original",
+      "identical": true,
+      "eligible_pairs": 4096,
+      "rgba_bytes": 33177600,
+      "draws": 16399,
+      "retained": true,
+      "samples": 4
+    },
+    {
+      "revision": "candidate",
+      "adapter": "rtx",
+      "foods": 4096,
+      "mode": "Native",
+      "identical": true,
+      "eligible_pairs": 2048,
+      "rgba_bytes": 33177600,
+      "draws": 8207,
+      "retained": true,
+      "samples": 1
+    },
+    {
+      "revision": "candidate",
+      "adapter": "rtx",
+      "foods": 4096,
+      "mode": "Original",
+      "identical": true,
+      "eligible_pairs": 2048,
+      "rgba_bytes": 33177600,
+      "draws": 8207,
+      "retained": true,
+      "samples": 4
+    }
+  ],
+  "regression_test": {
+    "name": "coincident_low_bodies_keep_the_generic_pair_packer",
+    "bed9a259": "failed",
+    "candidate": "passed"
+  }
+}

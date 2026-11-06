@@ -3,12 +3,14 @@
 ## Result
 
 <!-- RESULT -->
-Low RTX/Vulkan Native 4K at factor 0.065: CPU preparation, resource sync and submission fall from 11.534 to 1.580 ms (86.3% lower) against main `7cb5ec37`, medians of five runs. Low's candidate median is no greater than Auto or Medium in all 12 hardware/world/zoom cells. All 144 full-frame RGBA SHA-256 pairs are identical.
+Low RTX/Vulkan Native 4K at factor 0.065: CPU preparation, resource sync and submission fall from 7.590 to 1.392 ms (81.7% lower) against main `7cb5ec37`, medians of five runs. At far and whole-map zoom Low's median is 0.102–0.248 ms below Auto in all 8 cells; at stock zoom Low and Auto tie, with Low's median -0.019 to +0.017 ms from Auto's, inside both run ranges. Low is below Medium in all 12 cells. All 144 full-frame RGBA SHA-256 pairs are identical, and all 8 coincident-pair controls match the canonical renderer.
 <!-- /RESULT -->
 
-At far and whole-map zoom Low is 0.36–0.56 ms below Auto in every cell. At stock
-zoom its lead is 0.01–0.20 ms; RTX Original's 0.01 ms is within run variation.
-These results cover the authored rectangle and measured CPU stages below.
+Low is far below main and Medium everywhere and below Auto at far and whole-map
+zoom. At stock zoom it shows no measurable difference from Auto: RTX Native's
+median is 0.017 ms above Auto's, and the other three stock cells are
+0.009–0.019 ms below. Unrelated compiler work overlapped 15 of the 20 runs
+despite a quiet gate; see Timing. These results cover the authored rectangle and measured CPU stages below.
 They do not establish a bound for arbitrary worlds, hardware or every individual
 frame under competing system load.
 
@@ -33,6 +35,14 @@ menu backdrops and unusual texture-role metadata stay serial or use the generic
 packer. Wasm keeps its serial path. Low records its long single-state body
 runs directly; detailed food keeps #474's ordered native bundles.
 
+The generic packer merges two adjacent additive quads with the same source and
+identical positions and texture coordinates into one quantized `PairLighter`
+draw. Distinct Low foods meet that rule when they share position, color, size,
+factory units and animation state. Each chunk claimant therefore compares every
+body with its predecessor by the same rule, re-projecting the predecessor at a
+chunk start. Any such adjacency returns the whole frame to the generic packer,
+including across chunk and thread boundaries.
+
 The batch freezes its detail mode, resources and exact two-command budget;
 retries and failed menu admission retain the issued picture. Intermediate
 quality blends, unsupported sources, pressure and nonempty background prefixes
@@ -44,6 +54,13 @@ animation, food selection, MSAA or scaling policy changes.
 
 All of these are retained outside Git with their binaries, sources and logs.
 
+- **Unpaired coincident bodies (`bed9a259`).** An independent review found that
+  the direct stream drew coincident adjacent bodies as two `Lighter` draws
+  instead of the generic `PairLighter` pair. On authored coincident pairs this
+  changed up to 2,561 pixels by at most 4/255 at RTX/Vulkan Native, and up to
+  10,108 pixels by at most 6/255 with 8,192 foods on Original
+  (`coincident-controls.json`). The selected change falls back on any such
+  adjacency.
 - **Source-grouped Low instancing** was faster, but a supplemental ten-color
   AMD/DX12 control changed **10,606 pixels / 12,062 channels**, by at most
   **2/255** (`rejected-grouping.json`, measured on `1921f44c`). Additive
@@ -85,28 +102,32 @@ All of these are retained outside Git with their binaries, sources and logs.
   visit, Auto's reverse visit included, in about 0.36 ms. On matched reverse
   visits Low was below Auto (0.956/1.032 against 1.033/1.098 ms). The selected
   matrix adds one untimed traversal of every preset before measuring.
+- **The warmed matrix on `bed9a259`** put Low at or below Auto and Medium in all
+  12 cells (11.534 to 1.580 ms on RTX Native at 0.065, under 23–75% machine
+  load), with 144 identical images. It measured the unpaired coincident-body
+  code above and is superseded by the matrix on the fix.
 
 ## Timing
 
 <!-- SUMMARY -->
-20 interleaved runs; 48,000 measured frames, each cell visited forward and reversed; 20 runs with an observed compiler/linker. Per-run median machine CPU load: 23.0–75.1%; all sampled load: 13.1–100.0%.
+20 interleaved runs; 48,000 measured frames, each cell visited forward and reversed; 15 of 20 runs observed a compiler/linker from unrelated work despite a quiet gate; only round 3 had none in all four runs, and there Low is at or below Auto in 12 of 12 cells. Per-run median machine CPU load: 9.4–33.3%; all sampled load: 3.1–100.0%.
 <!-- /SUMMARY -->
 
 <!-- TIMING -->
 | Adapter / world / zoom | Low main (ms) | Low candidate (ms) | Auto candidate (ms) | Medium candidate (ms) |
 | --- | ---: | ---: | ---: | ---: |
-| rtx / Native / stock | 4.598 [4.392, 4.969] | 0.950 [0.924, 0.994] | 0.996 [0.974, 1.050] | 4.685 [3.787, 5.082] |
-| rtx / Native / far | 11.534 [10.660, 12.837] | 1.580 [1.485, 1.703] | 2.082 [2.012, 2.171] | 11.744 [9.549, 15.350] |
-| rtx / Native / whole | 12.069 [10.384, 13.641] | 1.532 [1.378, 1.664] | 1.893 [1.866, 2.366] | 11.915 [9.752, 13.981] |
-| rtx / Original / stock | 4.653 [4.474, 5.456] | 1.050 [0.994, 1.072] | 1.060 [1.026, 1.193] | 4.816 [4.091, 5.902] |
-| rtx / Original / far | 12.134 [10.582, 13.729] | 1.603 [1.494, 1.794] | 2.052 [2.030, 2.164] | 12.032 [10.545, 15.547] |
-| rtx / Original / whole | 11.452 [10.904, 13.758] | 1.592 [1.511, 1.697] | 1.983 [1.954, 2.048] | 11.700 [10.379, 14.114] |
-| amd / Native / stock | 4.602 [4.436, 4.762] | 0.915 [0.690, 0.985] | 1.031 [0.856, 1.070] | 4.012 [3.240, 4.886] |
-| amd / Native / far | 11.530 [9.474, 12.290] | 1.551 [1.266, 1.654] | 2.115 [1.881, 2.123] | 11.771 [10.266, 12.728] |
-| amd / Native / whole | 11.229 [7.705, 13.757] | 1.530 [1.252, 1.589] | 1.918 [1.900, 1.947] | 11.733 [8.524, 12.751] |
-| amd / Original / stock | 4.667 [3.973, 5.368] | 0.875 [0.715, 1.034] | 1.079 [0.913, 1.196] | 4.215 [3.604, 4.958] |
-| amd / Original / far | 12.364 [8.552, 12.387] | 1.632 [1.428, 1.739] | 2.126 [1.945, 2.146] | 12.283 [9.083, 12.990] |
-| amd / Original / whole | 11.870 [7.676, 14.273] | 1.535 [1.415, 1.772] | 1.966 [1.802, 2.001] | 12.075 [8.769, 12.983] |
+| rtx / Native / stock | 3.156 [3.030, 3.715] | 0.773 [0.726, 0.854] | 0.756 [0.728, 0.866] | 3.204 [3.099, 3.321] |
+| rtx / Native / far | 7.590 [7.124, 11.723] | 1.392 [1.330, 1.506] | 1.582 [1.504, 1.939] | 7.987 [7.544, 8.487] |
+| rtx / Native / whole | 7.601 [7.034, 10.285] | 1.336 [1.292, 1.440] | 1.458 [1.428, 1.701] | 8.099 [7.371, 9.206] |
+| rtx / Original / stock | 3.192 [3.096, 3.996] | 0.818 [0.794, 0.898] | 0.827 [0.797, 0.988] | 3.282 [3.202, 3.503] |
+| rtx / Original / far | 7.541 [7.260, 10.698] | 1.442 [1.403, 1.514] | 1.596 [1.548, 1.853] | 7.959 [7.513, 8.828] |
+| rtx / Original / whole | 7.732 [7.151, 10.796] | 1.406 [1.383, 1.453] | 1.593 [1.517, 1.724] | 7.801 [7.427, 9.213] |
+| amd / Native / stock | 3.112 [3.003, 3.626] | 0.786 [0.771, 0.813] | 0.805 [0.799, 0.848] | 3.187 [3.156, 3.823] |
+| amd / Native / far | 7.853 [7.106, 8.562] | 1.395 [1.275, 1.846] | 1.643 [1.605, 1.823] | 7.849 [7.569, 8.773] |
+| amd / Native / whole | 7.781 [7.182, 7.853] | 1.373 [1.238, 1.481] | 1.530 [1.522, 1.554] | 7.846 [7.315, 8.524] |
+| amd / Original / stock | 3.166 [3.045, 3.643] | 0.838 [0.825, 0.882] | 0.853 [0.837, 0.886] | 3.245 [3.210, 4.007] |
+| amd / Original / far | 7.709 [7.073, 7.775] | 1.498 [1.397, 1.937] | 1.600 [1.593, 1.732] | 7.871 [7.506, 9.840] |
+| amd / Original / whole | 7.671 [7.369, 8.017] | 1.438 [1.341, 1.505] | 1.593 [1.562, 1.650] | 8.076 [7.382, 8.757] |
 <!-- /TIMING -->
 
 Entries are median [minimum, maximum] across five per-run medians, in
@@ -124,8 +145,13 @@ one adapter without measuring. It then measures them in the order Auto, Low,
 Medium, High and again reversed. Each visit has 10 warmup and 50 measured frames
 of a frozen animation state, so each cell pools 100 frames from both positions. Five rounds alternate main/candidate
 order; both adapters use the same release driver. All scheduled runs are
-retained; no samples or pairs are excluded for load. Other work, including
-compilers, ran on the machine throughout; `runs.csv` records its sampled load.
+retained; no samples or pairs are excluded for load. Before each run the driver
+waited up to 80 minutes for 60 seconds without a compiler or linker, but another
+agent's builds and tests resumed during most runs: 15 of 20 runs observed a
+compiler or linker, and only round 3 was free of them in all four runs. That
+clean round alone puts Low at or below Auto in all 12 cells (RTX Native stock
+0.726 against 0.728 ms), but one round is not a separate result. `runs.csv`
+records each run's sampled load and compiler flag.
 
 ## Exactness
 
@@ -142,6 +168,16 @@ its own canonical renderer on ten interleaved food colors: both adapters, all
 three zooms, both world modes and all three animation states. Every decoded
 RGBA byte matches. This exercises the source-order counterexample above; it is
 separate from the main-versus-candidate 144-image matrix.
+
+`coincident-controls.json` adds 8 full-frame 4K comparisons of the candidate
+against its own canonical renderer on authored coincident pairs: food 2j and
+2j+1 share color, position, size and factory units. Both adapters, Native and
+Original, with 4,096 foods (serial preparation) and 8,192 foods (scoped chunks)
+all match byte for byte; the review's six `bed9a259` failures are retained beside
+them. The offscreen test `coincident_low_bodies_keep_the_generic_pair_packer`
+checks that preparation falls back for serial and scoped duplicates, for a
+single pair straddling the first chunk boundary and behind a menu prefix, and
+not for distinct foods. It fails on `bed9a259` and passes on the candidate.
 
 The authored fixture repeats #470's 25,000-food protocol-13 rectangle: 200
 columns, 125 rows, color 9, size 1, plus one authored snake. Its authored arena
@@ -171,10 +207,11 @@ against the generic packer on the ten-color rectangle.
 
 ## Verification and access
 
-Focused pellet tests: 26 passed, with four explicit GPU/benchmark tests left to
-their own runs. The explicit offscreen packing test passed. The full client
-check (`npm run check`) and the repository guard passed on the rebased branch.
-No independent review or
+Focused pellet tests: 26 passed, with explicit GPU/benchmark tests left to
+their own runs. The explicit offscreen packing and coincident-pair tests passed
+on RTX/Vulkan. The full client check (`npm run check`) and the repository guard
+passed. An independent review of `bed9a259` found the coincident-pair
+difference above; the fix has not had a second independent review. No
 interactive play acceptance is claimed.
 
 Raw compressed RGBA, timing frames, system load/process journals, source

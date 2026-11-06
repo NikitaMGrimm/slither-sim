@@ -2,7 +2,7 @@
   "baseline": {
     "revision": "7cb5ec378cd7de1e10fe77a38813b0a69574c50e",
     "driver_sha256": "6484acf0b397c400126ef7b6a255ca8e4749f7aa162d3737b4551c6c59928cd4",
-    "exe_sha256": "a7c3b2b995621c9b7fd8e3009bf64fb333f9142487b48931a6e717950ee173c4",
+    "exe_sha256": "230da133e8baadbdd81a6c767b851697f1c7fbbe01ace43cad5d406ba9c76174",
     "source_archive_sha256": "8be41f11b6e5cb88c3c9507b9b30f9f1892388fff5f07619522aa81de29b11b3",
     "runtime_inventory_sha256": "a3be7fbb46a90bb64bd0080b6ba8964c0807947ce6cd8b304a46ce46f81a95b7",
     "runtime_sha256": {
@@ -16,18 +16,18 @@
     }
   },
   "candidate": {
-    "revision": "c691aeb648cceb69dd7d66b1f8638242208ab95d",
+    "revision": "f8695b43ec7f9f9fe2eb123ff4ffa25d2ac19939",
     "driver_sha256": "6484acf0b397c400126ef7b6a255ca8e4749f7aa162d3737b4551c6c59928cd4",
-    "exe_sha256": "a77d777251c8dc92ddc4828ef88f9b56b602a689e3160ef7bfd89c261874ddf4",
-    "source_archive_sha256": "99af8f7e63af1bf3bc78bab47f6754c551f713affd6cbc5ceed3039b00fa993a",
-    "runtime_inventory_sha256": "87b0d8c78bb5a1ed0644fbed988236770d1914f6fd81d516bda3bd5b421b19ab",
+    "exe_sha256": "d98457da780ab2b41dd1f7c43c3b862a7a606687b41ce6cc9e51e0f1a83a3766",
+    "source_archive_sha256": "8fff273021a4d87a67425356ebe02d622fcd99c96f7bd9372b250e2883bf43fe",
+    "runtime_inventory_sha256": "e3222b4379a9ebaa69a97143b754bdf2f830d3541900e0bac361ac737cdfd789",
     "runtime_sha256": {
       "render.rs": "6699d480f29990a97406e8b2ea20f6f2eaf1d8497f9ed8b642523aa171545f0f",
       "pellet_batch.rs": "1ce59be6c9f027d974fe943850ff791eb61692110314159745d2b5fdd46344a0",
       "pellet_cpu.rs": "308a570603f24fff68861e1f8db1770d884f21e745a27bca761cdcbd40b9a0bf",
       "pellet_gpu.rs": "008595804fb3f0f41843749a5c4d4c6b3ee430070d931f7547e218994ffca9de",
       "pellet_workers.rs": "df8a8bf2d532e2ad97ce2fa415177cfff742006f0826e46776f3c072c5067e4a",
-      "canonical_pellets.rs": "8f124a04d899a1a5e5370e8ce8a69491a4b88bbcb5f1511bee9805fdf35d4b61",
+      "canonical_pellets.rs": "049a40211e1e7df6a8f964e8e95181ba5e6db0a22e1c9bc70f4afe74b77c3be0",
       "gpu.rs": "a694ce8a21b24626d61fcb9f81d30daca1eb6dace9e081c1843a093bbbbb9d92"
     }
   },
