@@ -1,0 +1,19 @@
+{
+  "question": "Can Low avoid canonical command expansion and remain no more expensive than Auto or Medium without changing any preset pixels?",
+  "base_revision": "1921f44c",
+  "data_origin": "authored-synthetic",
+  "fixture": "25,000 protocol-13 food records in a 200 by 125 rectangle, color 9, size 1, as in the join-fade study; large authored arena admits distinct far and whole-map endpoints",
+  "physical_extent": [3840, 2160],
+  "projection_extent": [1500, 845],
+  "zoom": ["1", "0.065", "whole-map endpoint"],
+  "presets": ["Auto", "Low", "Medium", "High"],
+  "world_modes": ["Native", "Original"],
+  "hardware": ["RTX/Vulkan", "AMD integrated/DX12"],
+  "anti_aliasing": "Auto, unchanged",
+  "identity": "SHA-256 of every byte of full-frame RGBA8 at animation steps 1, 12 and 240, after 110 frozen-state camera preparations and three actual rendered frames",
+  "timing": "Five release runs per arm and adapter, alternating arm order on successive rounds; each run measures all presets, zooms and world modes, with 10 warmup and 50 measured frames per cell",
+  "cpu_metric": "Elapsed CPU preparation + resource sync + presenter submission; GPU completion waits, readback, compression and journaling excluded and waits recorded separately",
+  "acceptance": "All paired RGBA hashes identical. Low per-cell CPU median no greater than Auto or Medium, with run ranges reported. No pixel tolerance.",
+  "load": "Sample machine CPU every 0.5 seconds and compiler process names/CPU every 5 seconds. Retain all samples and failures. Hold the lane timing lock, release within 60 minutes.",
+  "limits": "Offscreen finite controls only; no game server, desktop window, official art, display pacing or interactive acceptance. Not a universal workload performance proof."
+}

@@ -1,0 +1,55 @@
+{
+  "baseline": {
+    "revision": "7cb5ec378cd7de1e10fe77a38813b0a69574c50e",
+    "driver_sha256": "6484acf0b397c400126ef7b6a255ca8e4749f7aa162d3737b4551c6c59928cd4",
+    "exe_sha256": "230da133e8baadbdd81a6c767b851697f1c7fbbe01ace43cad5d406ba9c76174",
+    "source_archive_sha256": "8be41f11b6e5cb88c3c9507b9b30f9f1892388fff5f07619522aa81de29b11b3",
+    "runtime_inventory_sha256": "a3be7fbb46a90bb64bd0080b6ba8964c0807947ce6cd8b304a46ce46f81a95b7",
+    "runtime_sha256": {
+      "render.rs": "94d44a071fd9e6ab9a4d85caf9cfd91c6b493f09b50821bc5fdbaac6006fa97a",
+      "pellet_batch.rs": "e8ce9bef5108e42e9ede1e72118fb4fb4db63f279a380e60f8973bb222a4c6a0",
+      "pellet_cpu.rs": "af3d2fabb0f4a6a87f1335d79ae63734869f7dc0484b4f04ca04a79af3560726",
+      "pellet_gpu.rs": "1fa1a79b0f23a7952a9755d04fcabe81d37207d28a435f639a839088b124ebbc",
+      "pellet_workers.rs": "a5997d17a9d9a2ee01fcad7ebdc57445cf193b77d7e37db51166d0ae35208052",
+      "canonical_pellets.rs": "c8cb383aa079c5a6680b43d57e12fdeb2c0c4adb4c5e0272188a5391179f56d3",
+      "gpu.rs": "79c6599c133086f6e12bead8cb8b57056c9f6a6d1c1d989339381a08fed35dce"
+    }
+  },
+  "candidate": {
+    "revision": "e532b9b2b98cd244fe8961dc2db15fe1e76f77ce",
+    "driver_sha256": "6484acf0b397c400126ef7b6a255ca8e4749f7aa162d3737b4551c6c59928cd4",
+    "exe_sha256": "09619954a696321c5e848346055f29f1b87448db3203815e13b6c8af8b1a7051",
+    "source_archive_sha256": "14a5d815e6ec886338ce5ef701b78657b022743ff0208cd0f7125d5672a1e3fd",
+    "runtime_inventory_sha256": "4a95b1fbd93cd49968562c75db93a16ad1ab92fbf4301fd4f87c2cf4320f8b80",
+    "runtime_sha256": {
+      "render.rs": "6699d480f29990a97406e8b2ea20f6f2eaf1d8497f9ed8b642523aa171545f0f",
+      "pellet_batch.rs": "1ce59be6c9f027d974fe943850ff791eb61692110314159745d2b5fdd46344a0",
+      "pellet_cpu.rs": "308a570603f24fff68861e1f8db1770d884f21e745a27bca761cdcbd40b9a0bf",
+      "pellet_gpu.rs": "008595804fb3f0f41843749a5c4d4c6b3ee430070d931f7547e218994ffca9de",
+      "pellet_workers.rs": "df8a8bf2d532e2ad97ce2fa415177cfff742006f0826e46776f3c072c5067e4a",
+      "canonical_pellets.rs": "a0f352fc7b75d046576743cd10c919f1df152010b0417e78fba5ff28a82739ac",
+      "gpu.rs": "a694ce8a21b24626d61fcb9f81d30daca1eb6dace9e081c1843a093bbbbb9d92"
+    }
+  },
+  "adapters": {
+    "rtx": {
+      "backend": "Vulkan",
+      "driver": "NVIDIA",
+      "driver_info": "617.14",
+      "name": "NVIDIA GeForce RTX 5070 Ti"
+    },
+    "amd": {
+      "backend": "Dx12",
+      "driver": "32.0.21001.9024",
+      "driver_info": "",
+      "name": "AMD Radeon(TM) Graphics"
+    }
+  },
+  "build": {
+    "rust": "1.99.0",
+    "profile": "release",
+    "target_directory": "D:/CargoTargets/low-preset",
+    "jobs": 2
+  },
+  "raw_root": "D:/slither-scratch/client-lane-20261105/perf/low-preset/rebased/"
+}

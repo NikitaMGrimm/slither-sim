@@ -339,6 +339,7 @@ impl Pellets {
                 project(
                     frame,
                     Input {
+                        detailed: b.detailed,
                         slot,
                         animation: food.paint_state(),
                     },

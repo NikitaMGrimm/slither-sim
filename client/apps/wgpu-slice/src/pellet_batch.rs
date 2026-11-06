@@ -60,6 +60,7 @@ impl Cache {
     pub fn prepare(
         &mut self,
         world: &FoodWorld,
+        detailed: bool,
         view: BodyPaintView,
         bounds: Option<FoodCullBounds>,
         assets: &[BodyAsset],
@@ -239,7 +240,13 @@ impl Cache {
             count += usize::from(inside);
         }
         if count
-            .checked_mul(if user_zoom < 1. { 3 } else { 7 })
+            .checked_mul(if !detailed {
+                2
+            } else if user_zoom < 1. {
+                3
+            } else {
+                7
+            })
             .is_none_or(|n| n > limit)
         {
             return Ok(None);
@@ -251,13 +258,14 @@ impl Cache {
             bounds: bounds.expect("checked bounds"),
             visible,
             visible_count: count,
+            detailed,
             user_zoom,
             #[cfg(feature = "frame-bench")]
             before_zoom_count: count,
             physical_pixels_per_unit: 1.,
             early_at: 0,
             late_at: 0,
-            canonical_submission: false,
+            canonical_submission: !detailed,
         }))
     }
 }
@@ -323,6 +331,8 @@ pub struct Batch {
     pub(crate) bounds: FoodCullBounds,
     pub(crate) visible: Vec<bool>,
     pub(crate) visible_count: usize,
+    // Low retains just the canonical outline and one body primitive.
+    pub(crate) detailed: bool,
     // Freeze the exact overload/LOD factor with the queued picture; the view's
     // camera zoom alone cannot recover the user factor or stock whole-source rule.
     // https://github.com/NikitaMGrimm/slither-sim/blob/main/research/client-performance/2026-11-03-retained-pellet-zoom/REPORT.md.
@@ -341,6 +351,7 @@ impl PartialEq for Batch {
             && self.view == other.view
             && self.bounds == other.bounds
             && self.user_zoom == other.user_zoom
+            && self.detailed == other.detailed
             && self.physical_pixels_per_unit == other.physical_pixels_per_unit
             && self.early_at == other.early_at
             && self.late_at == other.late_at
@@ -353,14 +364,16 @@ impl Batch {
         // their seven-command canonical expansion. Generic composition still
         // preflights all seven before allocating and can reject the picture.
         self.visible_count
-            * if self.user_zoom < 1. && !self.canonical_submission {
+            * if !self.detailed {
+                2
+            } else if self.user_zoom < 1. && !self.canonical_submission {
                 3
             } else {
                 7
             }
     }
     pub(crate) fn admit_canonical(&mut self, surrounding: usize) -> Result<()> {
-        let count = self.visible_count * 7;
+        let count = self.visible_count * if self.detailed { 7 } else { 2 };
         if count > MAX_FOOD_PAINT_COMMANDS.min(crate::frame::MAX_DRAWS.saturating_sub(surrounding))
         {
             return Err(crate::frame::DRAW_MEMORY_LIMIT.into());
@@ -392,9 +405,11 @@ impl Batch {
                 .map(|(i, _)| i),
         );
         let n = visible.len();
-        let early_end = self.early_at + 3 * n;
-        let late_start = self.late_at + 3 * n;
-        let late_end = late_start + 4 * n;
+        let early_count = if self.detailed { 3 } else { 2 } * n;
+        let late_count = if self.detailed { 4 } else { 0 } * n;
+        let early_end = self.early_at + early_count;
+        let late_start = self.late_at + early_count;
+        let late_end = late_start + late_count;
         let mut pending = None;
         Ok((0..frame.draw_count()).map(move |index| {
             if let Some(quad) = pending.take() {
@@ -402,15 +417,19 @@ impl Batch {
             }
             let (food, part) = if (self.early_at..early_end).contains(&index) {
                 let i = index - self.early_at;
-                if i < n { (i, 0) } else { ((i - n) / 2, 1) }
+                if i < n {
+                    (i, 0)
+                } else {
+                    ((i - n) / if self.detailed { 2 } else { 1 }, 1)
+                }
             } else if (late_start..late_end).contains(&index) {
                 let i = index - late_start;
                 (i / 4, 2 + (i % 4) / 2)
             } else {
                 let removed = if index >= late_end {
-                    7 * n
+                    early_count + late_count
                 } else if index >= early_end {
-                    3 * n
+                    early_count
                 } else {
                     0
                 };
@@ -447,7 +466,6 @@ impl Batch {
             quad.blend = BodyBlend::SourceOver;
             Ok((quad, None))
         } else if part == 1 {
-            let pulse = food_pulse(f);
             let (quad, gain) = project_food(
                 frame,
                 f,
@@ -457,7 +475,10 @@ impl Batch {
                 self.user_zoom,
                 self.physical_pixels_per_unit,
             )?;
-            Ok((quad, Some((food_body_alpha(f, 1., pulse)[1] * gain) as f32)))
+            let second = self
+                .detailed
+                .then(|| (food_body_alpha(f, 1., food_pulse(f))[1] * gain) as f32);
+            Ok((quad, second))
         } else {
             let (quad, second) = glow_pair(
                 frame,
@@ -477,12 +498,13 @@ impl Batch {
             .iter()
             .filter(|g| self.visible[g.range.clone()].contains(&true))
             .flat_map(|g| {
-                [
+                let sources = [
                     g.sources.outline.asset(),
                     g.sources.body.asset(),
                     g.sources.inner.asset(),
                     g.sources.outer.asset(),
-                ]
+                ];
+                sources.into_iter().take(if self.detailed { 4 } else { 2 })
             })
     }
     pub(crate) fn validate(&self, resident: &BTreeMap<ResourceKey, BodyAsset>) -> Result<()> {
@@ -508,8 +530,8 @@ impl Batch {
                 foods: self.world.foods(),
                 view: self.view,
                 quality: BodyPaintQuality {
-                    high_quality: true,
-                    blend: 1.,
+                    high_quality: self.detailed,
+                    blend: if self.detailed { 1. } else { 0. },
                 },
                 bounds: Some(self.bounds),
                 assets: &self.sources.assets,
@@ -556,7 +578,7 @@ impl Batch {
 /// Numeric half of the unchanged food image stream. Compute a paired rectangle
 /// once, retaining every f64 operation before the existing f32 boundary.
 #[inline(always)]
-fn project_food(
+pub(crate) fn project_food(
     frame: &Frame,
     f: FoodPaintSnapshot,
     source: FoodSource,
@@ -728,6 +750,113 @@ pub(crate) fn exact_instance(
 pub(crate) mod tests {
     use super::*;
     use crate::bank::Bank;
+
+    #[test]
+    fn low_stream_matches_food_plan_bits_and_two_command_budget() {
+        let mut bank = Bank::new().unwrap();
+        let mut world = rectangle_count(&bank, 2048);
+        let mut cache = Cache::default();
+        for delta in [0., 0.1, 1., 5., 5.] {
+            world.advance(step(delta), |_| unreachable!()).unwrap();
+            for user_zoom in [1., 0.065, 0.0005] {
+                for density in [0.64, 1., 2.56] {
+                    let view = BodyPaintView {
+                        zoom: view().zoom * user_zoom,
+                        ..view()
+                    };
+                    let bounds = Some(FoodCullBounds::from_view(view).unwrap());
+                    let plan = plan_food_with_zoom_and_density(
+                        FoodPaintInput {
+                            foods: world.foods(),
+                            view,
+                            quality: BodyPaintQuality {
+                                high_quality: false,
+                                blend: 0.,
+                            },
+                            bounds,
+                            assets: &bank.assets,
+                            target_handle: None,
+                            entry_alpha: 1.,
+                            command_limit: MAX_FOOD_PAINT_COMMANDS,
+                        },
+                        &mut bank.food_asset_index,
+                        Vec::new(),
+                        Vec::new(),
+                        user_zoom,
+                        density,
+                    )
+                    .unwrap();
+                    let limit = plan.counts.total();
+                    assert_eq!(limit, 2 * plan.counts.visible_foods);
+                    assert!(plan.late.is_empty());
+                    let mut b = cache
+                        .prepare(
+                            &world,
+                            false,
+                            view,
+                            bounds,
+                            &bank.assets,
+                            &bank.food_outline,
+                            &mut bank.food_asset_index,
+                            user_zoom,
+                            limit,
+                        )
+                        .unwrap()
+                        .unwrap();
+                    b.physical_pixels_per_unit = density;
+                    assert_eq!(b.draw_count(), limit);
+                    assert!(b.canonical_submission);
+                    assert!(b.admit_canonical(crate::frame::MAX_DRAWS - limit).is_ok());
+                    assert!(
+                        b.admit_canonical(crate::frame::MAX_DRAWS - limit + 1)
+                            .is_err()
+                    );
+                    assert!(
+                        cache
+                            .prepare(
+                                &world,
+                                false,
+                                view,
+                                bounds,
+                                &bank.assets,
+                                &bank.food_outline,
+                                &mut bank.food_asset_index,
+                                user_zoom,
+                                limit - 1,
+                            )
+                            .unwrap()
+                            .is_none()
+                    );
+                    let expected = Frame {
+                        identity: 1,
+                        extent: [3840, 2160],
+                        viewport_scale: density,
+                        tick: 0,
+                        draws: plan.early.iter().map(Draw::from).collect(),
+                        food_batch: None,
+                        snakes: Vec::new(),
+                    };
+                    let actual = Frame {
+                        draws: Vec::new(),
+                        food_batch: Some(b),
+                        ..expected.clone()
+                    };
+                    assert_eq!(actual.canonical().unwrap(), expected);
+                    let resident = bank.assets.iter().map(|a| ((*a).into(), *a)).collect();
+                    let a = actual.quads(&resident).unwrap();
+                    let e = expected.quads(&resident).unwrap();
+                    assert_eq!(a.len(), e.len());
+                    for (a, e) in a.iter().zip(&e) {
+                        assert_eq!((a.key, a.blend), (e.key, e.blend));
+                        assert_eq!(
+                            a.vertices.map(|v| v.map(f32::to_bits)),
+                            e.vertices.map(|v| v.map(f32::to_bits))
+                        );
+                    }
+                }
+            }
+        }
+    }
 
     #[test]
     fn menu_stream_matches_canonical_primitives_and_preserves_retry_picture() {
@@ -932,6 +1061,7 @@ pub(crate) mod tests {
         cache
             .prepare(
                 world,
+                true,
                 view,
                 Some(FoodCullBounds::from_view(view).unwrap()),
                 &bank.assets,
@@ -959,6 +1089,7 @@ pub(crate) mod tests {
             let b = Cache::default()
                 .prepare(
                     &world,
+                    true,
                     v,
                     Some(FoodCullBounds::from_view(v).unwrap()),
                     &bank.assets,
@@ -1011,6 +1142,7 @@ pub(crate) mod tests {
                 Cache::default()
                     .prepare(
                         &world,
+                        true,
                         v,
                         Some(FoodCullBounds::from_view(v).unwrap()),
                         &bank.assets,
@@ -1041,6 +1173,7 @@ pub(crate) mod tests {
                 let b = cache
                     .prepare(
                         &world,
+                        true,
                         v,
                         bounds,
                         &bank.assets,
@@ -1098,6 +1231,7 @@ pub(crate) mod tests {
                         cache
                             .prepare(
                                 &world,
+                                true,
                                 v,
                                 bounds,
                                 &bank.assets,
@@ -1189,6 +1323,7 @@ pub(crate) mod tests {
             Cache::default()
                 .prepare(
                     &world,
+                    true,
                     view(),
                     Some(FoodCullBounds::from_view(view()).unwrap()),
                     &bank.assets,
@@ -1253,6 +1388,7 @@ pub(crate) mod tests {
             cache
                 .prepare(
                     &world,
+                    true,
                     view(),
                     Some(FoodCullBounds::from_view(view()).unwrap()),
                     &bank.assets,
@@ -1289,6 +1425,7 @@ pub(crate) mod tests {
             cache
                 .prepare(
                     &world,
+                    true,
                     view(),
                     Some(FoodCullBounds::from_view(view()).unwrap()),
                     &invalid,
@@ -1397,6 +1534,7 @@ pub(crate) mod tests {
                 cache
                     .prepare(
                         &world,
+                        true,
                         view(),
                         Some(FoodCullBounds::from_view(view()).unwrap()),
                         &bank.assets,
@@ -1453,6 +1591,7 @@ pub(crate) mod tests {
                 Cache::default()
                     .prepare(
                         &world,
+                        true,
                         view(),
                         Some(FoodCullBounds::from_view(view()).unwrap()),
                         &bank.assets,
@@ -2047,6 +2186,7 @@ pub(crate) mod tests {
             let batch = cache
                 .prepare(
                     &world,
+                    true,
                     view,
                     Some(FoodCullBounds::from_view(view).unwrap()),
                     &bank.assets,

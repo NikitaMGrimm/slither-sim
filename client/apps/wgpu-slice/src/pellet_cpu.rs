@@ -3,21 +3,22 @@ use super::{soft_layers::covered_area, zero_pair};
 use crate::{
     Result,
     frame::Frame,
-    pellet_batch::{Sources, exact_instance, glow_pair},
+    pellet_batch::{Instance, Sources, exact_instance, glow_pair, project_food},
 };
 use slither_client::presentation::{
-    BodyPaintView, FoodPaintSnapshot, FoodPaintState, food_body_alpha, food_pulse,
+    BodyPaintView, FoodPaintSnapshot, FoodPaintState, food_body_alpha, food_body_center, food_pulse,
 };
 
 #[derive(Clone, Copy)]
 pub(super) struct Input {
     pub slot: usize,
     pub animation: FoodPaintState,
+    pub detailed: bool,
 }
 
 pub(super) struct Projected {
     slot: usize,
-    bytes: [u8; 96],
+    pub bytes: [u8; 96],
     bits: u32,
     areas: [f64; 2],
     bins: [u8; 2],
@@ -51,6 +52,35 @@ pub(super) fn project(
         animation: input.animation,
         sources: sources.groups[sources.slot_groups[input.slot]].sources,
     };
+    if !input.detailed {
+        // Single-image Low uses the same f64 projection and shared fs
+        // fragment as the canonical command; no pulse or glow is evaluated.
+        let (body, _) = project_food(
+            frame,
+            f,
+            f.sources.body,
+            food_body_center(f, view),
+            f.animation.fade,
+            user_zoom,
+            density,
+        )?;
+        let mut instance = Instance([[0.; 4]; 6]);
+        instance.0[0] = [
+            body.vertices[0][0],
+            body.vertices[0][1],
+            body.vertices[2][0],
+            body.vertices[2][1],
+        ];
+        instance.0[3][0] = body.vertices[0][4];
+        instance.0[4][2..].copy_from_slice(&body.vertices[2][2..4]);
+        return Ok(Projected {
+            slot: input.slot,
+            bytes: instance.bytes(),
+            bits: 1 | if body.vertices[0][4] == 0. { 32 } else { 0 },
+            areas: [0.; 2],
+            bins: [0; 2],
+        });
+    }
     let pulse = food_pulse(f);
     let glows = [
         glow_pair(frame, f, view, false, pulse, user_zoom, density)?,
