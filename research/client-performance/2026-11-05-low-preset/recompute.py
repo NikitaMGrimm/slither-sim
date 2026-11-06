@@ -102,9 +102,11 @@ def recompute():
         assert len(before) == len(low) == len(auto) == len(medium) == 5
         assert statistics.median(low) <= statistics.median(medium), (adapter, mode, zoom, "medium")
         if zoom == "stock":
-            # Stock zoom is a tie: report the median difference, and require it
-            # to stay inside both arms' run ranges rather than claim a lead.
-            assert min(low) <= max(auto) and min(auto) <= max(low), (adapter, mode, zoom, "auto")
+            # Stock zoom claims no lead, only "no costlier": Low's median must
+            # not exceed Auto's slowest run. AMD Native's Low median sits below
+            # Auto's whole range, so a symmetric "inside both ranges" tie would
+            # misdescribe it.
+            assert statistics.median(low) <= max(auto), (adapter, mode, zoom, "auto")
             stock.append(statistics.median(low) - statistics.median(auto))
         else:
             assert statistics.median(low) <= statistics.median(auto), (adapter, mode, zoom, "auto")
@@ -116,8 +118,8 @@ def recompute():
               f"{before:.3f} to {after:.3f} ms ({100 * (1 - after / before):.1f}% lower) against main `7cb5ec37`, "
               "medians of five runs. "
               f"At far and whole-map zoom Low's median is {min(lead):.3f}–{max(lead):.3f} ms below Auto in all 8 cells; "
-              f"at stock zoom Low and Auto tie, with Low's median {min(stock):+.3f} to {max(stock):+.3f} ms from Auto's, "
-              "inside both run ranges. Low is below Medium in all 12 cells. "
+              f"at stock zoom no lead is claimed: Low's median is {min(stock):+.3f} to {max(stock):+.3f} ms from Auto's "
+              "and never above Auto's slowest run. Low is below Medium in all 12 cells. "
               "All 144 full-frame RGBA SHA-256 pairs are identical, and all 8 coincident-pair controls "
               "match the canonical renderer.")
     unique_runs = {(r["round"], r["adapter"], r["arm"]): r for r in rows}

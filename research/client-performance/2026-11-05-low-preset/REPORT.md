@@ -3,7 +3,7 @@
 ## Result
 
 <!-- RESULT -->
-Low RTX/Vulkan Native 4K at factor 0.065: CPU preparation, resource sync and submission fall from 7.590 to 1.392 ms (81.7% lower) against main `7cb5ec37`, medians of five runs. At far and whole-map zoom Low's median is 0.102–0.248 ms below Auto in all 8 cells; at stock zoom Low and Auto tie, with Low's median -0.019 to +0.017 ms from Auto's, inside both run ranges. Low is below Medium in all 12 cells. All 144 full-frame RGBA SHA-256 pairs are identical, and all 8 coincident-pair controls match the canonical renderer.
+Low RTX/Vulkan Native 4K at factor 0.065: CPU preparation, resource sync and submission fall from 7.590 to 1.392 ms (81.7% lower) against main `7cb5ec37`, medians of five runs. At far and whole-map zoom Low's median is 0.102–0.248 ms below Auto in all 8 cells; at stock zoom no lead is claimed: Low's median is -0.019 to +0.017 ms from Auto's and never above Auto's slowest run. Low is below Medium in all 12 cells. All 144 full-frame RGBA SHA-256 pairs are identical, and all 8 coincident-pair controls match the canonical renderer.
 <!-- /RESULT -->
 
 Low is far below main and Medium everywhere and below Auto at far and whole-map
