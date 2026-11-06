@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## [0.1.2](https://github.com/NikitaMGrimm/slither-sim/compare/slither-protocol-v0.1.1...slither-protocol-v0.1.2) - 2026-11-06
+
 ## [0.1.1](https://github.com/NikitaMGrimm/slither-sim/compare/slither-protocol-v0.1.0...slither-protocol-v0.1.1) - 2026-11-01
 
 - Add borrowed protocol-13 server-message views with explicit IDs, coordinate
