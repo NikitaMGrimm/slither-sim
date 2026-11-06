@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## [0.11.0](https://github.com/NikitaMGrimm/slither-sim/compare/v0.10.0...v0.11.0) - 2026-11-06
+
 ### Added
 
 - One large world can step on several cores, with results identical to a
@@ -14,6 +16,12 @@
   ([guide](https://github.com/NikitaMGrimm/slither-sim/blob/main/docs/performance.md#parallel-step)).
   A new `dense-8192-step` benchmark row measures it, and `host_load` takes
   `--world-threads` and a fixed `--radius`.
+
+### Breaking
+
+- `HostConfig` has a new public field, `world_threads` (default 1), so Rust
+  code that builds a `HostConfig` with a struct literal must set it or end
+  with `..HostConfig::default()`. JSON configs need no change.
 
 ## [0.10.0](https://github.com/NikitaMGrimm/slither-sim/compare/v0.9.0...v0.10.0) - 2026-11-03
 

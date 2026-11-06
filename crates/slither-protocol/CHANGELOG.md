@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+## [0.1.2](https://github.com/NikitaMGrimm/slither-sim/compare/slither-protocol-v0.1.1...slither-protocol-v0.1.2) - 2026-11-06
+
+- Client admission now accepts a protocol-19 Setup with `sector_count` 0,
+  which some community servers send. Clients don't use the field; simulator
+  admission still rejects it.
+
 ## [0.1.1](https://github.com/NikitaMGrimm/slither-sim/compare/slither-protocol-v0.1.0...slither-protocol-v0.1.1) - 2026-11-01
 
 - Add borrowed protocol-13 server-message views with explicit IDs, coordinate
