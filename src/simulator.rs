@@ -10,6 +10,10 @@ use join_order::JoinOrder;
 mod initialization_tests;
 #[cfg(test)]
 mod observation_tests;
+#[cfg(feature = "parallel")]
+mod parallel_step;
+#[cfg(all(test, feature = "parallel"))]
+mod parallel_step_tests;
 #[cfg(test)]
 mod pit_food_tests;
 mod spawn_bounds;
@@ -873,7 +877,7 @@ pub struct Simulator {
     spawn_bounds: OnceLock<Vec<Option<Bounds>>>,
     eater_grid: EaterGrid,
     buffers: StepBuffers,
-    /// Batch observation on the rayon pool; see `set_parallel`.
+    /// Observation batches and large steps on the rayon pool; see `set_parallel`.
     #[cfg(feature = "parallel")]
     parallel: bool,
 }
@@ -882,10 +886,14 @@ impl Simulator {
     pub(crate) fn frame_bench_protect(&mut self, slots: usize) {
         self.frame_bench_protected_slots = slots;
     }
-    /// Split large `observe_all` and `observe_selected` batches over the current
-    /// rayon pool, with identical results. The global pool uses `RAYON_NUM_THREADS`
-    /// or the core count; `ThreadPool::install` overrides it. Off by default so
-    /// parallel worlds do not compete for cores. Not serialized, like event buffers.
+    /// Let this world use the current rayon pool, with results identical to the
+    /// serial world for any pool size. Large `observe_all` and `observe_selected`
+    /// batches split by observer. Steps with at least 4,096 living snakes split
+    /// snake motion, collision search and pickup lookup by snake; boost drops,
+    /// collision resolution, death and ambient food and prey stay serial. The
+    /// global pool uses `RAYON_NUM_THREADS` or the core count;
+    /// `ThreadPool::install` overrides it. Off by default so parallel worlds do
+    /// not compete for cores. Not serialized, like event buffers.
     #[cfg(feature = "parallel")]
     pub fn set_parallel(&mut self, parallel: bool) {
         self.parallel = parallel;
@@ -1640,6 +1648,10 @@ impl Simulator {
         if let Some(events) = &mut self.food_spawn_events {
             events.clear();
         }
+        #[cfg(feature = "parallel")]
+        let parallel = self.parallel;
+        #[cfg(not(feature = "parallel"))]
+        let parallel = false;
         let previous_pit_radius = self.pit_radius();
         self.update_radius(self.time + self.config.dt);
         let pit_radius = self.pit_radius();
@@ -1655,6 +1667,12 @@ impl Simulator {
             steering,
             order,
             candidates,
+            #[cfg(feature = "parallel")]
+            scales,
+            #[cfg(feature = "parallel")]
+            strikes,
+            #[cfg(all(test, feature = "parallel"))]
+            collision_grid_used,
             dead,
             fallen,
             eaters,
@@ -1689,157 +1707,85 @@ impl Simulator {
         heads.resize(self.snakes.len(), (Point::default(), (0.0, 0.0), 0.0));
         steering.resize(self.snakes.len(), SteeringCache::default());
         body_bounds.resize(self.snakes.len(), None);
-        for &i in alive.iter() {
-            let a = actions[i].expect("validated action");
-            let s = &mut self.snakes[i];
-            let body_len = s.body.len();
-            let state = &mut self.boosts[i];
-            state.held = a.boost;
-            if !a.boost {
-                state.exhausted = false;
-            }
-            // Boosting needs mass above the two-segment minimum; real 2-segment snakes keep
-            // boosting down to fam ~0. A `minScore` floor keeps boosting allowed:
-            // at the floor it is free speed, a mode design choice.
-            let floor = self.min_mass;
-            let can_boost = floor.is_some() || s.segments > 2 || s.fam > 0.0;
-            if a.boost && can_boost && !state.exhausted && !state.active {
-                // The first pellet usually drops within a loop of the boost request.
-                state.clock = BOOST_DROP_SECONDS;
-            }
-            state.active = a.boost && can_boost && !state.exhausted;
-            let boosting = state.active;
-            if boosting {
-                state.active_boost_seconds += c.dt;
-            }
-            let sc = scale(s.segments);
-            let speed = &mut self.speeds[i];
-            // Checkpoint v1 can retain a pending observed-speed inference from
-            // the former public-state API. Preserve that continuation behavior.
-            if speed.speed != s.speed {
-                *speed = SpeedState::from_observed_speed(s.speed, s.segments);
-            }
-            s.speed = speed.step(boosting, s.segments, c.dt, c.speed_model);
-            if boosting {
-                let elapsed = state.clock + c.dt;
-                // Counted, not subtracted until the clock runs out: at a long dt
-                // the subtraction stops changing the clock, and a 430-segment
-                // snake's boost costs no mass, so nothing else ends the loop.
-                // With at most one drop, as at any measured dt, this matches
-                // that subtraction exactly.
-                let (drops, rest) = drops_in(elapsed);
-                let mut dropped = 0;
-                while dropped < drops && state.active {
-                    dropped += 1;
-                    let tail = s.body.last().copied().unwrap_or(s.head);
-                    let mult = multiplier(s.segments as f64 + s.fam);
-                    // Pellets match the mass spent: nothing at the floor, so free
-                    // boosting never makes food, and a smaller last pellet above it.
-                    let available = floor.map_or(s.segments as f64 - 2.0 + s.fam, |floor| {
-                        floor.excess(s.segments, s.fam)
-                    });
-                    let cost =
-                        available.min(boost_cost(s.segments) * (0.94 + 0.14 * self.random.next()));
-                    let removed = remove_mass_above_floor(&mut s.segments, &mut s.fam, cost, floor);
-                    state.boost_mass_spent += cost;
-                    s.body.truncate(s.body.len() - removed);
-                    let size = ((cost * 0.95 / (NUTRITION * mult)).sqrt() * 5.0).floor() / 5.0;
-                    if size > 0.0 {
-                        let jitter = sc * 16.0;
-                        let x = tail.x + (self.random.next() - 0.5) * jitter;
-                        let y = tail.y + (self.random.next() - 0.5) * jitter;
-                        let pellet = Self::pellet(Point { x, y }, size, Origin::Boost);
-                        if c.emit_boost_food
-                            && (!c.food_only_inside_pit
-                                || pellet.point().distance_lt(
-                                    Point::default(),
-                                    pit_radius.unwrap().min(self.radius),
-                                ))
-                        {
-                            // Earlier admitted drops in this same step share the capacity.
-                            let admitted = !c.boost_food.enabled
-                                || self.food_cache.has_room(
-                                    &self.food,
-                                    &pellet,
-                                    c.boost_food.cell_size,
-                                    c.boost_food.max_per_cell,
-                                );
-                            if admitted {
-                                if let Some(events) = &mut self.food_spawn_events {
-                                    events.push(FoodSpawnEvent {
-                                        source: Some(i),
-                                        food: pellet,
-                                    });
-                                }
-                                self.food_cache.push(&pellet);
-                                push_food_birth(
-                                    &mut self.food_birth_order,
-                                    &mut self.next_food_birth,
-                                );
-                                self.food.push(pellet);
-                            }
-                        }
-                    }
-                    if floor.is_none() && s.segments == 2 && s.fam <= 0.0 {
-                        state.active = false;
-                        state.exhausted = true;
-                    }
+        let floor = self.min_mass;
+        let motion = Motion {
+            config: c,
+            radius: self.radius,
+            pit_radius,
+            previous_pit_radius,
+            floor,
+        };
+        let mut drops = Drops {
+            random: &mut self.random,
+            food: &mut self.food,
+            cache: &mut self.food_cache,
+            births: &mut self.food_birth_order,
+            next_birth: &mut self.next_food_birth,
+            events: &mut self.food_spawn_events,
+        };
+        let parts = step_parts(parallel, alive.len());
+        // Parallel phases live in separate non-inlined functions: copies of the
+        // per-snake code inside this function slowed the serial step by up to
+        // 6% in paired runs, through changed code generation.
+        if parts > 1 {
+            #[cfg(feature = "parallel")]
+            parallel_step::movement(
+                parts,
+                &motion,
+                &mut drops,
+                actions,
+                alive,
+                previous,
+                scales,
+                &mut self.boosts,
+                &mut self.speeds,
+                parallel_step::MotionSlots {
+                    snakes: &mut self.snakes,
+                    steering,
+                    heads,
+                    pit_entered: &mut self.pit_entered,
+                    body_bounds,
+                    kiosks: &mut self.kiosks,
+                },
+                boundary_deaths,
+            );
+        } else {
+            for &i in alive.iter() {
+                let a = actions[i].expect("validated action");
+                let s = &mut self.snakes[i];
+                let body_len = s.body.len();
+                let sc = drops.boost(
+                    c,
+                    i,
+                    a.boost,
+                    s,
+                    &mut self.boosts[i],
+                    &mut self.speeds[i],
+                    floor,
+                    pit_radius,
+                    self.radius,
+                );
+                if let Some(reason) = motion.advance(
+                    a.heading,
+                    previous[i],
+                    sc,
+                    s,
+                    &mut steering[i],
+                    &mut heads[i].1,
+                    &mut self.pit_entered[i],
+                    &mut body_bounds[i],
+                    &mut self.kiosks[i],
+                ) {
+                    boundary_deaths.push((i, reason));
                 }
-                state.clock = if dropped == drops {
-                    rest
-                } else {
-                    elapsed - dropped as f64 * BOOST_DROP_SECONDS
-                };
-            } else {
-                state.clock = 0.0;
-            }
-            (s.head, s.heading, heads[i].1) =
-                steering[i].advance(s.head, s.heading, a.heading, s.speed, s.segments, c.dt);
-            let (head, lethal) =
-                crate::boundary::constrain(s.head, s.heading, sc, self.radius, c.boundary_mode);
-            s.head = head;
-            if lethal {
-                boundary_deaths.push((i, DeathReason::Boundary));
-            } else if let Some(pit) = pit_radius {
-                // A mode rule, not an official mechanic: docs/configuration.md#battledome.
-                // The swept head-center path counts, so the rule does not depend on
-                // dt: crossing the pit or clipping its edge within a tick also kills.
-                // Growth overtaking a head is not physical entry. The existing
-                // entry bit keeps engulfed newborns free to leave, while lives
-                // initialized inside and later inward crossings remain one-way.
-                // research/battledome/2026-10-26-spawn-capacity/REPORT.md
-                let can_enter = !c.dynamic_radius
-                    || c.min_score.is_none()
-                    || !previous[i].distance_lt(
-                        Point::default(),
-                        pit.max(previous_pit_radius.unwrap_or(pit)),
-                    );
-                let touched =
-                    self.pit_entered[i] || (can_enter && reaches_center(previous[i], s.head, pit));
-                if touched {
-                    if s.head.distance_lt(Point::default(), pit) {
-                        self.pit_entered[i] = true;
-                    } else {
-                        boundary_deaths.push((i, DeathReason::Pit));
-                    }
+                // Invalidate on any tail removal across the combined boost and
+                // motion pass. parallel_step::movement checks each pass: motion
+                // can append an anchor after boost removed one, hiding a net
+                // length change (and already invalidates on that append).
+                if s.body.len() != body_len {
+                    body_bounds[i] = None;
                 }
             }
-            if let Some(anchor) = crossed_anchor(s.head, s.body[0]) {
-                body_bounds[i] = None;
-                let grow = s.fam >= 1.0;
-                if grow {
-                    s.fam -= 1.0;
-                    s.segments += 1;
-                }
-                append_anchor(&mut s.body, anchor, grow);
-            }
-            Self::update_mass(s);
-            self.kiosks[i].step(s, &c.kiosk, c.dt, self.min_mass);
-            // Boost and kiosk penalties can both remove tail anchors.
-            if s.body.len() != body_len {
-                body_bounds[i] = None;
-            }
-            Self::update_mass(s);
         }
         if PROFILE {
             profile.movement_seconds += clock.unwrap().elapsed().as_secs_f64();
@@ -1898,10 +1844,8 @@ impl Simulator {
         // Large dense worlds repay expanded body insertion by avoiding a merged,
         // sorted query for every head. The grid declines sparse or oversized
         // geometry, retaining the existing bounds index in those worlds.
-        // A single grown snake must not inflate every body's grid insertion.
-        // Larger heads query neighbouring cells and restore newest-first order;
-        // the original f64 pair predicate still decides every candidate.
-        const GRID_HEAD_SEGMENTS: usize = 32;
+        // A single grown snake must not inflate every body's grid insertion
+        // (see GRID_HEAD_SEGMENTS).
         let grid = (order.len() >= 4096)
             .then(|| {
                 let longest = order
@@ -1924,6 +1868,10 @@ impl Simulator {
                     .map(|grid| (grid, 3.666 * collision_distance(longest, longest)))
             })
             .flatten();
+        #[cfg(all(test, feature = "parallel"))]
+        {
+            *collision_grid_used = grid.is_some();
+        }
         // Small worlds test every pair faster than they build an index.
         let index = (grid.is_none() && order.len() >= 32).then(|| {
             let bounds: Vec<Bounds> = order
@@ -1937,78 +1885,45 @@ impl Simulator {
         dead.clear();
         fallen.clear();
         fallen.resize(self.snakes.len(), false);
-        for &i in order.iter() {
-            if let Ok(k) = boundary_deaths.binary_search_by_key(&i, |&(j, _)| j) {
-                dead.push((i, None, boundary_deaths[k].1));
-                fallen[i] = true;
-                continue;
-            }
-            // The visible-frame harness needs a stable local life without
-            // physical input. Bots still strike this body; rim/pit deaths above
-            // remain real. This feature is not a mechanics-evidence workload.
-            #[cfg(feature = "frame-bench")]
-            if i < self.frame_bench_protected_slots {
-                continue;
-            }
-            let s = &self.snakes[i];
-            let (tip, direction, head_scale) = heads[i];
-            let probe = Bounds::between(tip, tip);
-            let indexed = index.as_ref().is_some_and(|(index, longest)| {
-                // Scale grows with segments, so this bounds every pair's reach below.
-                let reach = 3.666 * collision_distance(s.segments, *longest);
-                index.candidates(probe, reach, candidates)
-            });
-            let test = |j: usize, profile: &mut StepProfile| {
-                if i == j || fallen[j] {
-                    return false;
-                }
-                let other_bounds = bodies[j].expect("living snake has bounds");
-                let other = &self.snakes[j];
-                let (other_tip, _, body_scale) = heads[j];
-                if PROFILE {
-                    profile.body_pairs += 1;
-                }
-                // `3.666 * collision_distance(head, body)` with the same operation order.
-                let reach = 3.666 * (BODY_RADIUS * (head_scale + body_scale));
-                if !other_bounds.near(probe, reach) {
-                    return false;
-                }
-                if PROFILE {
-                    profile.segment_tests += self.snakes[j].body.len() as u64;
-                }
-                let line = [other_tip, other.head]
-                    .into_iter()
-                    .chain(other.body.iter().copied());
-                strikes_scaled(last_tips[i], tip, direction, head_scale, body_scale, line)
-            };
-            let grid_candidates = grid.as_ref().and_then(|(grid, max_reach)| {
-                grid.candidates_for_head(
-                    tip,
-                    head_scale,
-                    scale(GRID_HEAD_SEGMENTS),
-                    *max_reach,
-                    candidates,
-                )
-            });
-            // Both visit positions newest first; the index omits only snakes
-            // whose bounds fail the test above.
-            let killer = if let Some(candidates) = grid_candidates {
-                candidates
-                    .iter()
-                    .map(|&k| order[k as usize])
-                    .find(|&j| test(j, profile))
-            } else if indexed {
-                candidates
-                    .iter()
-                    .map(|&k| order[k as usize])
-                    .find(|&j| test(j, profile))
-            } else {
-                order.iter().rev().copied().find(|&j| test(j, profile))
-            };
-            if killer.is_some() {
-                dead.push((i, killer, DeathReason::Body));
-                fallen[i] = true;
-            }
+        let scene = Collisions {
+            snakes: &self.snakes,
+            bodies,
+            heads,
+            last_tips,
+            order,
+            grid: grid.as_ref(),
+            index: index.as_ref(),
+        };
+        // The visible-frame harness needs a stable local life without physical
+        // input. Bots still strike these bodies; rim/pit deaths remain real.
+        // This feature is not a mechanics-evidence workload.
+        #[cfg(feature = "frame-bench")]
+        let protected = self.frame_bench_protected_slots;
+        #[cfg(not(feature = "frame-bench"))]
+        let protected = 0;
+        let parts = step_parts(parallel, order.len());
+        if parts > 1 {
+            #[cfg(feature = "parallel")]
+            parallel_step::collisions::<PROFILE>(
+                parts,
+                &scene,
+                boundary_deaths,
+                protected,
+                dead,
+                fallen,
+                strikes,
+                candidates,
+                profile,
+            );
+        } else {
+            resolve_collisions(
+                order,
+                boundary_deaths,
+                protected,
+                dead,
+                fallen,
+                |_, i, fallen| scene.first_strike::<PROFILE>(i, |j| fallen[j], candidates, profile),
+            );
         }
         if PROFILE {
             profile.collision_seconds += clock.unwrap().elapsed().as_secs_f64();
@@ -2114,15 +2029,34 @@ impl Simulator {
         // first and then applied in the same reverse food order.
         hits.clear();
         if dense {
+            // Lookups only read positions and each pellet has one cell, so cell
+            // slices find the serial hits, and sorting restores their order.
+            // Split counters sum to the serial counts.
+            let parts = step_parts(parallel, eaters.len());
             if let Some(pellets) = self.food_cache.pellets(&self.food) {
-                indexed_hits::<PROFILE>(
-                    &self.eater_grid,
-                    pellets,
-                    &self.snakes,
-                    eaters,
-                    hits,
-                    profile,
-                );
+                if parts > 1 {
+                    #[cfg(feature = "parallel")]
+                    parallel_step::indexed_hits::<PROFILE>(
+                        parts,
+                        &self.eater_grid,
+                        pellets,
+                        &self.snakes,
+                        eaters,
+                        hits,
+                        profile,
+                    );
+                } else {
+                    indexed_hits::<PROFILE>(
+                        &self.eater_grid,
+                        pellets,
+                        &self.snakes,
+                        eaters,
+                        0..self.eater_grid.occupied_len(),
+                        hits,
+                        profile,
+                    );
+                }
+                hits.sort_unstable_by_key(|hit| std::cmp::Reverse(hit.0));
             } else {
                 dense_hits::<PROFILE>(
                     &self.eater_grid,
@@ -2917,6 +2851,14 @@ struct StepBuffers {
     steering: Vec<SteeringCache>,
     order: JoinOrder,
     candidates: Vec<u32>,
+    /// Parallel step only: each slot's scale before boost drops.
+    #[cfg(feature = "parallel")]
+    scales: Vec<f64>,
+    /// Parallel step only: each head's first strike, by collision order position.
+    #[cfg(feature = "parallel")]
+    strikes: Vec<Option<usize>>,
+    #[cfg(all(test, feature = "parallel"))]
+    collision_grid_used: bool,
     dead: Vec<(usize, Option<usize>, DeathReason)>,
     fallen: Vec<bool>,
     eaters: Vec<(usize, Point, f64, Bounds)>,
@@ -2950,6 +2892,361 @@ impl Clone for StepBuffers {
 impl std::fmt::Debug for StepBuffers {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("StepBuffers").finish_non_exhaustive()
+    }
+}
+
+/// Fewest living snakes worth one parallel task in the split step phases.
+/// Official-500 profiles spend 70-95 µs per tick in each of motion, collision
+/// search and pickup lookup, about 0.15-0.2 µs per snake, and waking pool
+/// threads costs tens of microseconds. A task of this size does about 100 µs
+/// of work.
+#[cfg(feature = "parallel")]
+const SNAKES_PER_TASK: usize = 512;
+
+/// Fewest tasks' worth of snakes before a step splits at all: 4,096 snakes at
+/// the shipped task size. Each split phase keeps serial work (index builds, the
+/// boost pass, the resolution walk) and pays a second pass over snake memory
+/// plus pool dispatch. On an AWS c8a.4xlarge (2026-11-05, official density)
+/// splitting 1,024 snakes was about 10% slower than serial on 2-16 threads,
+/// 2,048 broke even on 2 threads, and 4,096 was faster on every pool size
+/// (1.06x on 2 threads, 1.4x on 8); see docs/performance.md#measured-scaling.
+#[cfg(feature = "parallel")]
+const MIN_STEP_TASKS: usize = 8;
+
+/// Pool tasks for a step phase over `snakes` items; 1 runs it serially.
+#[inline]
+fn step_parts(parallel: bool, snakes: usize) -> usize {
+    #[cfg(feature = "parallel")]
+    if parallel {
+        #[cfg(test)]
+        let per_task = parallel_step_tests::TASK_SNAKES.with(std::cell::Cell::get);
+        #[cfg(not(test))]
+        let per_task = SNAKES_PER_TASK;
+        let tasks = snakes / per_task;
+        return if tasks < MIN_STEP_TASKS {
+            1
+        } else {
+            crate::parallel::parts(tasks)
+        };
+    }
+    let _ = (parallel, snakes);
+    1
+}
+
+/// Collision-grid insertion reach is capped at this head size. Larger heads
+/// query neighbouring cells and restore newest-first order; the original f64
+/// pair predicate still decides every candidate.
+const GRID_HEAD_SEGMENTS: usize = 32;
+
+/// One tick's read-only collision geometry.
+struct Collisions<'a> {
+    snakes: &'a [Snake],
+    bodies: &'a [Option<Bounds>],
+    heads: &'a [(Point, (f64, f64), f64)],
+    last_tips: &'a [Point],
+    /// Living slots oldest first.
+    order: &'a [usize],
+    grid: Option<&'a (CollisionGrid, f64)>,
+    index: Option<&'a (BoundsIndex, usize)>,
+}
+impl Collisions<'_> {
+    /// The newest body that head `i` strikes, ignoring bodies `skip` rules out.
+    #[inline(always)]
+    fn first_strike<const PROFILE: bool>(
+        &self,
+        i: usize,
+        skip: impl Fn(usize) -> bool,
+        candidates: &mut Vec<u32>,
+        profile: &mut StepProfile,
+    ) -> Option<usize> {
+        let s = &self.snakes[i];
+        let (tip, direction, head_scale) = self.heads[i];
+        let probe = Bounds::between(tip, tip);
+        let indexed = self.index.is_some_and(|(index, longest)| {
+            // Scale grows with segments, so this bounds every pair's reach below.
+            let reach = 3.666 * collision_distance(s.segments, *longest);
+            index.candidates(probe, reach, candidates)
+        });
+        let test = |j: usize, profile: &mut StepProfile| {
+            if i == j || skip(j) {
+                return false;
+            }
+            let other_bounds = self.bodies[j].expect("living snake has bounds");
+            let other = &self.snakes[j];
+            let (other_tip, _, body_scale) = self.heads[j];
+            if PROFILE {
+                profile.body_pairs += 1;
+            }
+            // `3.666 * collision_distance(head, body)` with the same operation order.
+            let reach = 3.666 * (BODY_RADIUS * (head_scale + body_scale));
+            if !other_bounds.near(probe, reach) {
+                return false;
+            }
+            if PROFILE {
+                profile.segment_tests += other.body.len() as u64;
+            }
+            let line = [other_tip, other.head]
+                .into_iter()
+                .chain(other.body.iter().copied());
+            strikes_scaled(
+                self.last_tips[i],
+                tip,
+                direction,
+                head_scale,
+                body_scale,
+                line,
+            )
+        };
+        let grid_candidates = self.grid.and_then(|(grid, max_reach)| {
+            grid.candidates_for_head(
+                tip,
+                head_scale,
+                scale(GRID_HEAD_SEGMENTS),
+                *max_reach,
+                candidates,
+            )
+        });
+        // Both visit positions newest first; the index omits only snakes
+        // whose bounds fail the test above.
+        if let Some(candidates) = grid_candidates {
+            candidates
+                .iter()
+                .map(|&k| self.order[k as usize])
+                .find(|&j| test(j, profile))
+        } else if indexed {
+            candidates
+                .iter()
+                .map(|&k| self.order[k as usize])
+                .find(|&j| test(j, profile))
+        } else {
+            self.order.iter().rev().copied().find(|&j| test(j, profile))
+        }
+    }
+}
+
+/// Resolve heads oldest first: wall and pit deaths, then each head's first
+/// strike on a body that has not fallen earlier in this walk.
+/// `search(position, slot, fallen)` finds that strike.
+#[inline(always)]
+fn resolve_collisions(
+    order: &[usize],
+    boundary_deaths: &[(usize, DeathReason)],
+    protected: usize,
+    dead: &mut Vec<(usize, Option<usize>, DeathReason)>,
+    fallen: &mut [bool],
+    mut search: impl FnMut(usize, usize, &[bool]) -> Option<usize>,
+) {
+    for (k, &i) in order.iter().enumerate() {
+        if let Ok(b) = boundary_deaths.binary_search_by_key(&i, |&(j, _)| j) {
+            dead.push((i, None, boundary_deaths[b].1));
+            fallen[i] = true;
+            continue;
+        }
+        if i < protected {
+            continue;
+        }
+        let killer = search(k, i, fallen);
+        if killer.is_some() {
+            dead.push((i, killer, DeathReason::Body));
+            fallen[i] = true;
+        }
+    }
+}
+
+/// What boost drops write: the world RNG and food, in slot order.
+struct Drops<'a> {
+    random: &'a mut Random,
+    food: &'a mut Vec<Food>,
+    cache: &'a mut FoodCache,
+    births: &'a mut Vec<u64>,
+    next_birth: &'a mut u64,
+    events: &'a mut Option<Vec<FoodSpawnEvent>>,
+}
+impl Drops<'_> {
+    /// Boost state, speed and boost drops for living slot `i`. Returns the
+    /// scale before drops, which the wall test of the same tick still uses.
+    #[allow(clippy::too_many_arguments)]
+    #[inline(always)]
+    fn boost(
+        &mut self,
+        c: &Config,
+        i: usize,
+        boost: bool,
+        s: &mut Snake,
+        state: &mut Boost,
+        speed: &mut SpeedState,
+        floor: Option<MassFloor>,
+        pit_radius: Option<f64>,
+        radius: f64,
+    ) -> f64 {
+        state.held = boost;
+        if !boost {
+            state.exhausted = false;
+        }
+        // Boosting needs mass above the two-segment minimum; real 2-segment snakes keep
+        // boosting down to fam ~0. A `minScore` floor keeps boosting allowed:
+        // at the floor it is free speed, a mode design choice.
+        let can_boost = floor.is_some() || s.segments > 2 || s.fam > 0.0;
+        if boost && can_boost && !state.exhausted && !state.active {
+            // The first pellet usually drops within a loop of the boost request.
+            state.clock = BOOST_DROP_SECONDS;
+        }
+        state.active = boost && can_boost && !state.exhausted;
+        let boosting = state.active;
+        if boosting {
+            state.active_boost_seconds += c.dt;
+        }
+        let sc = scale(s.segments);
+        // Checkpoint v1 can retain a pending observed-speed inference from
+        // the former public-state API. Preserve that continuation behavior.
+        if speed.speed != s.speed {
+            *speed = SpeedState::from_observed_speed(s.speed, s.segments);
+        }
+        s.speed = speed.step(boosting, s.segments, c.dt, c.speed_model);
+        if boosting {
+            let elapsed = state.clock + c.dt;
+            // Counted, not subtracted until the clock runs out: at a long dt
+            // the subtraction stops changing the clock, and a 430-segment
+            // snake's boost costs no mass, so nothing else ends the loop.
+            // With at most one drop, as at any measured dt, this matches
+            // that subtraction exactly.
+            let (drops, rest) = drops_in(elapsed);
+            let mut dropped = 0;
+            while dropped < drops && state.active {
+                dropped += 1;
+                let tail = s.body.last().copied().unwrap_or(s.head);
+                let mult = multiplier(s.segments as f64 + s.fam);
+                // Pellets match the mass spent: nothing at the floor, so free
+                // boosting never makes food, and a smaller last pellet above it.
+                let available = floor.map_or(s.segments as f64 - 2.0 + s.fam, |floor| {
+                    floor.excess(s.segments, s.fam)
+                });
+                let cost =
+                    available.min(boost_cost(s.segments) * (0.94 + 0.14 * self.random.next()));
+                let removed = remove_mass_above_floor(&mut s.segments, &mut s.fam, cost, floor);
+                state.boost_mass_spent += cost;
+                s.body.truncate(s.body.len() - removed);
+                let size = ((cost * 0.95 / (NUTRITION * mult)).sqrt() * 5.0).floor() / 5.0;
+                if size > 0.0 {
+                    let jitter = sc * 16.0;
+                    let x = tail.x + (self.random.next() - 0.5) * jitter;
+                    let y = tail.y + (self.random.next() - 0.5) * jitter;
+                    let pellet = Simulator::pellet(Point { x, y }, size, Origin::Boost);
+                    if c.emit_boost_food
+                        && (!c.food_only_inside_pit
+                            || pellet
+                                .point()
+                                .distance_lt(Point::default(), pit_radius.unwrap().min(radius)))
+                    {
+                        // Earlier admitted drops in this same step share the capacity.
+                        let admitted = !c.boost_food.enabled
+                            || self.cache.has_room(
+                                self.food,
+                                &pellet,
+                                c.boost_food.cell_size,
+                                c.boost_food.max_per_cell,
+                            );
+                        if admitted {
+                            if let Some(events) = self.events {
+                                events.push(FoodSpawnEvent {
+                                    source: Some(i),
+                                    food: pellet,
+                                });
+                            }
+                            self.cache.push(&pellet);
+                            push_food_birth(self.births, self.next_birth);
+                            self.food.push(pellet);
+                        }
+                    }
+                }
+                if floor.is_none() && s.segments == 2 && s.fam <= 0.0 {
+                    state.active = false;
+                    state.exhausted = true;
+                }
+            }
+            state.clock = if dropped == drops {
+                rest
+            } else {
+                elapsed - dropped as f64 * BOOST_DROP_SECONDS
+            };
+        } else {
+            state.clock = 0.0;
+        }
+        sc
+    }
+}
+
+/// Per-tick constants for snake motion after the boost pass.
+struct Motion<'a> {
+    config: &'a Config,
+    radius: f64,
+    pit_radius: Option<f64>,
+    previous_pit_radius: Option<f64>,
+    floor: Option<MassFloor>,
+}
+impl Motion<'_> {
+    /// Steering, walls, pit, anchors and kiosk penalties for one living snake.
+    /// Reads and writes only that slot, so slots may move in any order.
+    /// Returns a wall or pit death.
+    #[allow(clippy::too_many_arguments)]
+    #[inline(always)]
+    fn advance(
+        &self,
+        heading: f64,
+        previous: Point,
+        sc: f64,
+        s: &mut Snake,
+        steering: &mut SteeringCache,
+        direction: &mut (f64, f64),
+        pit_entered: &mut bool,
+        body_bounds: &mut Option<Bounds>,
+        kiosk: &mut KioskState,
+    ) -> Option<DeathReason> {
+        let c = self.config;
+        let mut death = None;
+        (s.head, s.heading, *direction) =
+            steering.advance(s.head, s.heading, heading, s.speed, s.segments, c.dt);
+        let (head, lethal) =
+            crate::boundary::constrain(s.head, s.heading, sc, self.radius, c.boundary_mode);
+        s.head = head;
+        if lethal {
+            death = Some(DeathReason::Boundary);
+        } else if let Some(pit) = self.pit_radius {
+            // A mode rule, not an official mechanic: docs/configuration.md#battledome.
+            // The swept head-center path counts, so the rule does not depend on
+            // dt: crossing the pit or clipping its edge within a tick also kills.
+            // Growth overtaking a head is not physical entry. The existing
+            // entry bit keeps engulfed newborns free to leave, while lives
+            // initialized inside and later inward crossings remain one-way.
+            // research/battledome/2026-10-26-spawn-capacity/REPORT.md
+            let can_enter = !c.dynamic_radius
+                || c.min_score.is_none()
+                || !previous.distance_lt(
+                    Point::default(),
+                    pit.max(self.previous_pit_radius.unwrap_or(pit)),
+                );
+            let touched = *pit_entered || (can_enter && reaches_center(previous, s.head, pit));
+            if touched {
+                if s.head.distance_lt(Point::default(), pit) {
+                    *pit_entered = true;
+                } else {
+                    death = Some(DeathReason::Pit);
+                }
+            }
+        }
+        if let Some(anchor) = crossed_anchor(s.head, s.body[0]) {
+            *body_bounds = None;
+            let grow = s.fam >= 1.0;
+            if grow {
+                s.fam -= 1.0;
+                s.segments += 1;
+            }
+            append_anchor(&mut s.body, anchor, grow);
+        }
+        Simulator::update_mass(s);
+        kiosk.step(s, &c.kiosk, c.dt, self.floor);
+        Simulator::update_mass(s);
+        death
     }
 }
 
@@ -3059,12 +3356,14 @@ fn compact_food<T: Copy>(food: &mut Vec<T>, removed: impl Iterator<Item = usize>
     food.truncate(write);
 }
 
-/// Query occupied eater cells, then restore the original reverse pellet order.
+/// Query the occupied eater cells in `cells`. Callers sort the hits to
+/// restore the original reverse pellet order.
 fn indexed_hits<const PROFILE: bool>(
     grid: &EaterGrid,
     pellets: &PelletIndex,
     snakes: &[Snake],
     eaters: &[(usize, Point, f64, Bounds)],
+    cells: std::ops::Range<usize>,
     hits: &mut Vec<(usize, usize)>,
     profile: &mut StepProfile,
 ) {
@@ -3074,6 +3373,7 @@ fn indexed_hits<const PROFILE: bool>(
             |cell| pellets.direct_pellets(cell),
             snakes,
             eaters,
+            cells,
             hits,
             profile,
         );
@@ -3083,6 +3383,7 @@ fn indexed_hits<const PROFILE: bool>(
             |cell| pellets.pellets(cell),
             snakes,
             eaters,
+            cells,
             hits,
             profile,
         );
@@ -3094,13 +3395,14 @@ fn indexed_hits_by<'a, const PROFILE: bool, I: Iterator<Item = crate::food_grid:
     food_in_cell: impl Fn(u32) -> I,
     snakes: &[Snake],
     eaters: &[(usize, Point, f64, Bounds)],
+    cells: std::ops::Range<usize>,
     hits: &mut Vec<(usize, usize)>,
     profile: &mut StepProfile,
 ) {
     // Unique cells and one handle per pellet give at most one hit per pellet.
-    // Reuse the exact tests and eater order; sorting restores the original
-    // reverse-food event/mass/removal order before anything is applied.
-    for (cell, candidates) in grid.occupied() {
+    // Reuse the exact tests and eater order; the caller's sort restores the
+    // original reverse-food event/mass/removal order before anything is applied.
+    for (cell, candidates) in grid.occupied(cells) {
         for pellet in food_in_cell(cell) {
             if let Some(eater) = find_eater::<PROFILE>(
                 snakes,
@@ -3112,7 +3414,6 @@ fn indexed_hits_by<'a, const PROFILE: bool, I: Iterator<Item = crate::food_grid:
             }
         }
     }
-    hits.sort_unstable_by_key(|hit| std::cmp::Reverse(hit.0));
 }
 
 /// Visit food in reverse, recording each pellet's eater.
@@ -3672,9 +3973,11 @@ mod food_pickup_order_tests {
             cache.pellets(&food).unwrap(),
             &world.snakes,
             &eaters,
+            0..grid.occupied_len(),
             &mut indexed,
             &mut profile,
         );
+        indexed.sort_unstable_by_key(|hit| std::cmp::Reverse(hit.0));
         assert_eq!(indexed, hits);
         let scanned: Vec<_> = food
             .iter()

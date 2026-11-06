@@ -256,6 +256,43 @@ measure your own workload before relying on them.
   same VM slowed the first by roughly a quarter, because they share cache and
   memory.
 
+### World threads
+
+A world with thousands of snakes can step on several cores. Set
+`worldThreads` to the number of cores the world may use:
+
+```json
+{
+  "bots": { "count": 8000, "threads": 4 },
+  "simulation": {
+    "world": {
+      "preset": "official",
+      "radius": 32000,
+      "foodCount": 250210,
+      "ambientReplenishPerSecond": 3660,
+      "prey": { "count": 322 }
+    }
+  },
+  "worldThreads": 4
+}
+```
+
+The world then gets its own pool of that many threads, apart from the socket
+thread and `bots.threads`; give each its own core. Once at least 4,096 snakes
+are alive, each tick splits snake movement, collision checks and food pickup
+across the pool. Everything that draws random numbers or decides who killed
+whom still runs in order on one thread, so the game is identical for every
+thread count.
+
+Protocol 19 caps the arena radius at 32,000, which official sizing reaches at
+2,281 seats, so only a fixed, denser arena like the one above has enough snakes
+to split. The example keeps official food and prey per area; a fixed radius
+does not rescale them. Smaller worlds don't split: a 500-player official step
+takes about 0.2–0.3 ms of its 7 ms tick. Most of a large server's time goes
+into per-player updates, which `worldThreads` doesn't spread yet. With 4,500
+bots, eight world threads cut simulation time per tick by about 10%
+([measurements](performance.md#measured-scaling)).
+
 ### Build and allocator
 
 On Linux with glibc 2.35 or newer, set `GLIBC_TUNABLES=glibc.malloc.hugetlb=1` in the host's

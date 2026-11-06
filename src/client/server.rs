@@ -130,6 +130,9 @@ pub struct HostConfig {
     /// Stretch overloaded ticks up to this many seconds; `None` keeps fixed ticks.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub max_tick: Option<f64>,
+    /// Threads that step the world, including the simulation thread. Above 1,
+    /// the world gets its own pool of this size; results are unchanged.
+    pub world_threads: usize,
 }
 
 impl Default for HostConfig {
@@ -143,6 +146,7 @@ impl Default for HostConfig {
             bots: BotConfig::default(),
             simulation: SimulationConfig::default(),
             max_tick: None,
+            world_threads: 1,
         }
     }
 }
@@ -211,6 +215,12 @@ impl HostConfig {
             .ok_or("players.max + bots.count must fit in usize")?;
         if self.players.max == 0 {
             return Err("Host needs 1 or more players.max".into());
+        }
+        if self.world_threads == 0 {
+            return Err("worldThreads must be at least 1".into());
+        }
+        if !cfg!(feature = "parallel") && self.world_threads > 1 {
+            return Err("worldThreads above 1 needs the parallel build feature".into());
         }
         if self.bots.count > 0 && self.bots.threads == 0 {
             return Err("Bots need 1 or more bots.threads".into());
@@ -283,8 +293,17 @@ impl Clock {
     }
 }
 
+#[cfg(all(test, feature = "parallel"))]
+struct WorldContext {
+    threads: usize,
+    parallel: bool,
+    name: String,
+}
+
 /// State every host thread can see.
 struct Shared {
+    #[cfg(all(test, feature = "parallel"))]
+    world_context: Mutex<Option<Sender<WorldContext>>>,
     #[cfg(windows)]
     socket_wake: wake::Wake,
     clock: Clock,
@@ -424,6 +443,8 @@ impl Delivery {
 /// A bound protocol-13/19 server. `start` serves it on its own threads; `run`
 /// serves it until a failure.
 pub struct Host {
+    #[cfg(all(test, feature = "parallel"))]
+    world_context: Option<Sender<WorldContext>>,
     listener: TcpListener,
     world: RawSimulator,
     max_clients: usize,
@@ -433,6 +454,8 @@ pub struct Host {
     latency: LatencyConfig,
     decision_seconds: f64,
     max_tick: Option<f64>,
+    #[cfg(feature = "parallel")]
+    world_threads: usize,
     #[cfg(feature = "latency-rig")]
     latency_truth: Option<super::latency_truth::Export>,
 }
@@ -451,9 +474,13 @@ impl Host {
         world.set_player_latency(config.players.max, config.players.latency);
         #[cfg(feature = "frame-bench")]
         world.set_frame_bench(config.frame_bench);
+        #[cfg(feature = "parallel")]
+        world.set_parallel(config.world_threads > 1);
         let listener = TcpListener::bind(config.bind).map_err(|e| e.to_string())?;
         listener.set_nonblocking(true).map_err(|e| e.to_string())?;
         Ok(Self {
+            #[cfg(all(test, feature = "parallel"))]
+            world_context: None,
             listener,
             world,
             max_clients: config.players.max,
@@ -463,6 +490,8 @@ impl Host {
             latency,
             decision_seconds,
             max_tick: config.max_tick,
+            #[cfg(feature = "parallel")]
+            world_threads: config.world_threads,
             #[cfg(feature = "latency-rig")]
             latency_truth: None,
         })
@@ -498,6 +527,8 @@ impl Host {
         let mut challenge = vec![0, 0, b'6'];
         challenge.extend(encoded);
         let shared = Arc::new(Shared {
+            #[cfg(all(test, feature = "parallel"))]
+            world_context: Mutex::new(self.world_context),
             #[cfg(windows)]
             socket_wake: wake::Wake::new().map_err(|e| e.to_string())?,
             clock: Clock {
@@ -568,6 +599,10 @@ impl Host {
             deliveries: socket_inbox,
         };
         let agents = self.max_clients + self.bots;
+        #[cfg(feature = "parallel")]
+        let pool = (self.world_threads > 1)
+            .then(|| WorldPool::new(self.world_threads))
+            .transpose()?;
         let simulation = Simulation {
             world,
             commands: inbox,
@@ -584,6 +619,18 @@ impl Host {
             ticks: 0,
             deferred: 0,
         };
+        #[cfg(feature = "parallel")]
+        match pool {
+            // Serve from one of the world pool's threads, so each tick's split
+            // phases reach the other threads without a hand-off to the pool.
+            Some(pool) => running.spawn(
+                "slither-simulation",
+                (pool, simulation),
+                |(pool, simulation)| pool.pool.as_ref().unwrap().install(|| simulation.run()),
+            )?,
+            None => running.spawn("slither-simulation", simulation, Simulation::run)?,
+        }
+        #[cfg(not(feature = "parallel"))]
         running.spawn("slither-simulation", simulation, Simulation::run)?;
         running.spawn("slither-sockets", gateway, Gateway::run)?;
         Ok(running)
@@ -592,6 +639,59 @@ impl Host {
     /// Serve until a thread fails, and return its error.
     pub fn run(self) -> Result<(), String> {
         self.start()?.wait()
+    }
+}
+
+/// Rayon pool drop signals termination; the host also owns the worker handles
+/// so stop, unwind and partial startup wait for actual thread termination.
+#[cfg(feature = "parallel")]
+struct WorldPool {
+    pool: Option<rayon::ThreadPool>,
+    workers: Vec<JoinHandle<()>>,
+}
+
+#[cfg(feature = "parallel")]
+impl WorldPool {
+    fn new(threads: usize) -> Result<Self, String> {
+        Self::spawn_with(threads, |worker| {
+            let mut builder = thread::Builder::new();
+            if let Some(name) = worker.name() {
+                builder = builder.name(name.to_owned());
+            }
+            builder.spawn(move || worker.run())
+        })
+    }
+
+    fn spawn_with(
+        threads: usize,
+        mut spawn: impl FnMut(rayon::ThreadBuilder) -> io::Result<JoinHandle<()>>,
+    ) -> Result<Self, String> {
+        let mut owned = Self {
+            pool: None,
+            workers: Vec::new(),
+        };
+        let pool = rayon::ThreadPoolBuilder::new()
+            .num_threads(threads)
+            .thread_name(|i| format!("slither-world-{i}"))
+            .spawn_handler(|worker| {
+                owned.workers.push(spawn(worker)?);
+                Ok(())
+            })
+            .build()
+            .map_err(|e| e.to_string())?;
+        owned.pool = Some(pool);
+        Ok(owned)
+    }
+}
+
+#[cfg(feature = "parallel")]
+impl Drop for WorldPool {
+    fn drop(&mut self) {
+        // Signal all workers before waiting, including after a partial build.
+        drop(self.pool.take());
+        for worker in self.workers.drain(..) {
+            let _ = worker.join();
+        }
     }
 }
 
@@ -756,6 +856,14 @@ struct PendingJoin {
 
 impl Simulation {
     fn run(&mut self) -> Result<(), String> {
+        #[cfg(all(test, feature = "parallel"))]
+        if let Some(probe) = self.shared.world_context.lock().unwrap().take() {
+            let _ = probe.send(WorldContext {
+                threads: rayon::current_num_threads(),
+                parallel: self.world.fixture_world().parallel(),
+                name: thread::current().name().unwrap_or_default().to_owned(),
+            });
+        }
         if let Some(max) = self.shared.clock.max_tick {
             return self.run_adaptive(max);
         }
@@ -2300,6 +2408,9 @@ fn challenge_parts() -> Result<(Vec<u8>, [Vec<u8>; 3]), String> {
 #[cfg(test)]
 mod bot_tests;
 
+#[cfg(all(test, feature = "parallel"))]
+mod world_pool_tests;
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2979,6 +3090,8 @@ mod tests {
 
     fn shared(dt: f64, sockets: usize) -> Arc<Shared> {
         Arc::new(Shared {
+            #[cfg(feature = "parallel")]
+            world_context: Mutex::new(None),
             #[cfg(windows)]
             socket_wake: wake::Wake::new().unwrap(),
             clock: Clock {

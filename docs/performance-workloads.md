@@ -52,6 +52,12 @@ workload, simulator tick benchmark or FPS case.
   `protocol` come first; the catalog holds their resolved definitions.
 - **Sandbox and official:** `Config::sandbox()` and `Config::official(n)` at
   several populations, giving a scaling curve.
+- **Dense:** `dense-8192-step` keeps 8,192 snakes of 8–24 segments in a fixed
+  24,000-unit arena, about six times the official density, with official food
+  and prey per area. It exists for the [parallel step](performance.md#parallel-step):
+  one step takes about 5.5 ms on one core, split roughly evenly between
+  movement, collision search and food pickup. A full snapshot of this world is
+  about 80 MB, so its one-operation trace is about 240 MB, above the usual aim.
 - **Battledome:** `battledome-32-step` and `battledome-32-bot` use the unmodified
   [`Config::battledome()`](configuration.md#battledome): pit, permanent size
   floor, circular spawn band, ambient food and rolling kill score.
@@ -296,7 +302,8 @@ hide a just-died snake's state from parity checks. Respawn records keep the new
 poses and lengths; client slots reconnect before the next decision.
 
 `--parallel` calls `Simulator::set_parallel(true)` on the timed world, so
-`observe` and `-bot` rows observe on the rayon pool. It needs the default
+`observe` and `-bot` rows observe on the rayon pool, and steps with at least
+4,096 living snakes split across it. It needs the default
 `parallel` feature and adds `"parallel": true` to the report; every other trace
 line must match the run without it. Runners and PR comparisons don't pass it.
 

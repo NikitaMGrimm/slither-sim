@@ -22,26 +22,33 @@ use std::{
 };
 use tungstenite::{Message, connect};
 
-const USAGE: &str =
-    "Usage: host_load [--bots N] [--bot-threads N] [--seconds N] [--round-trip-ms N]";
+const USAGE: &str = "Usage: host_load [--bots N] [--bot-threads N] [--world-threads N] [--radius R] [--seconds N] [--round-trip-ms N]";
 /// Excess delays are measured against the smallest within this many frames.
 const WINDOW: usize = 1200;
 
 struct Options {
     bots: usize,
     bot_threads: usize,
+    world_threads: usize,
+    /// Fixed arena radius; seat-following official sizing when absent.
+    radius: Option<f64>,
     seconds: f64,
     round_trip: f64,
 }
 
 fn options() -> Result<Options, String> {
+    parse_options(&std::env::args().skip(1).collect::<Vec<_>>())
+}
+
+fn parse_options(args: &[String]) -> Result<Options, String> {
     let mut options = Options {
         bots: 500,
         bot_threads: 2,
+        world_threads: 1,
+        radius: None,
         seconds: 60.,
         round_trip: 0.04,
     };
-    let args: Vec<String> = std::env::args().skip(1).collect();
     for pair in args.chunks(2) {
         let [flag, value] = pair else {
             return Err(USAGE.into());
@@ -50,6 +57,10 @@ fn options() -> Result<Options, String> {
         match flag.as_str() {
             "--bots" => options.bots = number(value)? as usize,
             "--bot-threads" => options.bot_threads = number(value)? as usize,
+            "--world-threads" => {
+                options.world_threads = value.parse::<usize>().map_err(|_| USAGE.to_string())?;
+            }
+            "--radius" => options.radius = Some(number(value)?),
             "--seconds" => options.seconds = number(value)?,
             "--round-trip-ms" => options.round_trip = number(value)? / 1000.,
             _ => return Err(USAGE.into()),
@@ -58,15 +69,52 @@ fn options() -> Result<Options, String> {
     Ok(options)
 }
 
+#[test]
+fn world_threads_requires_an_integer() {
+    for value in [
+        "2.9",
+        "1.9",
+        "-1",
+        "NaN",
+        "inf",
+        "2e0",
+        "18446744073709551616",
+    ] {
+        assert!(parse_options(&["--world-threads".into(), value.into()]).is_err());
+    }
+    for value in ["1", "2", "7"] {
+        let options = parse_options(&["--world-threads".into(), value.into()]).unwrap();
+        assert_eq!(options.world_threads, value.parse::<usize>().unwrap());
+    }
+}
+
 fn percentile(sorted: &[f64], share: f64) -> f64 {
     sorted[((sorted.len() - 1) as f64 * share).round() as usize]
 }
 
 fn run(options: Options) -> Result<(), String> {
+    #[cfg(not(slither_host_world_threads))]
+    if options.world_threads != 1 {
+        return Err("this runtime does not support --world-threads above 1".into());
+    }
     println!(
         "policy=A4-mean parameter_manifest_sha256={}",
         slither_sim::bot::PARAMETER_MANIFEST_SHA256,
     );
+    let mut world = Config::official(options.bots + 1);
+    if let Some(radius) = options.radius {
+        // Protocol 19 caps the arena radius, so worlds past about 2,300 seats
+        // need a fixed radius. Food and prey keep official per-area densities:
+        // 7 pellets and 0.1024 refill attempts per 300-unit sector, one prey
+        // per ten million square units.
+        let area = std::f64::consts::PI * radius * radius;
+        world.radius = radius;
+        world.dynamic_radius = false;
+        world.size_to_population = false;
+        world.food_count = (7.0 * area / 90_000.0) as usize;
+        world.ambient_replenish_per_second = 0.1024 * area / 90_000.0;
+        world.prey.count = (area / 10_000_000.0).round().max(1.0) as usize;
+    }
     let config = HostConfig {
         bind: "127.0.0.1:0".parse().map_err(|_| "bad address")?,
         players: PlayerConfig {
@@ -79,9 +127,11 @@ fn run(options: Options) -> Result<(), String> {
             latency: LatencyConfig::fixed(options.round_trip),
         },
         simulation: SimulationConfig {
-            world: Config::official(options.bots + 1),
+            world,
             ..Default::default()
         },
+        #[cfg(slither_host_world_threads)]
+        world_threads: options.world_threads,
         ..Default::default()
     };
     let host = Host::bind(config)?.start()?;
@@ -134,7 +184,8 @@ fn run(options: Options) -> Result<(), String> {
     }
     let ticks = host.ticks();
     let deferred = host.deferred_ticks();
-    let load = host.simulation_seconds() / start.elapsed().as_secs_f64();
+    let busy_seconds = host.simulation_seconds();
+    let load = busy_seconds / start.elapsed().as_secs_f64();
     host.stop()?;
     let mut relative: Vec<f64> = excess
         .chunks(WINDOW)
@@ -148,10 +199,12 @@ fn run(options: Options) -> Result<(), String> {
         return Err("The watcher received no frames".into());
     }
     println!(
-        "bots={} frames={} ticks={ticks} deferred={deferred} simulation load={:.0}%",
+        "bots={} world_threads={} frames={} ticks={ticks} deferred={deferred} simulation load={:.0}% busy per tick ms={:.3}",
         options.bots,
+        options.world_threads,
         relative.len(),
-        load * 100.
+        load * 100.,
+        busy_seconds * 1000. / ticks.max(1) as f64
     );
     println!(
         "excess delay ms: p50={:.2} p90={:.2} p99={:.2} max={:.2}",
@@ -424,6 +477,8 @@ pub fn benchmark(
             world,
             ..Default::default()
         },
+        #[cfg(slither_host_world_threads)]
+        world_threads: 1,
     })?
     .start()?;
     let executable = std::env::current_exe().map_err(|e| e.to_string())?;
