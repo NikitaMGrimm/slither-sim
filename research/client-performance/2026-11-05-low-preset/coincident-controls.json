@@ -1,9 +1,15 @@
 {
-  "fixture": "authored protocol-13 coincident pairs: food 2j and 2j+1 share color j%10, raw position (1200+j%200, 1050+j/200), size 1 and factory units [0.25, 0.5]; Low, factor 1, 12 animation updates, 4K; retained picture versus frame.canonical() through the same WorldPresenter",
-  "before_source": "independent review of bed9a259 (GPT 6.1 Sol via Codex)",
+  "fixtures": {
+    "body pairs": "authored protocol-13 foods 2j and 2j+1 share color j%10, raw position (1200+j%200, 1050+j/200), size 1 and factory units [0.25, 0.5]",
+    "one body pair": "25,000 authored foods with hashed colors, positions and factory units; only foods 0 and 1 coincide",
+    "late-barrier caller pair": "4,096 distinct Low foods; 17 caller draws on a non-food resource, the two Lighter draws at indices 15 and 16 coincide across the empty late barrier (late_at 16)",
+    "common": "Low, factor 1, 12 animation updates, 4K; retained picture versus frame.canonical() through the same WorldPresenter, three renders"
+  },
+  "before_source": "independent reviews of bed9a259 and 4a49757f (GPT 6.1 Sol via Codex)",
   "before": [
     {
       "revision": "bed9a259",
+      "case": "body pairs",
       "adapter": "amd",
       "foods": 4096,
       "mode": "Native",
@@ -14,6 +20,7 @@
     },
     {
       "revision": "bed9a259",
+      "case": "body pairs",
       "adapter": "amd",
       "foods": 4096,
       "mode": "Original",
@@ -24,6 +31,7 @@
     },
     {
       "revision": "bed9a259",
+      "case": "body pairs",
       "adapter": "rtx",
       "foods": 8192,
       "mode": "Native",
@@ -34,6 +42,7 @@
     },
     {
       "revision": "bed9a259",
+      "case": "body pairs",
       "adapter": "rtx",
       "foods": 8192,
       "mode": "Original",
@@ -44,6 +53,7 @@
     },
     {
       "revision": "bed9a259",
+      "case": "body pairs",
       "adapter": "rtx",
       "foods": 4096,
       "mode": "Native",
@@ -54,6 +64,7 @@
     },
     {
       "revision": "bed9a259",
+      "case": "body pairs",
       "adapter": "rtx",
       "foods": 4096,
       "mode": "Original",
@@ -61,36 +72,35 @@
       "changed_pixels": 4968,
       "changed_channels": 5659,
       "maximum_difference": 6
+    },
+    {
+      "revision": "4a49757f",
+      "case": "late-barrier caller pair",
+      "adapter": "rtx",
+      "foods": 4096,
+      "mode": "Native",
+      "identical": false,
+      "changed_pixels": 5300,
+      "changed_channels": 5599,
+      "maximum_difference": 2
+    },
+    {
+      "revision": "4a49757f",
+      "case": "late-barrier caller pair",
+      "adapter": "rtx",
+      "foods": 4096,
+      "mode": "Original",
+      "identical": false,
+      "changed_pixels": 5626,
+      "changed_channels": 5942,
+      "maximum_difference": 2
     }
   ],
   "after": [
     {
       "revision": "candidate",
-      "adapter": "amd",
-      "foods": 8192,
-      "mode": "Native",
-      "identical": true,
-      "eligible_pairs": 4096,
-      "rgba_bytes": 33177600,
-      "draws": 16399,
-      "retained": true,
-      "samples": 1
-    },
-    {
-      "revision": "candidate",
-      "adapter": "amd",
-      "foods": 8192,
-      "mode": "Original",
-      "identical": true,
-      "eligible_pairs": 4096,
-      "rgba_bytes": 33177600,
-      "draws": 16399,
-      "retained": true,
-      "samples": 4
-    },
-    {
-      "revision": "candidate",
-      "adapter": "amd",
+      "case": "body pairs",
+      "adapter": "rtx",
       "foods": 4096,
       "mode": "Native",
       "identical": true,
@@ -102,7 +112,8 @@
     },
     {
       "revision": "candidate",
-      "adapter": "amd",
+      "case": "body pairs",
+      "adapter": "rtx",
       "foods": 4096,
       "mode": "Original",
       "identical": true,
@@ -114,6 +125,7 @@
     },
     {
       "revision": "candidate",
+      "case": "body pairs",
       "adapter": "rtx",
       "foods": 8192,
       "mode": "Native",
@@ -126,6 +138,7 @@
     },
     {
       "revision": "candidate",
+      "case": "body pairs",
       "adapter": "rtx",
       "foods": 8192,
       "mode": "Original",
@@ -138,7 +151,8 @@
     },
     {
       "revision": "candidate",
-      "adapter": "rtx",
+      "case": "body pairs",
+      "adapter": "amd",
       "foods": 4096,
       "mode": "Native",
       "identical": true,
@@ -150,20 +164,160 @@
     },
     {
       "revision": "candidate",
-      "adapter": "rtx",
+      "case": "body pairs",
+      "adapter": "amd",
       "foods": 4096,
       "mode": "Original",
       "identical": true,
       "eligible_pairs": 2048,
       "rgba_bytes": 33177600,
       "draws": 8207,
+      "retained": true,
+      "samples": 4
+    },
+    {
+      "revision": "candidate",
+      "case": "body pairs",
+      "adapter": "amd",
+      "foods": 8192,
+      "mode": "Native",
+      "identical": true,
+      "eligible_pairs": 4096,
+      "rgba_bytes": 33177600,
+      "draws": 16399,
+      "retained": true,
+      "samples": 1
+    },
+    {
+      "revision": "candidate",
+      "case": "body pairs",
+      "adapter": "amd",
+      "foods": 8192,
+      "mode": "Original",
+      "identical": true,
+      "eligible_pairs": 4096,
+      "rgba_bytes": 33177600,
+      "draws": 16399,
+      "retained": true,
+      "samples": 4
+    },
+    {
+      "revision": "candidate",
+      "case": "one body pair",
+      "adapter": "rtx",
+      "foods": 25000,
+      "mode": "Native",
+      "identical": true,
+      "eligible_pairs": 1,
+      "rgba_bytes": 33177600,
+      "draws": 50015,
+      "retained": true,
+      "samples": 1
+    },
+    {
+      "revision": "candidate",
+      "case": "one body pair",
+      "adapter": "rtx",
+      "foods": 25000,
+      "mode": "Original",
+      "identical": true,
+      "eligible_pairs": 1,
+      "rgba_bytes": 33177600,
+      "draws": 50015,
+      "retained": true,
+      "samples": 4
+    },
+    {
+      "revision": "candidate",
+      "case": "one body pair",
+      "adapter": "amd",
+      "foods": 25000,
+      "mode": "Native",
+      "identical": true,
+      "eligible_pairs": 1,
+      "rgba_bytes": 33177600,
+      "draws": 50015,
+      "retained": true,
+      "samples": 1
+    },
+    {
+      "revision": "candidate",
+      "case": "one body pair",
+      "adapter": "amd",
+      "foods": 25000,
+      "mode": "Original",
+      "identical": true,
+      "eligible_pairs": 1,
+      "rgba_bytes": 33177600,
+      "draws": 50015,
+      "retained": true,
+      "samples": 4
+    },
+    {
+      "revision": "candidate",
+      "case": "late-barrier caller pair",
+      "adapter": "rtx",
+      "foods": 4096,
+      "mode": "Native",
+      "identical": true,
+      "eligible_pairs": 1,
+      "rgba_bytes": 33177600,
+      "draws": 8209,
+      "retained": true,
+      "samples": 1
+    },
+    {
+      "revision": "candidate",
+      "case": "late-barrier caller pair",
+      "adapter": "rtx",
+      "foods": 4096,
+      "mode": "Original",
+      "identical": true,
+      "eligible_pairs": 1,
+      "rgba_bytes": 33177600,
+      "draws": 8209,
+      "retained": true,
+      "samples": 4
+    },
+    {
+      "revision": "candidate",
+      "case": "late-barrier caller pair",
+      "adapter": "amd",
+      "foods": 4096,
+      "mode": "Native",
+      "identical": true,
+      "eligible_pairs": 1,
+      "rgba_bytes": 33177600,
+      "draws": 8209,
+      "retained": true,
+      "samples": 1
+    },
+    {
+      "revision": "candidate",
+      "case": "late-barrier caller pair",
+      "adapter": "amd",
+      "foods": 4096,
+      "mode": "Original",
+      "identical": true,
+      "eligible_pairs": 1,
+      "rgba_bytes": 33177600,
+      "draws": 8209,
       "retained": true,
       "samples": 4
     }
   ],
-  "regression_test": {
-    "name": "coincident_low_bodies_keep_the_generic_pair_packer",
-    "bed9a259": "failed",
-    "candidate": "passed"
+  "standard_controls_passed": 16,
+  "regression_tests": {
+    "revision 4a49757f with the new tests": {
+      "coincident_low_bodies_pair_like_the_generic_packer": "failed",
+      "caller_pairs_cross_the_empty_low_late_barrier": "failed",
+      "prepared_bytes_states_and_coverage_match_the_canonical_stream": "passed"
+    },
+    "candidate": {
+      "coincident_low_bodies_pair_like_the_generic_packer": "passed",
+      "caller_pairs_cross_the_empty_low_late_barrier": "passed",
+      "prepared_bytes_states_and_coverage_match_the_canonical_stream": "passed"
+    },
+    "superseded": "coincident_low_bodies_keep_the_generic_pair_packer asserted the whole-frame fallback; it failed on bed9a259 and passed on f8695b43"
   }
 }

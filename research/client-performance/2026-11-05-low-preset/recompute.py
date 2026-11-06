@@ -1,6 +1,7 @@
 """Recompute selected authored Low-preset results; --check verifies REPORT.md."""
 from pathlib import Path
 import argparse
+import collections
 import csv
 import itertools
 import json
@@ -64,19 +65,28 @@ def recompute():
         ["rtx", "amd"], ["stock", "far", "whole"], ["Native", "Original"], [1, 12, 240],
     ))
     coincident = json.loads((ROOT / "coincident-controls.json").read_text())
-    assert coincident["before"] and all(
-        not c["identical"] and c["changed_pixels"] > 0 and c["revision"] == "bed9a259"
-        for c in coincident["before"])
+    before_cases = collections.Counter((c["revision"], c["case"]) for c in coincident["before"])
+    assert before_cases == {("bed9a259", "body pairs"): 6, ("4a49757f", "late-barrier caller pair"): 2}
+    assert all(not c["identical"] and c["changed_pixels"] > 0 for c in coincident["before"])
     after_keys = set()
+    pairs = {"body pairs": None, "one body pair": 1, "late-barrier caller pair": 1}
     for c in coincident["after"]:
-        key = (c["adapter"], c["foods"], c["mode"])
+        key = (c["case"], c["adapter"], c["foods"], c["mode"])
         assert key not in after_keys and c["identical"] and c["retained"]
-        assert c["rgba_bytes"] == 3840 * 2160 * 4 and c["eligible_pairs"] == c["foods"] // 2
+        assert c["rgba_bytes"] == 3840 * 2160 * 4
+        assert c["eligible_pairs"] == (pairs[c["case"]] or c["foods"] // 2)
         assert c["samples"] == (1 if c["mode"] == "Native" else 4)
         after_keys.add(key)
-    assert after_keys == set(itertools.product(["rtx", "amd"], [4096, 8192], ["Native", "Original"]))
-    assert coincident["regression_test"]["bed9a259"] == "failed"
-    assert coincident["regression_test"]["candidate"] == "passed"
+    assert after_keys == {
+        (case, adapter, foods, mode)
+        for case, foods in [("body pairs", 4096), ("body pairs", 8192), ("one body pair", 25000),
+                            ("late-barrier caller pair", 4096)]
+        for adapter in ["rtx", "amd"] for mode in ["Native", "Original"]}
+    assert coincident["standard_controls_passed"] == 16
+    tests = coincident["regression_tests"]
+    assert set(tests["candidate"].values()) == {"passed"}
+    assert tests["revision 4a49757f with the new tests"]["coincident_low_bodies_pair_like_the_generic_packer"] == "failed"
+    assert tests["revision 4a49757f with the new tests"]["caller_pairs_cross_the_empty_low_late_barrier"] == "failed"
     rejected = json.loads((ROOT / "rejected-grouping.json").read_text())
     assert rejected["status"] == "rejected"
     assert rejected["changed_pixels"] == 10606 and rejected["changed_channels"] == 12062
@@ -101,43 +111,24 @@ def recompute():
         medium = values(adapter, mode, zoom, "candidate", "medium")
         assert len(before) == len(low) == len(auto) == len(medium) == 5
         assert statistics.median(low) <= statistics.median(medium), (adapter, mode, zoom, "medium")
-        if zoom == "stock":
-            # Stock zoom claims no lead, only "no costlier": Low's median must
-            # not exceed Auto's slowest run. AMD Native's Low median sits below
-            # Auto's whole range, so a symmetric "inside both ranges" tie would
-            # misdescribe it.
-            assert statistics.median(low) <= max(auto), (adapter, mode, zoom, "auto")
-            stock.append(statistics.median(low) - statistics.median(auto))
-        else:
-            assert statistics.median(low) <= statistics.median(auto), (adapter, mode, zoom, "auto")
-            lead.append(statistics.median(auto) - statistics.median(low))
+        assert statistics.median(low) <= statistics.median(auto), (adapter, mode, zoom, "auto")
+        (stock if zoom == "stock" else lead).append(statistics.median(auto) - statistics.median(low))
         table.append(f"| {adapter} / {mode} / {zoom} | {cell(before)} | {cell(low)} | {cell(auto)} | {cell(medium)} |")
     before = statistics.median(values("rtx", "Native", "far", "baseline", "low"))
     after = statistics.median(values("rtx", "Native", "far", "candidate", "low"))
     result = (f"Low RTX/Vulkan Native 4K at factor 0.065: CPU preparation, resource sync and submission fall from "
               f"{before:.3f} to {after:.3f} ms ({100 * (1 - after / before):.1f}% lower) against main `7cb5ec37`, "
               "medians of five runs. "
-              f"At far and whole-map zoom Low's median is {min(lead):.3f}–{max(lead):.3f} ms below Auto in all 8 cells; "
-              f"at stock zoom no lead is claimed: Low's median is {min(stock):+.3f} to {max(stock):+.3f} ms from Auto's "
-              "and never above Auto's slowest run. Low is below Medium in all 12 cells. "
-              "All 144 full-frame RGBA SHA-256 pairs are identical, and all 8 coincident-pair controls "
+              f"Low's median is below Auto's in all 12 hardware/world/zoom cells: by {min(lead):.3f}–{max(lead):.3f} ms "
+              f"at far and whole-map zoom and by {min(stock):.3f}–{max(stock):.3f} ms at stock zoom. "
+              "Low is below Medium in all 12 cells. "
+              "All 144 full-frame RGBA SHA-256 pairs are identical, and all 16 coincident-pair controls "
               "match the canonical renderer.")
     unique_runs = {(r["round"], r["adapter"], r["arm"]): r for r in rows}
     assert len(unique_runs) == 20
     overlap = sum(r["compiler_observed"] == "True" for r in unique_runs.values())
-    clean = sorted(n for n in {k[0] for k in unique_runs}
-                   if all(r["compiler_observed"] == "False" for k, r in unique_runs.items() if k[0] == n))
-    clean_rows = [r for r in rows if r["round"] in clean and r["arm"] == "candidate"]
-
-    def clean_value(adapter, mode, zoom, preset):
-        return statistics.median(float(r["cpu_p50_ms"]) for r in clean_rows if
-                                 (r["adapter"], r["mode"], r["zoom"], r["preset"]) == (adapter, mode, zoom, preset))
-    cells = list(itertools.product(["rtx", "amd"], ["Native", "Original"], ["stock", "far", "whole"]))
-    clean_wins = sum(clean_value(*c, "low") <= clean_value(*c, "auto") for c in cells) if clean else 0
     summary = (f"20 interleaved runs; {sum(int(r['frames']) for r in rows):,} measured frames, each cell visited forward and reversed; "
-               f"{overlap} of 20 runs observed a compiler/linker from unrelated work despite a quiet gate; "
-               f"only round {', '.join(clean)} had none in all four runs, and there Low is at or below Auto in "
-               f"{clean_wins} of 12 cells. "
+               f"{overlap} of 20 runs observed a compiler or linker process. "
                f"Per-run median machine CPU load: {min(float(r['load_median_pct']) for r in rows):.1f}"
                f"–{max(float(r['load_median_pct']) for r in rows):.1f}%; "
                f"all sampled load: {min(float(r['load_min_pct']) for r in rows):.1f}"
