@@ -1007,7 +1007,9 @@ impl Renderer {
             // Compact gameplay can be as command-heavy as the canonical join.
             // https://github.com/NikitaMGrimm/slither-sim/blob/main/research/client-performance/2026-11-05-far-zoom-bundles/REPORT.md
             // Keep the same chunk order and direct path below four chunks.
-            self.canonical_bundles = frame.food_batch.is_some();
+            // Low's long single-state body runs record faster directly:
+            // https://github.com/NikitaMGrimm/slither-sim/blob/main/research/client-performance/2026-11-05-low-preset/REPORT.md.
+            self.canonical_bundles = frame.food_batch.as_ref().is_some_and(|b| b.detailed);
         }
         if self.lost.load(Ordering::SeqCst) {
             return Err(RenderError::Host(

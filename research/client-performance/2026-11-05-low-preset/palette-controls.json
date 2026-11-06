@@ -1,0 +1,333 @@
+{
+  "identity": {
+    "driver_sha256": "37160fd3beecd06b239790fc7f2a6e9de002b996a54b6a0d3ffa37ccc4077e98",
+    "exe_sha256": "e4bd1328a53b26bf42c3a9f4ad352ce5a461d2517c7b1fd49af139c0b48fd02c",
+    "runtime_inventory_sha256": "87b0d8c78bb5a1ed0644fbed988236770d1914f6fd81d516bda3bd5b421b19ab"
+  },
+  "comparisons": [
+    {
+      "adapter": "rtx",
+      "zoom": "stock",
+      "mode": "Native",
+      "state": 1,
+      "actual_sha256": "51f5e8922edc1ee37eff41a3eaec3fd1f8f577cda75bc7e735a6dab24a44c3ae",
+      "canonical_sha256": "51f5e8922edc1ee37eff41a3eaec3fd1f8f577cda75bc7e735a6dab24a44c3ae",
+      "rgba_bytes": 33177600
+    },
+    {
+      "adapter": "rtx",
+      "zoom": "stock",
+      "mode": "Native",
+      "state": 12,
+      "actual_sha256": "75473647dc15599fd28c21852cc41875cee555404c99bbdac1e1034a4486c7d9",
+      "canonical_sha256": "75473647dc15599fd28c21852cc41875cee555404c99bbdac1e1034a4486c7d9",
+      "rgba_bytes": 33177600
+    },
+    {
+      "adapter": "rtx",
+      "zoom": "stock",
+      "mode": "Native",
+      "state": 240,
+      "actual_sha256": "a587aa5835392825820044243627ca6f2420c3389d309247742fd5689c54e940",
+      "canonical_sha256": "a587aa5835392825820044243627ca6f2420c3389d309247742fd5689c54e940",
+      "rgba_bytes": 33177600
+    },
+    {
+      "adapter": "rtx",
+      "zoom": "stock",
+      "mode": "Original",
+      "state": 1,
+      "actual_sha256": "24c818aaf022ba7e864644fbc385f8f6f08f7a336745f647c8d1336081d8f8c3",
+      "canonical_sha256": "24c818aaf022ba7e864644fbc385f8f6f08f7a336745f647c8d1336081d8f8c3",
+      "rgba_bytes": 33177600
+    },
+    {
+      "adapter": "rtx",
+      "zoom": "stock",
+      "mode": "Original",
+      "state": 12,
+      "actual_sha256": "4b4687ffd7713616f0e9e4ec86505de06db66492a86a0322debe9f5976707794",
+      "canonical_sha256": "4b4687ffd7713616f0e9e4ec86505de06db66492a86a0322debe9f5976707794",
+      "rgba_bytes": 33177600
+    },
+    {
+      "adapter": "rtx",
+      "zoom": "stock",
+      "mode": "Original",
+      "state": 240,
+      "actual_sha256": "e468273a27b7e179107668b9cc6502048d3f0b4ec54ab2adc7cbfa3cb5cb3ce5",
+      "canonical_sha256": "e468273a27b7e179107668b9cc6502048d3f0b4ec54ab2adc7cbfa3cb5cb3ce5",
+      "rgba_bytes": 33177600
+    },
+    {
+      "adapter": "rtx",
+      "zoom": "far",
+      "mode": "Native",
+      "state": 1,
+      "actual_sha256": "0cab9548873e4272658c96845049f01ba4981a41a22650fed579c778a8985846",
+      "canonical_sha256": "0cab9548873e4272658c96845049f01ba4981a41a22650fed579c778a8985846",
+      "rgba_bytes": 33177600
+    },
+    {
+      "adapter": "rtx",
+      "zoom": "far",
+      "mode": "Native",
+      "state": 12,
+      "actual_sha256": "18009b2e7c4ab22244559bb1afcdc9511fbe7f1255e58082095190c6fe4e1ae3",
+      "canonical_sha256": "18009b2e7c4ab22244559bb1afcdc9511fbe7f1255e58082095190c6fe4e1ae3",
+      "rgba_bytes": 33177600
+    },
+    {
+      "adapter": "rtx",
+      "zoom": "far",
+      "mode": "Native",
+      "state": 240,
+      "actual_sha256": "607debdb3fae62e3593076a6f359b31c768c018a2e1b43d59180b992d2137a98",
+      "canonical_sha256": "607debdb3fae62e3593076a6f359b31c768c018a2e1b43d59180b992d2137a98",
+      "rgba_bytes": 33177600
+    },
+    {
+      "adapter": "rtx",
+      "zoom": "far",
+      "mode": "Original",
+      "state": 1,
+      "actual_sha256": "7547f1f77bec997ac5becfcb8eb098b95b20659058d7bf5a8b6e55391b227c20",
+      "canonical_sha256": "7547f1f77bec997ac5becfcb8eb098b95b20659058d7bf5a8b6e55391b227c20",
+      "rgba_bytes": 33177600
+    },
+    {
+      "adapter": "rtx",
+      "zoom": "far",
+      "mode": "Original",
+      "state": 12,
+      "actual_sha256": "2d7cc6c141bd2427a1553c1142ca230bae18b37c0a943d94ad1af320ec8e7f84",
+      "canonical_sha256": "2d7cc6c141bd2427a1553c1142ca230bae18b37c0a943d94ad1af320ec8e7f84",
+      "rgba_bytes": 33177600
+    },
+    {
+      "adapter": "rtx",
+      "zoom": "far",
+      "mode": "Original",
+      "state": 240,
+      "actual_sha256": "1476b3b4f09ac8783ed906978b2ab5e1db29898cbbce803a7713d56da09396e6",
+      "canonical_sha256": "1476b3b4f09ac8783ed906978b2ab5e1db29898cbbce803a7713d56da09396e6",
+      "rgba_bytes": 33177600
+    },
+    {
+      "adapter": "rtx",
+      "zoom": "whole",
+      "mode": "Native",
+      "state": 1,
+      "actual_sha256": "221bff49745ec61a885fd6b4a465d3ca6256c2f2f360df735fd5aba030fa1187",
+      "canonical_sha256": "221bff49745ec61a885fd6b4a465d3ca6256c2f2f360df735fd5aba030fa1187",
+      "rgba_bytes": 33177600
+    },
+    {
+      "adapter": "rtx",
+      "zoom": "whole",
+      "mode": "Native",
+      "state": 12,
+      "actual_sha256": "aafa94c7c85ab2fef117b9283b7eec1a416f44ec71baf176c33131c49c08c3c2",
+      "canonical_sha256": "aafa94c7c85ab2fef117b9283b7eec1a416f44ec71baf176c33131c49c08c3c2",
+      "rgba_bytes": 33177600
+    },
+    {
+      "adapter": "rtx",
+      "zoom": "whole",
+      "mode": "Native",
+      "state": 240,
+      "actual_sha256": "696165fef0e18130e4aacb819e7a0c2325d328bb8cdaaa007c054185e5e8276b",
+      "canonical_sha256": "696165fef0e18130e4aacb819e7a0c2325d328bb8cdaaa007c054185e5e8276b",
+      "rgba_bytes": 33177600
+    },
+    {
+      "adapter": "rtx",
+      "zoom": "whole",
+      "mode": "Original",
+      "state": 1,
+      "actual_sha256": "1c3bbdd0bb7cf93c8d3ebc0ba66315c9399068424a2454870c2a85219058012a",
+      "canonical_sha256": "1c3bbdd0bb7cf93c8d3ebc0ba66315c9399068424a2454870c2a85219058012a",
+      "rgba_bytes": 33177600
+    },
+    {
+      "adapter": "rtx",
+      "zoom": "whole",
+      "mode": "Original",
+      "state": 12,
+      "actual_sha256": "74280b4660c3728dd0a0e86638801a200820870d0f23d93276df80d127174360",
+      "canonical_sha256": "74280b4660c3728dd0a0e86638801a200820870d0f23d93276df80d127174360",
+      "rgba_bytes": 33177600
+    },
+    {
+      "adapter": "rtx",
+      "zoom": "whole",
+      "mode": "Original",
+      "state": 240,
+      "actual_sha256": "5a9742b47fd77726b40bd496527934711da027a97e857409cea612151edaee34",
+      "canonical_sha256": "5a9742b47fd77726b40bd496527934711da027a97e857409cea612151edaee34",
+      "rgba_bytes": 33177600
+    },
+    {
+      "adapter": "amd",
+      "zoom": "stock",
+      "mode": "Native",
+      "state": 1,
+      "actual_sha256": "53b1ad93231b3dc0bea4e0e6e032db01360b9ef09af4f7116fb0fb7abfe3b722",
+      "canonical_sha256": "53b1ad93231b3dc0bea4e0e6e032db01360b9ef09af4f7116fb0fb7abfe3b722",
+      "rgba_bytes": 33177600
+    },
+    {
+      "adapter": "amd",
+      "zoom": "stock",
+      "mode": "Native",
+      "state": 12,
+      "actual_sha256": "15ee2d579034aa281ea0278cee3686e72dba3797bbecd22f9a3163ae4d6b0827",
+      "canonical_sha256": "15ee2d579034aa281ea0278cee3686e72dba3797bbecd22f9a3163ae4d6b0827",
+      "rgba_bytes": 33177600
+    },
+    {
+      "adapter": "amd",
+      "zoom": "stock",
+      "mode": "Native",
+      "state": 240,
+      "actual_sha256": "f6a46e96d43d5e47ca664b2a2f9087b9a74d6776791bb221bedc73067dc34a36",
+      "canonical_sha256": "f6a46e96d43d5e47ca664b2a2f9087b9a74d6776791bb221bedc73067dc34a36",
+      "rgba_bytes": 33177600
+    },
+    {
+      "adapter": "amd",
+      "zoom": "stock",
+      "mode": "Original",
+      "state": 1,
+      "actual_sha256": "f040b1b9e8bed48a57d520e20b34f27d85f4b9a4c95f4c3e38998bd26c975644",
+      "canonical_sha256": "f040b1b9e8bed48a57d520e20b34f27d85f4b9a4c95f4c3e38998bd26c975644",
+      "rgba_bytes": 33177600
+    },
+    {
+      "adapter": "amd",
+      "zoom": "stock",
+      "mode": "Original",
+      "state": 12,
+      "actual_sha256": "e21f82778e3f960d0c8906ec1ffb8424cd6806bed476c47b52a01adc26efb98d",
+      "canonical_sha256": "e21f82778e3f960d0c8906ec1ffb8424cd6806bed476c47b52a01adc26efb98d",
+      "rgba_bytes": 33177600
+    },
+    {
+      "adapter": "amd",
+      "zoom": "stock",
+      "mode": "Original",
+      "state": 240,
+      "actual_sha256": "f4fb0fb2134fbdc9716ed85b9be7b1791ddf99a18bffd7512883d0b49d9c254c",
+      "canonical_sha256": "f4fb0fb2134fbdc9716ed85b9be7b1791ddf99a18bffd7512883d0b49d9c254c",
+      "rgba_bytes": 33177600
+    },
+    {
+      "adapter": "amd",
+      "zoom": "far",
+      "mode": "Native",
+      "state": 1,
+      "actual_sha256": "f7cea8229f2bc55453a8f37c96735add68f2d49a7eb6341fddcbb7a525566e94",
+      "canonical_sha256": "f7cea8229f2bc55453a8f37c96735add68f2d49a7eb6341fddcbb7a525566e94",
+      "rgba_bytes": 33177600
+    },
+    {
+      "adapter": "amd",
+      "zoom": "far",
+      "mode": "Native",
+      "state": 12,
+      "actual_sha256": "a42435be2d8e5d813870e4a80e4348a6bb2b9f3dbab896f2b7a9c563d5dbcebe",
+      "canonical_sha256": "a42435be2d8e5d813870e4a80e4348a6bb2b9f3dbab896f2b7a9c563d5dbcebe",
+      "rgba_bytes": 33177600
+    },
+    {
+      "adapter": "amd",
+      "zoom": "far",
+      "mode": "Native",
+      "state": 240,
+      "actual_sha256": "b31fd4806fe16113c7fdb2d3fc5342a55d376aa4e570ae59db469539e0010cc9",
+      "canonical_sha256": "b31fd4806fe16113c7fdb2d3fc5342a55d376aa4e570ae59db469539e0010cc9",
+      "rgba_bytes": 33177600
+    },
+    {
+      "adapter": "amd",
+      "zoom": "far",
+      "mode": "Original",
+      "state": 1,
+      "actual_sha256": "4bb506173c1f350238a5805a8b3dde9235b4b36ee4d8403eac453251f69dd3b5",
+      "canonical_sha256": "4bb506173c1f350238a5805a8b3dde9235b4b36ee4d8403eac453251f69dd3b5",
+      "rgba_bytes": 33177600
+    },
+    {
+      "adapter": "amd",
+      "zoom": "far",
+      "mode": "Original",
+      "state": 12,
+      "actual_sha256": "603be24c43e050bcf17257882f38ae5cfc20502c5fac883dd6d9894f04fbc993",
+      "canonical_sha256": "603be24c43e050bcf17257882f38ae5cfc20502c5fac883dd6d9894f04fbc993",
+      "rgba_bytes": 33177600
+    },
+    {
+      "adapter": "amd",
+      "zoom": "far",
+      "mode": "Original",
+      "state": 240,
+      "actual_sha256": "0e6f3db82b8b29d8866781d27070dd00030e6ae36774cdaf56d09455d247a7f9",
+      "canonical_sha256": "0e6f3db82b8b29d8866781d27070dd00030e6ae36774cdaf56d09455d247a7f9",
+      "rgba_bytes": 33177600
+    },
+    {
+      "adapter": "amd",
+      "zoom": "whole",
+      "mode": "Native",
+      "state": 1,
+      "actual_sha256": "b59948d3cf4dd2639a7006e899f9763c9a2d55e7b3b172319fc7e9428dc726e6",
+      "canonical_sha256": "b59948d3cf4dd2639a7006e899f9763c9a2d55e7b3b172319fc7e9428dc726e6",
+      "rgba_bytes": 33177600
+    },
+    {
+      "adapter": "amd",
+      "zoom": "whole",
+      "mode": "Native",
+      "state": 12,
+      "actual_sha256": "664599345664037f7b0356ff645a208142d3430e712fcd843cd568883baace23",
+      "canonical_sha256": "664599345664037f7b0356ff645a208142d3430e712fcd843cd568883baace23",
+      "rgba_bytes": 33177600
+    },
+    {
+      "adapter": "amd",
+      "zoom": "whole",
+      "mode": "Native",
+      "state": 240,
+      "actual_sha256": "d2071bdf6d9a3f0d7d51e16081f203bdc101772be1a6d0aa8f5ac5bd0e3704d8",
+      "canonical_sha256": "d2071bdf6d9a3f0d7d51e16081f203bdc101772be1a6d0aa8f5ac5bd0e3704d8",
+      "rgba_bytes": 33177600
+    },
+    {
+      "adapter": "amd",
+      "zoom": "whole",
+      "mode": "Original",
+      "state": 1,
+      "actual_sha256": "df75f0dcf90c4f4ddaab146e99dc23701bd43f0d7a6a8567ac57f38369ff2716",
+      "canonical_sha256": "df75f0dcf90c4f4ddaab146e99dc23701bd43f0d7a6a8567ac57f38369ff2716",
+      "rgba_bytes": 33177600
+    },
+    {
+      "adapter": "amd",
+      "zoom": "whole",
+      "mode": "Original",
+      "state": 12,
+      "actual_sha256": "38d94629f3f6e16dd2a18cc5b0bf17ff5ae1e14926105fafddaa49291ed67ffa",
+      "canonical_sha256": "38d94629f3f6e16dd2a18cc5b0bf17ff5ae1e14926105fafddaa49291ed67ffa",
+      "rgba_bytes": 33177600
+    },
+    {
+      "adapter": "amd",
+      "zoom": "whole",
+      "mode": "Original",
+      "state": 240,
+      "actual_sha256": "5278f55f2d069e18aafdf15e7615c0ca160163c296bae392cf8b47f5d0eccfc2",
+      "canonical_sha256": "5278f55f2d069e18aafdf15e7615c0ca160163c296bae392cf8b47f5d0eccfc2",
+      "rgba_bytes": 33177600
+    }
+  ]
+}

@@ -1096,14 +1096,27 @@ fn prepare_composed(
         client.food_bounds(),
         user_zoom,
     );
+    let food_quality = if applied.applied_mode == QualityMode::Medium {
+        BodyPaintQuality {
+            high_quality: false,
+            blend: 0.,
+        }
+    } else {
+        quality
+    };
+    let detailed_food = food_quality.high_quality || food_quality.blend > 0.;
+    // Retain Low's two food commands without expanding them. Other presets and
+    // transitional blends keep their existing admission and command paths.
+    // https://github.com/NikitaMGrimm/slither-sim/blob/main/research/client-performance/2026-11-05-low-preset/REPORT.md.
     let mut retained_food = if !pressure
         && applied.applied_mode != QualityMode::Medium
-        && quality.high_quality
-        && quality.blend == 1.
+        && (food_quality.high_quality && food_quality.blend == 1.
+            || applied.applied_mode == QualityMode::Low && !detailed_food)
         && draws.is_empty()
     {
         bank.food_batch_cache.prepare(
             client.foods(),
+            detailed_food,
             view,
             client.food_bounds(),
             &bank.assets,
@@ -1145,14 +1158,7 @@ fn prepare_composed(
             FoodPaintInput {
                 foods: &foods,
                 view,
-                quality: if applied.applied_mode == QualityMode::Medium {
-                    BodyPaintQuality {
-                        high_quality: false,
-                        blend: 0.,
-                    }
-                } else {
-                    quality
-                },
+                quality: food_quality,
                 bounds: client.food_bounds(),
                 assets: &bank.assets,
                 target_handle: None,

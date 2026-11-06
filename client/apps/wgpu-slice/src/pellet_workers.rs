@@ -372,6 +372,7 @@ impl Workers {
             let slot = b.sources.slots[i];
             if b.visible[slot] {
                 inputs.push(Input {
+                    detailed: b.detailed,
                     slot,
                     animation: food.paint_state(),
                 });
@@ -498,6 +499,7 @@ mod tests {
             .filter_map(|(i, f)| {
                 let slot = b.sources.slots[i];
                 b.visible[slot].then_some(Input {
+                    detailed: b.detailed,
                     slot,
                     animation: f.paint_state(),
                 })
@@ -694,6 +696,7 @@ mod tests {
                                     project(
                                         &frame,
                                         Input {
+                                            detailed: b.detailed,
                                             slot,
                                             animation: f.paint_state(),
                                         },
@@ -729,6 +732,7 @@ mod tests {
                                         project(
                                             &frame,
                                             Input {
+                                                detailed: b.detailed,
                                                 slot,
                                                 animation: f.paint_state(),
                                             },

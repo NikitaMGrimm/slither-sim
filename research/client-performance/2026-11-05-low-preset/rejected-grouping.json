@@ -1,0 +1,20 @@
+{
+  "changed_channels": 12062,
+  "changed_pixels": 10606,
+  "maximum_channel_difference": 2,
+  "status": "rejected",
+  "fixture": "authored 25000-food rectangle, ten interleaved colors",
+  "adapter": "AMD/DX12",
+  "physical": [
+    3840,
+    2160
+  ],
+  "world": "Native",
+  "zoom": 1,
+  "animation_steps": 12,
+  "actual_rgba_sha256": "a2aefe5bbb00fd80a55fce38b75599ed9fac8667d035187fd7eb0f478ef6c07d",
+  "canonical_rgba_sha256": "15ee2d579034aa281ea0278cee3686e72dba3797bbecd22f9a3163ae4d6b0827",
+  "driver_sha256": "37160fd3beecd06b239790fc7f2a6e9de002b996a54b6a0d3ffa37ccc4077e98",
+  "exe_sha256": "2efc7e07a795e528ee1091794c0452dba5e48dd359de3d71ed7ae748c4d401b0",
+  "runtime_inventory_sha256": "bc14cbb6fd2728dfc0e42f5610d3ee7d506d107a02f756c5152a9959dbdb3fba"
+}
