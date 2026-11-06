@@ -207,10 +207,10 @@ against the generic packer on the ten-color rectangle.
 
 ## Verification and access
 
-Focused pellet tests: 26 passed, with explicit GPU/benchmark tests left to
-their own runs. The explicit offscreen packing and coincident-pair tests passed
-on RTX/Vulkan. The full client check (`npm run check`) and the repository guard
-passed. An independent review of `bed9a259` found the coincident-pair
+The full client check (`npm run check`), which runs every non-ignored client
+test, and the repository guard passed. The explicit offscreen packing and
+coincident-pair tests passed on RTX/Vulkan; the other explicit GPU/benchmark
+tests were not run. An independent review of `bed9a259` found the coincident-pair
 difference above; the fix has not had a second independent review. No
 interactive play acceptance is claimed.
 
