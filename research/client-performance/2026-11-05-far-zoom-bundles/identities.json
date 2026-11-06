@@ -1,0 +1,151 @@
+{
+  "baseline": {
+    "base": "eaac7df723f5509b262870b6a089ab0763497d15",
+    "exe_sha256": "1081b749ee23eabde45b69c84cdaecc2a2a4ef32dde17680cd096efc00dd9024",
+    "files": {
+      "client/apps/wgpu-slice/src/gpu.rs": "0aced8ae136a25dff16fcdae84f54a3e57145863437a52cc2eaa62e5aa3c443a",
+      "client/apps/wgpu-slice/src/quad_encoder.rs": "e558df06314cbefac7a40ddb170090280247a4b7251e3e05ffe83a4ae1f250cc",
+      "client/apps/wgpu-slice/src/pellet_gpu.rs": "1fa1a79b0f23a7952a9755d04fcabe81d37207d28a435f639a839088b124ebbc",
+      "client/apps/wgpu-slice/examples/frame_perf/presented.rs": "6cbaeb8db5af8d96c9370795af07c27aef438e20a9a70cc0f7468b0fe02a8bd7",
+      "client/apps/wgpu-slice/examples/frame_perf/battledome.rs": "c46eb542971fcf015146dcfb601aee0b27a0179e96afdd93cb4f9bb9ac13e70c",
+      "client/apps/wgpu-slice/tests/support/battledome_world.rs": "4449995e0328602a116bd7fec1f077d0d9e2609c1408a89f27aaea053bed7b03"
+    }
+  },
+  "candidate": {
+    "base": "eaac7df723f5509b262870b6a089ab0763497d15",
+    "exe_sha256": "3c6e2cc9d0b3c7431356a88c4aa6733ae066f9273477f6b1607834e3b75b69a3",
+    "files": {
+      "client/apps/wgpu-slice/src/gpu.rs": "0ae9fe4ebfc0b25df4f7fd616145444306c7035f86faca70cc33f6cdfd25eb5d",
+      "client/apps/wgpu-slice/src/quad_encoder.rs": "1c3677010c78db1f1d2ed88485477c9b943ab40fb9c9b828982eafcaf80799bd",
+      "client/apps/wgpu-slice/src/pellet_gpu.rs": "1fa1a79b0f23a7952a9755d04fcabe81d37207d28a435f639a839088b124ebbc",
+      "client/apps/wgpu-slice/examples/frame_perf/presented.rs": "6cbaeb8db5af8d96c9370795af07c27aef438e20a9a70cc0f7468b0fe02a8bd7",
+      "client/apps/wgpu-slice/examples/frame_perf/battledome.rs": "c46eb542971fcf015146dcfb601aee0b27a0179e96afdd93cb4f9bb9ac13e70c",
+      "client/apps/wgpu-slice/tests/support/battledome_world.rs": "4449995e0328602a116bd7fec1f077d0d9e2609c1408a89f27aaea053bed7b03"
+    }
+  },
+  "raw_frame_csv_sha256": {
+    "timing-1-baseline-vulkan/10de-2c05/frames.csv": "42b58fdc0f096e6d9806e78536eb25834985bb605936f8999a57b2517d8d2e5c",
+    "timing-1-baseline-dx12/1002-13c0/frames.csv": "788e410e7d5cddadfc17ff186133e7743c3c5895fe309153e1538deee7e907c4",
+    "timing-1-candidate-vulkan/10de-2c05/frames.csv": "13847ff0b5d972ea9a47db889a08b8185c33c1b1b4e202eab5c7a4edf593906b",
+    "timing-1-candidate-dx12/1002-13c0/frames.csv": "cb1c7ce8daf6f85263ffb331f82b7c6d2670563f9cb239e14874fbab5273517e",
+    "timing-2-baseline-vulkan/10de-2c05/frames.csv": "fe3d76ff4d6dfb22926b1dc4420d58b87cb738817733e0c98676702be2cd86ac",
+    "timing-2-baseline-dx12/1002-13c0/frames.csv": "88faa723e6b729714bbf1e1525aa0cae3d49d0c41344a3954123d12d0315b7cd",
+    "timing-2-candidate-vulkan/10de-2c05/frames.csv": "118128eef5f1ce612dab67a7dee54aa0e59c46c39e2f2995f13996a071642913",
+    "timing-2-candidate-dx12/1002-13c0/frames.csv": "ace11fec4893e446972db87b6c4d307bbfc853a3d51f0d92741d722d5d9235b7",
+    "timing-3-baseline-vulkan/10de-2c05/frames.csv": "3803145250f8584e06fe3b4074f9ea4906e8345d46e578048a8fb84697536a60",
+    "timing-3-baseline-dx12/1002-13c0/frames.csv": "9816641f8c7bd594311548683b5a385d1520a29ac9c6a1b602e53c742ae95f78",
+    "timing-3-candidate-vulkan/10de-2c05/frames.csv": "5a486ac743940c0dab3721aab33767ec1f8121b5326ea989442c2b550ae00c9c",
+    "timing-3-candidate-dx12/1002-13c0/frames.csv": "db05c8b7b2d5b58be57a97edcceca566831b130a72044177c42b1bc1ae62b121",
+    "timing-4-baseline-vulkan/10de-2c05/frames.csv": "9b161ba4a364e7cddb002dc2e0ba7ab76f974a3861f5c23bc86e75155bdb3797",
+    "timing-4-baseline-dx12/1002-13c0/frames.csv": "f286edd12fd74699839184ea975214b67abcf8f1babfd4bee8fbf5cd1585a5ad",
+    "timing-4-candidate-vulkan/10de-2c05/frames.csv": "29a1c36d29a0d95146dcd2d548db910bd8feb47ecefd2bf6abca894ca41d436a",
+    "timing-4-candidate-dx12/1002-13c0/frames.csv": "bf0b1ff5e69d6cc51cfb382c93e0fdc3c6ce165a6d593424dac6ecf1db98fc4f",
+    "timing-5-baseline-vulkan/10de-2c05/frames.csv": "18877c5d8f55603a8fc5a48fde8f0299daa15d6aa6d474cb771a9fa8db33af69",
+    "timing-5-baseline-dx12/1002-13c0/frames.csv": "13797d9954c745855e78ae466a1e44fa78db62fd70464be183d5621ff3a283d4",
+    "timing-5-candidate-vulkan/10de-2c05/frames.csv": "108ed443dea40185a7e75d10141c3ed00355757e6340566e5bc9223296b1207e",
+    "timing-5-candidate-dx12/1002-13c0/frames.csv": "85d3f1acb06c9913972ff083559c578726c7d5aaefb9856b26a9d0d5ed71787b",
+    "profile-1-baseline-vulkan/10de-2c05/egui.csv": "ca9f8cd55ab5b3c9a906ca7968db578734456dcbf82c33b647b6328abf30c741",
+    "profile-1-baseline-vulkan/10de-2c05/failures.csv": "0aab0795a6777a061049c1930af58a2d6dbd43b93b690114eaa66149056a552b",
+    "profile-1-baseline-vulkan/10de-2c05/frames.csv": "ed0ea592bb131b62101221f5133d97ed8e5f689da1bbb94238662eaba544e984",
+    "profile-1-baseline-vulkan/10de-2c05/phases.csv": "03449d3457478c1aa3b2266cefaf310664f66b47cf4d02e4ef259692fdd03f0e",
+    "profile-1-baseline-dx12/1002-13c0/egui.csv": "3a353667d9a222356227576d3c5d4240e6ea601af50b3f7b1230df9327833774",
+    "profile-1-baseline-dx12/1002-13c0/failures.csv": "0aab0795a6777a061049c1930af58a2d6dbd43b93b690114eaa66149056a552b",
+    "profile-1-baseline-dx12/1002-13c0/frames.csv": "0a58a055f58f37178503e8bc248cc2841e92269d2e8bea752738c4d8427e373c",
+    "profile-1-baseline-dx12/1002-13c0/phases.csv": "de731e4c7b4add5d54448c59012bcb10f83f210d242fe83cececede537229eb6",
+    "profile-1-candidate-vulkan/10de-2c05/egui.csv": "509130ce135d7b22591876eeec3eef7d138ff304db41163774d2da94244f543b",
+    "profile-1-candidate-vulkan/10de-2c05/failures.csv": "0aab0795a6777a061049c1930af58a2d6dbd43b93b690114eaa66149056a552b",
+    "profile-1-candidate-vulkan/10de-2c05/frames.csv": "3f9f1b94ee15f4bda19354e29797a25c38bdd5cf2d90d9b8d3e80152ad08c3a2",
+    "profile-1-candidate-vulkan/10de-2c05/phases.csv": "78906fe7d08c3d77e582bdba40b071766aa07ea9c7f833f7ce59f486a83c051f",
+    "profile-1-candidate-dx12/1002-13c0/egui.csv": "84372608e7dacc9061d2fd3f9ee65c860a4fd5effc23529717d6311d79fc25db",
+    "profile-1-candidate-dx12/1002-13c0/failures.csv": "0aab0795a6777a061049c1930af58a2d6dbd43b93b690114eaa66149056a552b",
+    "profile-1-candidate-dx12/1002-13c0/frames.csv": "b35e63404d0aaadb29f9bda31490737ed2fbe3e23782bf4adc42496462d0e41a",
+    "profile-1-candidate-dx12/1002-13c0/phases.csv": "0699178be650a097fecbf6b4acb02db77cd827b03c586867550e08ff523c6fa7",
+    "profile-1-bundles-vulkan/10de-2c05/egui.csv": "cdc707ce237753a70e4415ec7e20d691e9e7d6658baf79ffaf187dbebbcd9d84",
+    "profile-1-bundles-vulkan/10de-2c05/failures.csv": "0aab0795a6777a061049c1930af58a2d6dbd43b93b690114eaa66149056a552b",
+    "profile-1-bundles-vulkan/10de-2c05/frames.csv": "6d2c1b26c3f2bbda5fca2d7dc93a8c99a4bf7e5c26a126588e2021537d40c8dc",
+    "profile-1-bundles-vulkan/10de-2c05/phases.csv": "a5d66178e417aa48f14193632ee91390fc34dc4ddb1c588026c74e4a3bc77c20",
+    "profile-1-bundles-dx12/1002-13c0/egui.csv": "90abc7b374ddf2a21f46f2e9496fdf5bff4dcae221aab02430f1290ac7b0e492",
+    "profile-1-bundles-dx12/1002-13c0/failures.csv": "0aab0795a6777a061049c1930af58a2d6dbd43b93b690114eaa66149056a552b",
+    "profile-1-bundles-dx12/1002-13c0/frames.csv": "fd353991110d941a915973130e1ec857f9554457e6353faa4967859b6adbebaa",
+    "profile-1-bundles-dx12/1002-13c0/phases.csv": "e584a762df329aed37e3f0c0936e2895e2295c46d0828fa6dd78c6655ddd826d"
+  },
+  "method": "Five interleaved runs per arm; 30 frames per cell; no load exclusions.",
+  "run_median_cpu_percent": [
+    83.077,
+    100.0,
+    100.0,
+    100.0,
+    100.0,
+    99.806,
+    91.535,
+    86.058,
+    54.492,
+    77.286
+  ],
+  "supplemental_cell_binaries": {
+    "baseline-cell": {
+      "exe_sha256": "885084ec470db9b9bf250cb50190f4c0b10f5814e920644ac3943e5d91f6ae30",
+      "files": {
+        "client/apps/wgpu-slice/src/gpu.rs": "68839f62d12123ddf821c7d55e2edb91eee6cc15b5890f5a58ff09783df5d622",
+        "client/apps/wgpu-slice/src/quad_encoder.rs": "5d8d6da1737fe087767ac8d3c5afbb56556005b2d87371b5e2f5bb01e20347aa",
+        "client/apps/wgpu-slice/src/pellet_gpu.rs": "1fa1a79b0f23a7952a9755d04fcabe81d37207d28a435f639a839088b124ebbc",
+        "client/apps/wgpu-slice/examples/frame_perf/presented.rs": "8e26a93f8047535938196c9ed9f43002bb2dc5db6643662e034565d57b5488ad",
+        "client/apps/wgpu-slice/examples/frame_perf/battledome.rs": "c46eb542971fcf015146dcfb601aee0b27a0179e96afdd93cb4f9bb9ac13e70c",
+        "client/apps/wgpu-slice/tests/support/battledome_world.rs": "909063465f3b2e7a5b1fd25218a73e4e9167090d53c7ddad87db1f945d8717f1"
+      }
+    },
+    "candidate-cell": {
+      "exe_sha256": "230ebaf1cabdfbae2fd43e95b547bd4e57a754348302e5c865270f4e722c842c",
+      "files": {
+        "client/apps/wgpu-slice/src/gpu.rs": "79c6599c133086f6e12bead8cb8b57056c9f6a6d1c1d989339381a08fed35dce",
+        "client/apps/wgpu-slice/src/quad_encoder.rs": "5d8d6da1737fe087767ac8d3c5afbb56556005b2d87371b5e2f5bb01e20347aa",
+        "client/apps/wgpu-slice/src/pellet_gpu.rs": "1fa1a79b0f23a7952a9755d04fcabe81d37207d28a435f639a839088b124ebbc",
+        "client/apps/wgpu-slice/examples/frame_perf/presented.rs": "8e26a93f8047535938196c9ed9f43002bb2dc5db6643662e034565d57b5488ad",
+        "client/apps/wgpu-slice/examples/frame_perf/battledome.rs": "c46eb542971fcf015146dcfb601aee0b27a0179e96afdd93cb4f9bb9ac13e70c",
+        "client/apps/wgpu-slice/tests/support/battledome_world.rs": "909063465f3b2e7a5b1fd25218a73e4e9167090d53c7ddad87db1f945d8717f1"
+      }
+    }
+  },
+  "final_runtime": {
+    "client/apps/wgpu-slice/src/gpu.rs": "79c6599c133086f6e12bead8cb8b57056c9f6a6d1c1d989339381a08fed35dce"
+  },
+  "supplemental_plan": {
+    "purpose": "Confirm bundle cost with shorter matched cells after inconclusive matrix tails",
+    "rounds": 5,
+    "cells": "Native 100/500 bots at mid/out, both backends",
+    "order": "reverse A/B order on even rounds",
+    "samples": 30,
+    "warmup": 10,
+    "selection": "all successful runs, no load exclusions",
+    "limitation": "Supplemental experiment chosen after inspecting original matrix; not pooled with it"
+  },
+  "focused_gpu_test_log_sha256": "c709ec5425fd54e9b4cb618cc9c05d328d62f1f9e0afc28f41e0254fe73418b7",
+  "measured_final_comment_diff_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "check_log_sha256": "dfdf34c91b56f916c6c95d859a78db8b15d5f8cde754efa5c21d3a34339dd8e9",
+  "cell_load_median_range_percent": [
+    20.1171875,
+    83.12843570745699
+  ],
+  "final_source_sha256": {
+    "client/apps/wgpu-slice/src/gpu.rs": "79c6599c133086f6e12bead8cb8b57056c9f6a6d1c1d989339381a08fed35dce",
+    "client/apps/wgpu-slice/src/quad_encoder.rs": "1e977623ec25716bc3a12fbc4abc27fdc3b2d2537f705913cc0ded758b436aa4",
+    "client/apps/wgpu-slice/src/pellet_gpu.rs": "1fa1a79b0f23a7952a9755d04fcabe81d37207d28a435f639a839088b124ebbc",
+    "client/apps/wgpu-slice/examples/frame_perf/presented.rs": "8e26a93f8047535938196c9ed9f43002bb2dc5db6643662e034565d57b5488ad",
+    "client/apps/wgpu-slice/examples/frame_perf/battledome.rs": "c46eb542971fcf015146dcfb601aee0b27a0179e96afdd93cb4f9bb9ac13e70c",
+    "client/apps/wgpu-slice/tests/support/battledome_world.rs": "b12d517b9ad4f0e4f7f2afc02882d53fcd3f6bd1e8c0bd82b0dd1aba78cdc245"
+  },
+  "original_source_archive_recovery": {
+    "baseline": {
+      "original_archive_sha256": "17754e1cceb374fd27f9a3babadb2419701b53e38bf069885d75f458443f88bf",
+      "recovered_archive": "baseline-sources-original-bytes.json",
+      "recovered_archive_sha256": "11438de97483a0fa26073fc0b06106f4d921269e5d5c75b82fa19de315722bda",
+      "recovery": "Each original JSON source string encoded as cp1252 reconstructs the recorded file bytes; every file hash verified, then decoded as UTF-8."
+    },
+    "candidate": {
+      "original_archive_sha256": "2b13bbe3d48d2da485dac48c531a53438fb93deabce17764f44cfe1ae55672ce",
+      "recovered_archive": "candidate-sources-original-bytes.json",
+      "recovered_archive_sha256": "9d07d6aa0dbf2b45d6a4f956510c77e28897932def82acd67ac5d26bd75e78d5",
+      "recovery": "Each original JSON source string encoded as cp1252 reconstructs the recorded file bytes; every file hash verified, then decoded as UTF-8."
+    }
+  }
+}

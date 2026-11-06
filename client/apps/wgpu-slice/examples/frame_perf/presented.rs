@@ -48,6 +48,18 @@ fn pass_times(r: &gpu::Renderer) -> Result<Vec<(&'static str, f64)>> {
 }
 
 pub fn run_created(output: &Path) -> Result<()> {
+    let far = std::env::var_os("FRAME_PERF_FAR_ZOOM").is_some();
+    let isolated_case = std::env::var("FRAME_PERF_FAR_CASE")
+        .ok()
+        .map(|s| s.split(':').map(str::to_owned).collect::<Vec<_>>());
+    if isolated_case.as_ref().is_some_and(|c| {
+        !far || c.len() != 3
+            || !["100", "500"].contains(&c[0].as_str())
+            || !["Original", "Native"].contains(&c[1].as_str())
+            || !["default", "mid", "out"].contains(&c[2].as_str())
+    }) {
+        return Err("invalid FRAME_PERF_FAR_CASE (bots:mode:level)".into());
+    }
     let dpr = std::env::var("FRAME_PERF_DPR")
         .unwrap_or_else(|_| "1".into())
         .parse::<f64>()
@@ -100,8 +112,17 @@ pub fn run_created(output: &Path) -> Result<()> {
     };
     let instance = gpu::instance();
     let mut seen = std::collections::BTreeSet::new();
-    for adapter in pollster::block_on(instance.enumerate_adapters(wgpu::Backends::DX12)) {
+    for adapter in pollster::block_on(instance.enumerate_adapters(
+        if std::env::var_os("FRAME_PERF_VULKAN").is_some() {
+            wgpu::Backends::VULKAN
+        } else {
+            wgpu::Backends::DX12
+        },
+    )) {
         let info = adapter.get_info();
+        if far && ((info.vendor == 0x10de) != std::env::var_os("FRAME_PERF_VULKAN").is_some()) {
+            continue;
+        }
         if info.device_type == wgpu::DeviceType::Cpu || !seen.insert((info.vendor, info.device)) {
             continue;
         }
@@ -122,7 +143,7 @@ pub fn run_created(output: &Path) -> Result<()> {
         let mut phases = String::from(
             "bots,width,height,dpr,mode,requested_samples,samples,level,frame,stage,ns\n",
         );
-        for requested_samples in [4, 1] {
+        for &requested_samples in if far { &[4][..] } else { &[4, 1][..] } {
             let make_renderer = || {
                 pollster::block_on(gpu::Renderer::from_adapter_for_diagnostics(
                     adapter.clone(),
@@ -134,21 +155,45 @@ pub fn run_created(output: &Path) -> Result<()> {
             let mut r = make_renderer()?;
             let mut presenter = WorldPresenter::new(&r);
             for requested in [Original, Native] {
+                if isolated_case
+                    .as_ref()
+                    .is_some_and(|c| c[1] != format!("{requested:?}"))
+                {
+                    continue;
+                }
                 if isolated_mode
                     .as_ref()
                     .is_some_and(|m| m != &format!("{requested:?}"))
                 {
                     continue;
                 }
-                for bots in [120, 500] {
+                for &bots in if far {
+                    &[100, 500][..]
+                } else {
+                    &[120, 500][..]
+                } {
+                    if isolated_case
+                        .as_ref()
+                        .is_some_and(|c| c[0] != bots.to_string())
+                    {
+                        continue;
+                    }
                     if controls_only && bots != 500 {
                         continue;
                     }
-                    for physical in [[1920, 1080], [3840, 2160]] {
+                    for &physical in if far {
+                        &[[3840, 2160]][..]
+                    } else {
+                        &[[1920, 1080], [3840, 2160]][..]
+                    } {
                         if isolated_width.is_some_and(|w| w != physical[0]) {
                             continue;
                         }
-                        let mut game = synthetic::world(bots)?;
+                        let mut game = if far {
+                            synthetic::far_world(bots)?
+                        } else {
+                            synthetic::world(bots)?
+                        };
                         let window = WorldWindow {
                             physical,
                             dpr,
@@ -173,7 +218,14 @@ pub fn run_created(output: &Path) -> Result<()> {
                             view_formats: &[],
                         });
                         let view = texture.create_view(&Default::default());
-                        for (level, notches) in [("default", 0.), ("mid", -12.), ("out", -1000.)] {
+                        for (level, notches) in [
+                            ("default", 0.),
+                            ("mid", if far { -24.118942187336824 } else { -12. }),
+                            ("out", -1000.),
+                        ] {
+                            if isolated_case.as_ref().is_some_and(|c| c[2] != level) {
+                                continue;
+                            }
                             if controls_only && level != "default" {
                                 continue;
                             }
@@ -184,6 +236,9 @@ pub fn run_created(output: &Path) -> Result<()> {
                             let mut world = game.client().clone();
                             let mut bank = slither_wgpu_slice::bank::Bank::new()?;
                             bank.overlay_viewport = game.bank.overlay_viewport;
+                            if far {
+                                bank.cosmetics = Some(synthetic::authored_cosmetics()?);
+                            }
                             world.wheel_zoom(notches);
                             for frame in 0..110 {
                                 let p = render::prepare_gameplay(
@@ -255,9 +310,12 @@ pub fn run_created(output: &Path) -> Result<()> {
                                 if profile {
                                     observe("build_end", 20000 + frame);
                                 }
-                                drop(observing);
+                                // Keep the observer through submission for nested CPU phases.
                                 let (_, sync_ns, sync_bytes) =
                                     measure(|| r.sync_resources(&p.resources).map_err(Into::into))?;
+                                if profile {
+                                    observe("sync_end", 20000 + frame);
+                                }
                                 let (report, submit_ns, submit_bytes) = measure(|| {
                                     presenter
                                         .render(
@@ -270,6 +328,10 @@ pub fn run_created(output: &Path) -> Result<()> {
                                         )
                                         .map_err(Into::into)
                                 })?;
+                                if profile {
+                                    observe("submit_end", 20000 + frame);
+                                }
+                                drop(observing);
                                 let times = pass_times(&r)?;
                                 if let Some(error) = pollster::block_on(scope.pop()) {
                                     return Err(format!("GPU validation: {error}"));
@@ -306,9 +368,18 @@ pub fn run_created(output: &Path) -> Result<()> {
                                         }});
                                     }
                                 }
-                                if frame + 1 == rendered_frames && requested_samples == 4 {
-                                    let name =
-                                        format!("{bots}-{}-{level}-{requested:?}", physical[0]);
+                                if (frame + 1 == rendered_frames
+                                    || far && [10, 25].contains(&frame))
+                                    && requested_samples == 4
+                                {
+                                    let name = if far {
+                                        format!(
+                                            "{bots}-{}-{level}-{requested:?}-f{frame}",
+                                            physical[0]
+                                        )
+                                    } else {
+                                        format!("{bots}-{}-{level}-{requested:?}", physical[0])
+                                    };
                                     if capture_pixels && (!whole_map_png_only || level == "out") {
                                         capture_png(
                                             &r,
@@ -339,6 +410,45 @@ pub fn run_created(output: &Path) -> Result<()> {
                     }
                 }
             }
+        }
+        if far && profile {
+            let r = pollster::block_on(gpu::Renderer::from_adapter(
+                adapter.clone(),
+                wgpu::TextureFormat::Rgba8Unorm,
+            ))?;
+            // A menu-only control: never compose the gameplay HUD beneath egui.
+            let mut login = NativeLogin::new("Authored Player")?;
+            let texture = r.device.create_texture(&wgpu::TextureDescriptor {
+                label: Some("menu-only egui profile"),
+                size: wgpu::Extent3d {
+                    width: 3840,
+                    height: 2160,
+                    depth_or_array_layers: 1,
+                },
+                mip_level_count: 1,
+                sample_count: 1,
+                dimension: wgpu::TextureDimension::D2,
+                format: wgpu::TextureFormat::Rgba8Unorm,
+                usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
+                view_formats: &[],
+            });
+            let target = texture.create_view(&Default::default());
+            let mut egui = String::from("frame,prepare_ns,paint_wait_ns\n");
+            for frame in 0..40 {
+                login.egui.set_active(true);
+                let start = Instant::now();
+                login.egui.frame([3840, 2160], 1., &[], |ctx, reveal| {
+                    login.ingame_ui.show(ctx, true, 1., reveal);
+                });
+                let prepare = start.elapsed().as_nanos();
+                let start = Instant::now();
+                login.egui.paint(&r, &target);
+                wait(&r)?;
+                if frame >= 10 {
+                    writeln!(egui, "{frame},{prepare},{}", start.elapsed().as_nanos()).unwrap();
+                }
+            }
+            std::fs::write(dir.join("egui.csv"), egui).map_err(|e| e.to_string())?;
         }
         std::fs::write(dir.join("frames.csv"), csv).map_err(|e| e.to_string())?;
         std::fs::write(dir.join("failures.csv"), "bots,width,level,error\n")

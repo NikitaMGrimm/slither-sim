@@ -491,12 +491,18 @@ impl Pellets {
         samples: u32,
     ) -> RenderResult<()> {
         let b = frame.food_batch.as_ref().expect("batch");
+        #[cfg(feature = "frame-profile")]
+        crate::render::observe_preparation("pellet_prepare_begin", frame.identity);
         let bins = self.prepare(r, frame, b, attachment, samples)?;
+        #[cfg(feature = "frame-profile")]
+        crate::render::observe_preparation("pellet_prepare_end", frame.identity);
         let ordinary = Frame {
             food_batch: None,
             ..frame.clone()
         };
         let barriers = r.pack_pellet_surroundings(&ordinary, [b.early_at, b.late_at])?;
+        #[cfg(feature = "frame-profile")]
+        crate::render::observe_preparation("surroundings_end", frame.identity);
         if samples > 1
             && r.multisample
                 .as_ref()

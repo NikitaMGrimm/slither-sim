@@ -23,8 +23,11 @@ thread_local! {
     static PHASES: std::cell::RefCell<(Instant, Vec<Phase>)> = std::cell::RefCell::new((Instant::now(), Vec::with_capacity(32)));
 }
 fn observe(stage: &'static str, id: u64) {
+    if stage.starts_with("pellet_worker_") || stage == "pellet_late_chunks" {
+        return;
+    }
     PHASES.with_borrow_mut(|(start, rows)| {
-        assert!(rows.len() < 32, "phase recorder overflow");
+        assert!(rows.len() < 64, "phase recorder overflow");
         rows.push(Phase {
             stage,
             id,
