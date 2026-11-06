@@ -46,7 +46,7 @@ both delays.
 | `seed` | `1` | Unsigned 32-bit simulation seed. |
 | `worldThreads` | `1` | Threads that step the world, at least 1. Above 1 the world gets its own pool of that many threads, separate from `bots.threads`, and ticks with at least 4,096 living snakes split across it with identical results. See [large bot worlds](hosting.md#world-threads). |
 | `viewThreads` | `1` | Threads that build per-player updates after each world step, at least 1. Above 1 views get their own pool of that many threads, separate from `worldThreads` and `bots.threads`; frames are identical. See [view threads](hosting.md#view-threads). |
-| `maxTick` | `null` (fixed ticks) | Optional maximum physics tick in seconds, finite and at least `simulation.world.dt`. Both endpoints must satisfy the world's dt limits (including the sliding-boundary limit). See [tick stretching](raw-server.md#vps-use). |
+| `maxTick` | `null` (fixed ticks) | Optional maximum physics tick in seconds, finite and at least `simulation.world.dt`. Both endpoints must satisfy the world's dt limits (including the sliding-boundary limit). Not accepted with active `follow` bots; their planner requires fixed ticks. See [tick stretching](raw-server.md#vps-use). |
 | `players.max` | `4` | Reserved socket slots; at least 1. |
 | `players.latency` | Zero added delay | Server-side link delay added to socket connections; both processing fields must be zero. |
 | `ownerKey` | `null` | Optional host key: 1–23 printable Latin-1 characters without whitespace. Keys under 6 characters warn. Debug output redacts it; see [owner key](#owner-key). |
@@ -86,6 +86,8 @@ threads, frames, latency model or broadcasts to bot slots. They respawn through
 the ordinary spawn search and re-aim on staggered six-tick decisions; follow
 bots close to the owner's predicted path plan every tick. See
 [what is and isn't guaranteed](hosting.md#what-is-and-isnt-guaranteed).
+Active `follow` bots require fixed ticks: omit `maxTick`. `center` and `forager`
+support tick stretching; with `bots.count: 0`, no follow planner is constructed.
 
 ## SimulationConfig
 

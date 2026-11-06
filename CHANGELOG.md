@@ -18,9 +18,11 @@
 - Hosts can set `bots.behavior` to `center` or `follow` for cheap bots that
   the world thread drives directly, with no bot workers or packets. Center bots
   head for the arena center. Follow bots chase the owner and crash into the
-  owner's body. While the owner holds a steady heading or turn rate, they keep
-  their bodies off the owner's path, so they don't kill the owner by accident;
-  collisions and death food work as usual. The
+  owner's body. They plan around a steady heading or turn rate, including very
+  gentle quantized turns; eventual owner safety remains unproven because
+  future growth and missed predicted strikes can invalidate body lifetimes.
+  Active follow bots require fixed ticks (`maxTick` omitted).
+  Collisions and death food work as usual. The
   owner is the newest player whose nickname ends in `!` and the new `ownerKey`,
   which the host removes from the name at login. The default `forager` bots are
   unchanged.
