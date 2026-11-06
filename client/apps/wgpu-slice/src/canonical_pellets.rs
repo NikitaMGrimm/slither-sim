@@ -67,6 +67,30 @@ impl Packed {
         }
     }
 
+    /// The quad slot a PairLighter consumed; never drawn.
+    #[cfg(not(target_arch = "wasm32"))]
+    fn store_noop(t: &Texture, chunk: &mut VertexChunk, count: usize) -> Info {
+        store(
+            Self {
+                bytes: [0; QUAD_VERTEX_BYTES],
+                state: DrawState {
+                    pipeline: Pipeline::Lighter,
+                    key: t.array.key,
+                    repeat: false,
+                    glow_scale: 0,
+                    noop: true,
+                },
+                outline: false,
+                glow: false,
+                area: 0.,
+                unsafe_prefix: false,
+                black_prefix: false,
+            },
+            chunk,
+            count,
+        )
+    }
+
     fn new(q: &Quad, second: Option<f32>, t: &Texture, soft: bool, attachment: [u32; 2]) -> Self {
         let mut state = DrawState::new(q, t.black);
         if let Some(alpha) = second {
@@ -179,10 +203,18 @@ pub(super) fn prepare(
     }
     let mut surrounding = Vec::new();
     let mut ends = [0; 3];
-    for (i, range) in [0..b.early_at, b.early_at..b.late_at, b.late_at..quads.len()]
-        .into_iter()
-        .enumerate()
-    {
+    // Low inserts nothing at its late barrier, so the draws on both sides stay
+    // adjacent and keep the generic pair lookahead across it.
+    let ranges = if b.detailed {
+        [0..b.early_at, b.early_at..b.late_at, b.late_at..quads.len()]
+    } else {
+        [
+            0..b.early_at,
+            b.early_at..quads.len(),
+            quads.len()..quads.len(),
+        ]
+    };
+    for (i, range) in ranges.into_iter().enumerate() {
         for p in pack(
             quads[range].iter().cloned().map(Ok),
             textures,
@@ -244,7 +276,7 @@ pub(super) fn prepare(
     let late_count = if b.detailed { 2 } else { 0 } * n;
     let late_end = late_start + late_count;
     let total = surrounding.len() + early_count + late_count;
-    let packed_at = |index: usize| -> Result<Packed> {
+    let packed_at = |index: usize, paired: Option<f32>| -> Result<Packed> {
         let (food, part) = if (ends[0]..early_end).contains(&index) {
             let i = index - ends[0];
             (i % n, if skip_outlines { 1 } else { i / n })
@@ -271,45 +303,72 @@ pub(super) fn prepare(
             sources: b.sources.groups[group].sources,
         };
         let (q, second) = b.project_pair(frame, f, part)?;
-        Ok(Packed::new(&q, second, texture, soft, attachment))
+        Ok(Packed::new(
+            &q,
+            paired.or(second),
+            texture,
+            soft,
+            attachment,
+        ))
     };
-    // The generic packer merges adjacent coincident Lighter quads into one
-    // quantized PairLighter draw. Distinct Low foods can coincide, so any such
-    // adjacency, including across chunks, falls back to that packer.
+    // The generic packer greedily merges each adjacent coincident Lighter pair
+    // into one quantized PairLighter draw. Distinct Low foods can coincide, so
+    // a body equal to an unpaired predecessor turns that stored quad into the
+    // same PairLighter and keeps its own slot as a noop draw: chunk boundaries
+    // and claimants stay independent of where pairs fall.
     let bodies = if skip_outlines { ends[0] } else { ends[0] + n }..early_end;
-    let coincident = std::sync::atomic::AtomicBool::new(false);
-    let body_shape = |index: usize, bytes: Option<&[u8; 96]>| -> Result<(ResourceKey, [f32; 6])> {
+    let unmatched = std::sync::atomic::AtomicBool::new(false);
+    let body_texture = |group: usize| {
+        source_textures[group]
+            .as_ref()
+            .expect("visible source group")[1]
+    };
+    let project_body = |index: usize| -> Result<([u8; 96], usize)> {
         let food = visible[index - bodies.start];
         let slot = b.sources.slots[food];
-        let projected;
-        let bytes = match bytes {
-            Some(bytes) => bytes,
-            None => {
-                projected = super::pellet_cpu::project(
-                    frame,
-                    super::pellet_cpu::Input {
-                        slot,
-                        animation: b.world.foods()[food].paint_state(),
-                        detailed: false,
-                    },
-                    &b.sources,
-                    b.view,
-                    b.user_zoom,
-                    b.physical_pixels_per_unit,
-                    attachment,
-                )?;
-                &projected.bytes
-            }
-        };
+        let bytes = super::pellet_cpu::project(
+            frame,
+            super::pellet_cpu::Input {
+                slot,
+                animation: b.world.foods()[food].paint_state(),
+                detailed: false,
+            },
+            &b.sources,
+            b.view,
+            b.user_zoom,
+            b.physical_pixels_per_unit,
+            attachment,
+        )?
+        .bytes;
+        Ok((bytes, b.sources.slot_groups[slot]))
+    };
+    // Source key, both corners and the UV extent decide `additive_pair` for
+    // these axis-aligned, non-repeating Lighter body rectangles.
+    let shape = |bytes: &[u8; 96], group: usize| -> (ResourceKey, [f32; 6]) {
         let get = |i: usize| f32::from_le_bytes(bytes[i..i + 4].try_into().unwrap());
-        Ok((
-            b.sources.groups[b.sources.slot_groups[slot]]
-                .sources
-                .body
-                .asset()
-                .into(),
+        (
+            b.sources.groups[group].sources.body.asset().into(),
             [get(0), get(4), get(8), get(12), get(72), get(76)],
-        ))
+        )
+    };
+    let alpha = |bytes: &[u8; 96]| f32::from_le_bytes(bytes[48..52].try_into().unwrap());
+    // Outline/glow-tagged body sources feed layer spans that a noop slot would
+    // split; their pairs stay on the generic packer.
+    let layered = |group: usize| {
+        let t = body_texture(group);
+        soft && (t.food_outline || t.food_glow)
+    };
+    // Packed::new with a second alpha differs from the single quad only in
+    // these fields.
+    let pair_last = |chunk: &mut VertexChunk, first: f32, second: f32| {
+        let start = chunk.bytes.len() - QUAD_VERTEX_BYTES;
+        for i in 0..4 {
+            chunk.bytes[start + i * 28 + 20..start + i * 28 + 24]
+                .copy_from_slice(&second.to_le_bytes());
+        }
+        let state = chunk.states.last_mut().expect("stored body");
+        state.pipeline = Pipeline::PairLighter;
+        state.noop = zero_pair(first, second);
     };
     let compute = |chunks: &mut [VertexChunk], first: usize| -> Result<Vec<Info>> {
         let count = total
@@ -323,55 +382,73 @@ pub(super) fn prepare(
             let end = (start + VERTEX_CHUNK_QUADS).min(total);
             chunk.bytes.clear();
             chunk.states.clear();
-            let mut previous = if b.detailed || !bodies.contains(&start.wrapping_sub(1)) {
-                None
-            } else {
-                Some(body_shape(start - 1, None)?)
-            };
+            // A chunk's first body is the consumed half of a pair begun in the
+            // previous chunk when an odd number of equal bodies precede it.
+            let mut consumed = false;
+            if !b.detailed && bodies.contains(&start) && start > bodies.start {
+                let (bytes, group) = project_body(start)?;
+                let first = shape(&bytes, group);
+                let mut run = start;
+                while run > bodies.start && {
+                    let (bytes, group) = project_body(run - 1)?;
+                    shape(&bytes, group) == first
+                } {
+                    run -= 1;
+                }
+                consumed = (start - run) % 2 == 1;
+            }
+            // The last stored body while it is unpaired: shape, alpha, group.
+            let mut leader = None;
             for index in start..end {
-                if coincident.load(std::sync::atomic::Ordering::Relaxed) {
+                if unmatched.load(std::sync::atomic::Ordering::Relaxed) {
                     return Ok(info);
                 }
                 let count = (total - index).min(VERTEX_CHUNK_QUADS);
                 if b.detailed || !bodies.contains(&index) {
-                    previous = None;
-                    info.push(store(packed_at(index)?, chunk, count));
+                    leader = None;
+                    info.push(store(packed_at(index, None)?, chunk, count));
                     continue;
                 }
-                let food = visible[index - bodies.start];
-                let slot = b.sources.slots[food];
-                let texture = source_textures[b.sources.slot_groups[slot]]
-                    .as_ref()
-                    .expect("visible source group")[1];
-                // Project and store ordinary gameplay bodies in their chunk
-                // claimant, without an intermediate record pass.
-                let body = if skip_outlines && !texture.food_outline && !texture.food_glow {
-                    Some(super::pellet_cpu::project(
-                        frame,
-                        super::pellet_cpu::Input {
-                            slot,
-                            animation: b.world.foods()[food].paint_state(),
-                            detailed: false,
-                        },
-                        &b.sources,
-                        b.view,
-                        b.user_zoom,
-                        b.physical_pixels_per_unit,
-                        attachment,
-                    )?)
-                } else {
-                    None
-                };
-                let shape = body_shape(index, body.as_ref().map(|body| &body.bytes))?;
-                if previous == Some(shape) {
-                    coincident.store(true, std::sync::atomic::Ordering::Relaxed);
-                    return Ok(info);
+                let (bytes, group) = project_body(index)?;
+                let texture = body_texture(group);
+                if std::mem::take(&mut consumed) {
+                    info.push(Packed::store_noop(texture, chunk, count));
+                    continue;
                 }
-                previous = Some(shape);
-                info.push(match body {
-                    Some(body) => Packed::store_body(&body.bytes, texture, chunk, count),
-                    None => store(packed_at(index)?, chunk, count),
-                });
+                let current = shape(&bytes, group);
+                if let Some((previous, first, _)) = leader.take()
+                    && previous == current
+                {
+                    if layered(group) {
+                        unmatched.store(true, std::sync::atomic::Ordering::Relaxed);
+                        return Ok(info);
+                    }
+                    pair_last(chunk, first, alpha(&bytes));
+                    info.push(Packed::store_noop(texture, chunk, count));
+                    continue;
+                }
+                leader = Some((current, alpha(&bytes), group));
+                // Store ordinary gameplay bodies in their chunk claimant,
+                // without an intermediate record pass.
+                info.push(
+                    if skip_outlines && !texture.food_outline && !texture.food_glow {
+                        Packed::store_body(&bytes, texture, chunk, count)
+                    } else {
+                        store(packed_at(index, None)?, chunk, count)
+                    },
+                );
+            }
+            if let Some((previous, first, group)) = leader
+                && bodies.contains(&end)
+            {
+                let (bytes, next_group) = project_body(end)?;
+                if shape(&bytes, next_group) == previous {
+                    if layered(group) {
+                        unmatched.store(true, std::sync::atomic::Ordering::Relaxed);
+                        return Ok(info);
+                    }
+                    pair_last(chunk, first, alpha(&bytes));
+                }
             }
         }
         Ok(info)
@@ -390,7 +467,7 @@ pub(super) fn prepare(
     };
     if !b.detailed && (!skip_outlines || n < 8192) {
         let info = compute(&mut vertices[..chunk_count], 0)?;
-        return Ok(if coincident.into_inner() {
+        return Ok(if unmatched.into_inner() {
             fallback(vertices)
         } else {
             Some(info)
@@ -436,7 +513,7 @@ pub(super) fn prepare(
         }
     });
     drop(jobs);
-    if coincident.into_inner() {
+    if unmatched.into_inner() {
         return Ok(fallback(vertices));
     }
     let mut result = Vec::new();
@@ -711,92 +788,264 @@ mod tests {
         world
     }
 
-    #[test]
-    #[ignore = "explicit authored offscreen catalog and canonical packing comparison"]
-    fn coincident_low_bodies_keep_the_generic_pair_packer() {
+    fn vulkan() -> Renderer {
         let adapter = pollster::block_on(instance().enumerate_adapters(wgpu::Backends::VULKAN))
             .into_iter()
             .find(|a| a.get_info().device_type == wgpu::DeviceType::DiscreteGpu)
             .unwrap();
-        let mut r = pollster::block_on(Renderer::from_adapter_with_max_samples(
+        pollster::block_on(Renderer::from_adapter_with_max_samples(
             adapter,
             wgpu::TextureFormat::Rgba8Unorm,
             4,
         ))
+        .unwrap()
+    }
+
+    fn low_picture(bank: &mut Bank, world: &FoodWorld) -> PreparedFrame {
+        let mut b = batch(&mut Cache::default(), bank, world, view());
+        assert_eq!(b.visible_count, world.foods().len());
+        b.detailed = false;
+        b.canonical_submission = true;
+        let frame = Frame {
+            identity: 1,
+            extent: [3840, 2160],
+            viewport_scale: 1.,
+            tick: 0,
+            draws: Vec::new(),
+            food_batch: Some(b),
+            snakes: Vec::new(),
+        };
+        PreparedFrame {
+            background_draws: 0,
+            world_draws: 0,
+            #[cfg(feature = "frame-bench")]
+            food_submission: None,
+            resources: bank.resources(&frame).unwrap(),
+            frame,
+            overlay: None,
+        }
+    }
+
+    /// Prepared Low bytes, states and coverage equal the generic packer's
+    /// stream, apart from omitted black outlines and the noop slots of
+    /// consumed pair quads, and render the canonical pixels. Returns the
+    /// numbers of PairLighter draws and of noop slots.
+    fn assert_generic(r: &mut Renderer, picture: &PreparedFrame, label: &str) -> (usize, usize) {
+        r.sync_resources(&picture.resources).unwrap();
+        let resident = r.textures.iter().map(|(k, t)| (*k, t.asset)).collect();
+        let canonical = picture.frame.canonical().unwrap();
+        let expected: Vec<_> = pack(
+            canonical.quad_iter(&resident).unwrap(),
+            &r.textures,
+            true,
+            true,
+            [3840, 2160],
+        )
+        .collect::<Result<_>>()
         .unwrap();
+        let mut vertices: Vec<_> = (0..picture.frame.draw_count().div_ceil(VERTEX_CHUNK_QUADS))
+            .map(|_| VertexChunk::default())
+            .collect();
+        let info = prepare(
+            &picture.frame,
+            &r.textures,
+            true,
+            [3840, 2160],
+            &mut vertices,
+        )
+        .unwrap()
+        .unwrap_or_else(|| panic!("{label}: generic fallback"));
+        let mut actual = Vec::new();
+        let mut consumed = 0;
+        for (i, info) in info.iter().enumerate() {
+            let chunk = &vertices[i / VERTEX_CHUNK_QUADS];
+            let j = i % VERTEX_CHUNK_QUADS;
+            let state = chunk.states[j];
+            if state.noop && state.pipeline == Pipeline::Lighter {
+                assert!(!info.outline && !info.glow && !info.unsafe_prefix && !info.black_prefix);
+                consumed += 1;
+                continue;
+            }
+            actual.push((
+                &chunk.bytes[j * QUAD_VERTEX_BYTES..(j + 1) * QUAD_VERTEX_BYTES],
+                state,
+                *info,
+            ));
+        }
+        let pairs = expected
+            .iter()
+            .filter(|e| e.state.pipeline == Pipeline::PairLighter)
+            .count();
+        let omitted = expected.len() - actual.len();
+        assert!(
+            expected[..omitted].iter().all(|e| e.black_prefix),
+            "{label}"
+        );
+        for (k, ((bytes, state, info), e)) in actual.iter().zip(&expected[omitted..]).enumerate() {
+            assert_eq!(*bytes, e.bytes, "{label}: quad {k}");
+            assert_eq!(*state, e.state, "{label}: quad {k}");
+            assert_eq!(
+                (
+                    info.outline,
+                    info.glow,
+                    info.area.to_bits(),
+                    info.scale,
+                    info.unsafe_prefix,
+                    info.black_prefix
+                ),
+                (
+                    e.outline,
+                    e.glow,
+                    e.area.to_bits(),
+                    e.state.glow_scale,
+                    e.unsafe_prefix,
+                    e.black_prefix
+                ),
+                "{label}: quad {k}"
+            );
+        }
+        let mut frame = picture.frame.clone();
+        frame.extent = [1500, 844];
+        let canonical = frame.canonical().unwrap();
+        let target = crate::pellet_batch::offscreen::target(r, frame.extent);
+        let reference = crate::pellet_batch::offscreen::target(r, frame.extent);
+        r.render(&frame, &target.create_view(&Default::default()))
+            .unwrap();
+        r.render(&canonical, &reference.create_view(&Default::default()))
+            .unwrap();
+        assert!(
+            crate::pellet_batch::offscreen::pixels(r, &target).unwrap()
+                == crate::pellet_batch::offscreen::pixels(r, &reference).unwrap(),
+            "{label}: pixels"
+        );
+        (pairs, consumed)
+    }
+
+    #[test]
+    #[ignore = "explicit authored offscreen catalog and canonical packing comparison"]
+    fn coincident_low_bodies_pair_like_the_generic_packer() {
+        let mut r = vulkan();
         let mut bank = Bank::new().unwrap();
-        // Serial and scoped duplicate pairs, plus one pair whose bodies straddle
-        // the first chunk boundary (body order is reverse world order).
-        let boundary = 8_200 - VERTEX_CHUNK_QUADS;
-        let cases = [
-            (4_096, coincident(&bank, 4_096, |i| i / 2), true),
-            (8_194, coincident(&bank, 8_194, |i| i / 2), true),
+        // Body order is reverse world order: with 8,200 foods world food i is
+        // stream body 8,199 - i, so world foods 8 and 7 straddle the first chunk.
+        let run = |first: usize, last: usize| {
+            move |i: usize| {
+                if (first..=last).contains(&i) {
+                    first
+                } else {
+                    i
+                }
+            }
+        };
+        let cases: [(&str, FoodWorld, usize); 8] = [
             (
-                8_200,
-                coincident(&bank, 8_200, |i| if i == boundary { i - 1 } else { i }),
-                true,
+                "4,096 serial pairs",
+                coincident(&bank, 4_096, |i| i / 2),
+                2_048,
             ),
-            (8_200, coincident(&bank, 8_200, |i| i), false),
+            (
+                "8,194 scoped pairs",
+                coincident(&bank, 8_194, |i| i / 2),
+                4_097,
+            ),
+            (
+                "pair across a chunk",
+                coincident(&bank, 8_200, run(7, 8)),
+                1,
+            ),
+            (
+                "triple from a chunk end",
+                coincident(&bank, 8_200, run(6, 8)),
+                1,
+            ),
+            (
+                "triple to a chunk start",
+                coincident(&bank, 8_200, run(7, 9)),
+                1,
+            ),
+            (
+                "four across a chunk",
+                coincident(&bank, 8_200, run(5, 8)),
+                2,
+            ),
+            (
+                "one pair in 25,000",
+                coincident(&bank, 25_000, run(0, 1)),
+                1,
+            ),
+            ("distinct", coincident(&bank, 8_200, |i| i), 0),
         ];
-        for (count, world, paired) in cases {
+        for (label, world, pairs) in cases {
             for menu in [false, true] {
-                let mut b = batch(&mut Cache::default(), &mut bank, &world, view());
-                assert_eq!(b.visible_count, count);
-                b.detailed = false;
-                b.canonical_submission = true;
-                let frame = Frame {
-                    identity: 1,
-                    extent: [3840, 2160],
-                    viewport_scale: 1.,
-                    tick: 0,
-                    draws: Vec::new(),
-                    food_batch: Some(b),
-                    snakes: Vec::new(),
-                };
-                let mut picture = PreparedFrame {
-                    background_draws: 0,
-                    world_draws: 0,
-                    #[cfg(feature = "frame-bench")]
-                    food_submission: None,
-                    resources: bank.resources(&frame).unwrap(),
-                    frame,
-                    overlay: None,
-                };
+                let mut picture = low_picture(&mut bank, &world);
                 if menu {
                     MenuFrame::world_crossfade([3840, 2160], 1., 0.4)
                         .unwrap()
                         .append_to(&mut picture)
                         .unwrap();
                 }
-                r.sync_resources(&picture.resources).unwrap();
-                let resident = r.textures.iter().map(|(k, t)| (*k, t.asset)).collect();
-                let quads = picture.frame.canonical().unwrap().quads(&resident).unwrap();
-                let pairs = quads
-                    .windows(2)
-                    .filter(|q| super::super::additive_pair(&q[0], &q[1]))
-                    .count();
-                assert_eq!(pairs > 0, paired);
-                let mut vertices: Vec<_> =
-                    (0..picture.frame.draw_count().div_ceil(VERTEX_CHUNK_QUADS))
-                        .map(|_| VertexChunk::default())
-                        .collect();
-                let prepared = prepare(
-                    &picture.frame,
-                    &r.textures,
-                    true,
-                    [3840, 2160],
-                    &mut vertices,
-                )
-                .unwrap();
-                assert_eq!(prepared.is_none(), paired, "{count} bodies, menu {menu}");
-                if paired {
-                    assert!(
-                        vertices
-                            .iter()
-                            .all(|c| c.bytes.is_empty() && c.states.is_empty())
-                    );
-                }
+                let label = format!("{label}, menu {menu}");
+                assert_eq!(
+                    assert_generic(&mut r, &picture, &label),
+                    (pairs, pairs),
+                    "{label}"
+                );
             }
+        }
+    }
+
+    #[test]
+    #[ignore = "explicit authored offscreen catalog and canonical packing comparison"]
+    fn caller_pairs_cross_the_empty_low_late_barrier() {
+        use slither_client::presentation::{BodyBlend, BodyRect};
+        let mut r = vulkan();
+        let mut bank = Bank::new().unwrap();
+        let world = coincident(&bank, 4_096, |i| i);
+        let body = world.foods()[0].snapshot().sources.body.asset();
+        for early_at in [0, 1] {
+            let mut picture = low_picture(&mut bank, &world);
+            // A valid caller resource that is not a food source, so neither the
+            // food-key check nor the body pair rule covers it.
+            let mut resource = picture
+                .resources
+                .iter()
+                .find(|r| r.asset == body)
+                .unwrap()
+                .clone();
+            resource.asset.handle = 9_000_000_001;
+            resource.food_outline = false;
+            resource.food_glow = false;
+            let mut draw = crate::frame::Draw {
+                corners: None,
+                asset: resource.asset,
+                source: None,
+                repeat_uv: None,
+                black_effect: false,
+                destination: BodyRect {
+                    x: 620.3,
+                    y: 380.4,
+                    width: 74.,
+                    height: 74.,
+                },
+                translation: [0., 0.],
+                rotation: 0.,
+                effective_alpha: 0.,
+                blend: BodyBlend::SourceOver,
+            };
+            let mut draws = vec![draw.clone(); 16];
+            draw.blend = BodyBlend::Lighter;
+            draw.effective_alpha = 0.423;
+            draws[15] = draw.clone();
+            draw.effective_alpha = 0.611;
+            draws.push(draw);
+            picture.frame.draws = draws;
+            let b = picture.frame.food_batch.as_mut().unwrap();
+            b.early_at = early_at;
+            b.late_at = 16;
+            picture.resources.push(resource);
+            let label = format!("late barrier pair, early_at {early_at}");
+            // The caller pair has no noop slot: the surrounding packer merges it.
+            assert_eq!(assert_generic(&mut r, &picture, &label), (1, 0), "{label}");
         }
     }
 }
