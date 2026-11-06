@@ -129,7 +129,7 @@ fn synthetic_setup_values_and_optional_field_boundaries() {
 #[test]
 fn synthetic_invalid_setup_scalars_and_version_preserve_previous_world() {
     let mut state = playing();
-    for offsets in [&[1, 2, 3][..], &[4, 5], &[6, 7], &[8, 9], &[24]] {
+    for offsets in [&[1, 2, 3][..], &[4, 5], &[6, 7], &[24]] {
         let mut packet = setup_with_score_index(430);
         for &offset in offsets {
             packet[offset] = 0;

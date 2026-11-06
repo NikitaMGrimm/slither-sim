@@ -199,12 +199,10 @@ fn setup_boundaries_and_consumer_scalar_admission_are_explicit() {
         (s.game_mode, s.team, s.extensions),
         (Some(2), Some(3), &[99][..])
     );
-    for (at, len) in [(8, 2), (27, 3)] {
-        let mut p = full.clone();
-        p[at..at + len].fill(0);
-        assert!(decode(&p, Sim).is_ok());
-        assert!(decode(&p, ClientReceived).is_err());
-    }
+    let mut zero_radius = full.clone();
+    zero_radius[27..30].fill(0);
+    assert!(decode(&zero_radius, Sim).is_ok());
+    assert!(decode(&zero_radius, ClientReceived).is_err());
     full[23] = 13;
     assert_eq!(setup_protocol_version(&full, Sim).unwrap(), 13);
     assert_eq!(

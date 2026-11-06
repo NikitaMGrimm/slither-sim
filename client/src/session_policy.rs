@@ -426,9 +426,9 @@ impl SessionPolicy {
         if !self.control.connected && self.control.phase != Phase::Setup {
             return Err(SessionError("Unexpected protocol frame"));
         }
-        if self.control.phase == Phase::Setup && first != 97 {
-            return Err(SessionError("Expected Setup after login"));
-        }
+        // Custom servers can send extension commands before Setup, separately
+        // or bundled with it. Typed ingress already ignores unknown commands and
+        // requires Setup before applying world state; keep that authority there.
         Ok(false)
     }
     /// Canonical command admission; true requests the existing setup-version capability.

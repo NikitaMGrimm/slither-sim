@@ -240,7 +240,6 @@ impl SnakePresentation {
             || setup.radius <= 0.
             || setup.max_segments == 0
             || setup.sector_size == 0
-            || setup.sector_count == 0
             || setup.spangdv <= 0.
             || setup.nsp1 < 0.
             || setup.nsp2 < 0.

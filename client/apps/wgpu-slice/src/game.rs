@@ -6,7 +6,7 @@ use crate::{
     render::{self, PreparedFrame, SuppressedLayers},
 };
 use slither_client::{
-    challenge::solve_challenge,
+    challenge::answer_challenge,
     desktop_input::{DesktopInput, OwnInput, Point as InputPoint},
     gameplay_policy::GameplayPolicy,
     presentation::*,
@@ -891,7 +891,7 @@ impl LocalGame {
             .map_err(|e| e.0)?
         {
             let reply =
-                solve_challenge(&decoded.commands().next().expect("one challenge").bytes[1..])
+                answer_challenge(&decoded.commands().next().expect("one challenge").bytes[1..])
                     .map_err(|e| e.to_string())?;
             self.session = session;
             self.enqueue(EffectKind::Send(reply), After::None)?;

@@ -633,7 +633,7 @@ fn empty_v19_sector_fallback_preserves_controls_and_lifecycle_admission() {
         negotiating
             .receive(negotiating.generation(), &empty, 3.)
             .unwrap_err(),
-        "Expected Setup after login"
+        "world command requires setup"
     );
     assert_eq!(negotiating.phase(), Phase::Setup);
     assert_eq!(negotiating.client().received().frames_applied, 0);

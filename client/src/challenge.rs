@@ -1,6 +1,7 @@
 //! A tokenized, closed grammar for the string-copy challenge family.
 //!
-//! Unknown programs are rejected; no source is evaluated or interpreted generally.
+//! Production login keeps a stock-shaped acknowledgement for unrecognized
+//! challenges. No server-supplied source is evaluated or interpreted generally.
 
 use std::fmt;
 
@@ -12,6 +13,8 @@ pub const MAX_SOURCE_BYTES: usize = 256;
 pub enum ChallengeError {
     /// Empty, odd-length, or oversized encoded input.
     Size,
+    /// Challenge text would exceed the enclosing frame's byte bound.
+    FrameSize,
     /// The wire encoding contained a non-ASCII letter.
     Alphabet,
     /// A decoded nibble exceeded fifteen.
@@ -27,7 +30,8 @@ impl fmt::Display for ChallengeError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str(match self {
             Self::Size => "challenge size must be even and within 2..=512 bytes",
-            Self::Alphabet => "challenge encoding requires ASCII letters",
+            Self::FrameSize => "challenge text exceeds the frame byte bound",
+            Self::Alphabet => "challenge text contains an unsupported byte",
             Self::Nibble => "challenge encoding contains a nibble above 15",
             Self::Syntax => "unsupported challenge syntax or trailing tokens",
             Self::Literal => {
@@ -38,6 +42,30 @@ impl fmt::Display for ChallengeError {
 }
 
 impl std::error::Error for ChallengeError {}
+
+/// Answer recognized copy challenges exactly, or attempt login with an initialized
+/// acknowledgement. The stock client initializes its reply before handling server
+/// text; community servers can leave it untouched or ignore it entirely. An
+/// unsupported program is therefore not itself a reason to disconnect.
+///
+/// This is a best-effort fallback, not an interpreter for arbitrary JavaScript.
+/// The server still decides whether to accept the ordinary login. Preserve the
+/// stock text-byte admission and the enclosing frame's existing byte bound.
+pub fn answer_challenge(encoded: &[u8]) -> Result<Vec<u8>, ChallengeError> {
+    if encoded.len() >= crate::protocol::MAX_FRAME_BYTES {
+        return Err(ChallengeError::FrameSize);
+    }
+    if !encoded.iter().all(|byte| (b'A'..=b'z').contains(byte)) {
+        return Err(ChallengeError::Alphabet);
+    }
+    Ok(solve_challenge(encoded).unwrap_or_else(|_| {
+        // No secret or authentication proof is available in this path. Use a
+        // deterministic 27-byte seed so native and browser adapters agree.
+        let mut reply = vec![b'A'; 27];
+        rotate_reply(&mut reply);
+        reply
+    }))
+}
 
 /// Decode a challenge command payload (without its command byte) and solve it.
 ///
@@ -122,6 +150,11 @@ pub fn solve_challenge(encoded: &[u8]) -> Result<Vec<u8>, ChallengeError> {
         return Err(ChallengeError::Syntax);
     }
 
+    rotate_reply(&mut reply);
+    Ok(reply)
+}
+
+fn rotate_reply(reply: &mut [u8]) {
     let mut rotation = 0_i32;
     for (index, byte) in reply.iter_mut().enumerate() {
         let (base, upper) = if *byte >= b'a' {
@@ -138,7 +171,6 @@ pub fn solve_challenge(encoded: &[u8]) -> Result<Vec<u8>, ChallengeError> {
         *byte = ((value + rotation) % 26 + base) as u8;
         rotation += 4 + value;
     }
-    Ok(reply)
 }
 
 struct Parser<'a> {
