@@ -25,9 +25,11 @@ const CHUNK: usize = 64;
 /// idle workers other tasks to take over uneven views.
 #[cfg(feature = "parallel")]
 const WAVE_CHUNKS_PER_THREAD: usize = 4;
-/// Recipient ranges shorter than this keep the serial queries.
+/// Recipient ranges shorter than this keep the serial queries. On a 16-core
+/// c8a.4xlarge, forced splits made 500-bot hosts 9-16% slower, were
+/// inconclusive at 1,000 bots and 8% faster at 2,000; see docs/performance.md.
 #[cfg(feature = "parallel")]
-const MIN_RANGE: usize = 256;
+const MIN_RANGE: usize = 1024;
 
 /// One recipient's coverage and prey candidates, as the serial query would
 /// compute them at the start of its updates.
