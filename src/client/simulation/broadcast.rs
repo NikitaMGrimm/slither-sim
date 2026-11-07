@@ -64,6 +64,31 @@ struct SnakeQuery<'world, 'reports> {
 pub(super) const LEADERBOARD_ROWS: usize = 10;
 /// Physical packets, plus a browser view when pit decoration is active.
 type PacketViews = (Vec<Vec<u8>>, Option<Vec<Vec<u8>>>);
+
+/// Where `updates` takes visibility from. Generic, so the serial instance
+/// compiles to the original queries with no prepared-view branches.
+trait Plan<'v>: Copy {
+    const PREPARED: bool;
+    fn visibility(self) -> &'v Visibility;
+}
+
+/// Query coverage and prey inside `updates`, as without view workers.
+#[derive(Clone, Copy)]
+struct SerialQuery;
+
+impl<'v> Plan<'v> for SerialQuery {
+    const PREPARED: bool = false;
+    fn visibility(self) -> &'v Visibility {
+        unreachable!("serial updates run their own queries")
+    }
+}
+
+impl<'v> Plan<'v> for &'v Visibility {
+    const PREPARED: bool = true;
+    fn visibility(self) -> &'v Visibility {
+        self
+    }
+}
 /// One prey's correction clock, shared by every recipient: official
 /// corrections for one prey align across clients, and a new viewer does not
 /// restart it.
@@ -567,17 +592,29 @@ impl SimulatorBackend {
                 _ => None,
             };
             #[cfg(not(feature = "parallel"))]
-            let plan = None;
-            let (updates, presented_updates) = Self::updates(
-                &query,
-                slot,
+            let plan: Option<&Visibility> = None;
+            let (slots, reports, deltas, candidates, diffs) = (
                 &mut self.slots,
                 &mut self.reports,
                 &mut snakes.deltas,
                 &mut snakes.candidates,
                 &food_changes.diffs,
-                plan,
-            )?;
+            );
+            let (updates, presented_updates) = match plan {
+                Some(plan) => Self::updates(
+                    &query, slot, slots, reports, deltas, candidates, diffs, plan,
+                ),
+                None => Self::updates(
+                    &query,
+                    slot,
+                    slots,
+                    reports,
+                    deltas,
+                    candidates,
+                    diffs,
+                    SerialQuery,
+                ),
+            }?;
             if minimap_due && let Some(packet) = self.minimap(slot, &mut map)? {
                 prefix.push(packet);
             }
@@ -782,13 +819,14 @@ impl SimulatorBackend {
         Ok(Some(packet))
     }
 
-    /// Changes since this connection's last frame, own snake first. `plan`
-    /// replaces the coverage and prey queries with their prepared results.
+    /// Changes since this connection's last frame, own snake first. A
+    /// prepared `plan` replaces the coverage and prey queries with their
+    /// results; the serial instance contains only the original queries.
     #[expect(
         clippy::too_many_arguments,
         reason = "Disjoint borrows of the serial owner's fields"
     )]
-    fn updates(
+    fn updates<'v, P: Plan<'v>>(
         query: &ViewQuery<'_>,
         slot: usize,
         slots: &mut [Slot],
@@ -796,7 +834,7 @@ impl SimulatorBackend {
         deltas: &mut [SnakeDeltaCache],
         candidates: &mut Vec<usize>,
         food_diffs: &FoodDiffs,
-        plan: Option<&Visibility>,
+        plan: P,
     ) -> Result<PacketViews, String> {
         let me = &query.snakes[slot];
         let record = query.record_life == Some((slot, slots[slot].life));
@@ -837,41 +875,95 @@ impl SimulatorBackend {
         }
         let vision = query.vision;
         let head = me.head;
-        // Snakes that may cover the head, or that this connection shows and may
-        // need removing; every other snake is neither shown nor eligible.
-        if plan.is_none() {
+        // One snake's updates for this connection; expanded into the serial and
+        // prepared loops below so the serial loop keeps its own code.
+        macro_rules! visit {
+            ($i:expr, $eligible:expr) => {{
+                let i: usize = $i;
+                // Compact life/control facts are copied on demand from the serial
+                // owner; no world-sized snapshot or scan is added to this path.
+                let SnakeQuery {
+                    snake,
+                    life,
+                    heading: control,
+                    profile,
+                    opportunity,
+                } = SnakeQuery {
+                    snake: &query.snakes[i],
+                    life: slots[i].life,
+                    heading: slots[i].control.heading,
+                    profile: query.profiles.get(i).unwrap_or(&NATIVE_PROFILE),
+                    opportunity: &reports[i],
+                };
+                let eligible: bool = $eligible;
+                let own = i == slot;
+                let id = i as u16;
+                let connection = &mut slots[slot].connection;
+                let known = connection.snakes.get_mut(i);
+                match (known, eligible) {
+                    (Some(known), true) if known.life == life => {
+                        deltas[i].changes(
+                            &mut packets,
+                            own,
+                            id,
+                            known,
+                            snake,
+                            || physics::quantize_heading(control),
+                            profile,
+                            opportunity,
+                        )?;
+                        reports[i].observe(known);
+                    }
+                    (Some(known), false) => {
+                        let died = !snake.alive || known.life != life;
+                        packets.push(encode::removal(id, died));
+                        connection.snakes.remove(i);
+                    }
+                    (None, false) => {}
+                    (known, true) => {
+                        let wanted = physics::quantize_heading(control);
+                        if known.is_some() {
+                            packets.push(encode::removal(id, true));
+                        }
+                        full(&mut packets, own, id, snake, wanted, profile)?;
+                        let known = KnownSnake::new(life, snake, wanted)?;
+                        reports[i].observe(&known);
+                        connection.snakes.insert(i, known);
+                    }
+                }
+                let connection = &mut slots[slot].connection;
+                if own && connection.snakes.contains_key(slot) {
+                    // HUD packets wait for the client's own appearance; a
+                    // requested session ID follows it so the client knows itself.
+                    connection.appeared = true;
+                    let fam = encode::fam_u24(snake.fam);
+                    let credit = encode::segment_credit(snake.score, snake.segments, fam);
+                    if connection.credit != credit {
+                        connection.credit = credit;
+                        packets.push(encode::credit(credit));
+                    }
+                    if std::mem::take(&mut connection.session_pending) {
+                        packets.push(encode::session(id, connection.session));
+                    }
+                }
+            }};
+        }
+        if P::PREPARED {
+            // Eligibility prepared by the same coverage test, in the same order.
+            visit!(slot, me.alive);
+            for &(i, eligible) in &plan.visibility().snakes {
+                visit!(i, eligible);
+            }
+        } else {
+            // Snakes that may cover the head, or that this connection shows and
+            // may need removing; every other snake is neither shown nor eligible.
             let known = &slots[slot].connection.snakes;
             known.candidates(query.grid.near(head), candidates);
-        }
-        // A prepared eligibility replaces the identical coverage test.
-        let serial = plan
-            .is_none()
-            .then_some(candidates.iter().map(|&i| (i, None)))
-            .into_iter()
-            .flatten()
-            .filter(|&(i, _)| i != slot);
-        let prepared = plan
-            .into_iter()
-            .flat_map(|plan| plan.snakes.iter().map(|&(i, eligible)| (i, Some(eligible))));
-        let order = std::iter::once((slot, None)).chain(serial).chain(prepared);
-        for (i, prepared) in order {
-            // Compact life/control facts are copied on demand from the serial
-            // owner; no world-sized snapshot or scan is added to this path.
-            let SnakeQuery {
-                snake,
-                life,
-                heading: control,
-                profile,
-                opportunity,
-            } = SnakeQuery {
-                snake: &query.snakes[i],
-                life: slots[i].life,
-                heading: slots[i].control.heading,
-                profile: query.profiles.get(i).unwrap_or(&NATIVE_PROFILE),
-                opportunity: &reports[i],
-            };
-            let eligible = prepared.unwrap_or_else(|| {
-                snake.alive
+            let order =
+                std::iter::once(slot).chain(candidates.iter().copied().filter(|&i| i != slot));
+            for i in order {
+                let snake = &query.snakes[i];
+                let eligible = snake.alive
                     && (i == slot
                         || covered(
                             head,
@@ -879,57 +971,8 @@ impl SimulatorBackend {
                             query.bounds[i],
                             vision,
                             query.body_bounds.for_snake(i),
-                        ))
-            });
-            let own = i == slot;
-            let id = i as u16;
-            let connection = &mut slots[slot].connection;
-            let known = connection.snakes.get_mut(i);
-            match (known, eligible) {
-                (Some(known), true) if known.life == life => {
-                    deltas[i].changes(
-                        &mut packets,
-                        own,
-                        id,
-                        known,
-                        snake,
-                        || physics::quantize_heading(control),
-                        profile,
-                        opportunity,
-                    )?;
-                    reports[i].observe(known);
-                }
-                (Some(known), false) => {
-                    let died = !snake.alive || known.life != life;
-                    packets.push(encode::removal(id, died));
-                    connection.snakes.remove(i);
-                }
-                (None, false) => {}
-                (known, true) => {
-                    let wanted = physics::quantize_heading(control);
-                    if known.is_some() {
-                        packets.push(encode::removal(id, true));
-                    }
-                    full(&mut packets, own, id, snake, wanted, profile)?;
-                    let known = KnownSnake::new(life, snake, wanted)?;
-                    reports[i].observe(&known);
-                    connection.snakes.insert(i, known);
-                }
-            }
-            let connection = &mut slots[slot].connection;
-            if own && connection.snakes.contains_key(slot) {
-                // HUD packets wait for the client's own appearance; a
-                // requested session ID follows it so the client knows itself.
-                connection.appeared = true;
-                let fam = encode::fam_u24(snake.fam);
-                let credit = encode::segment_credit(snake.score, snake.segments, fam);
-                if connection.credit != credit {
-                    connection.credit = credit;
-                    packets.push(encode::credit(credit));
-                }
-                if std::mem::take(&mut connection.session_pending) {
-                    packets.push(encode::session(id, connection.session));
-                }
+                        ));
+                visit!(i, eligible);
             }
         }
         let connection = &mut slots[slot].connection;
@@ -960,8 +1003,8 @@ impl SimulatorBackend {
             None
         };
         let mut visible = BTreeMap::new();
-        if let Some(plan) = plan {
-            for &index in &plan.prey {
+        if P::PREPARED {
+            for &index in &plan.visibility().prey {
                 let prey = &query.prey[index];
                 visible.entry(prey.id).or_insert(prey);
             }

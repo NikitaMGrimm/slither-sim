@@ -379,6 +379,8 @@ impl KnownSnakes {
     }
     /// Occupied entries and coverage candidates are ascending and unique, so
     /// merge once without sorting. Copy membership before appearances/removals.
+    /// Inlined like `covered`: view workers are a second caller.
+    #[inline(always)]
     pub(super) fn candidates(&self, nearby: &[usize], out: &mut Vec<usize>) {
         out.clear();
         out.reserve(nearby.len() + self.entries.len());
@@ -515,6 +517,12 @@ impl CoverageGrid {
 }
 
 /// Coverage: any centerline part within `vision` of `head`.
+///
+/// Recipient updates and view workers both call this per candidate. With a
+/// second caller the compiler stopped inlining it into the serial loop, which
+/// cost the default single-thread host about 4.7% more instructions in
+/// `engine-raw-official-500`; keep it inlined at both sites.
+#[inline(always)]
 pub(super) fn covered(
     head: Point,
     snake: &Snake,
