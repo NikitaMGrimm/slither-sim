@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## [0.12.0](https://github.com/NikitaMGrimm/slither-sim/compare/v0.11.0...v0.12.0) - 2026-11-07
+
 ### Added
 
 - The hidden `perf-internals` harness records and compares ordered raw host
