@@ -263,6 +263,7 @@ pub fn button(
     keyboard_focus: bool,
     fade: Option<[f32; 2]>,
     tokens: MenuTheme,
+    palette: Option<bool>,
 ) -> egui::Response {
     let response = ui.interact(r, id, Sense::click());
     response.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, ui.is_enabled(), text));
@@ -293,8 +294,22 @@ pub fn button(
             color
         }
     });
-    theme::capsule(ui, r, colors, 1.);
-    if !compact && ui.is_enabled() {
+    // The picker shares the pill palette without changing its font, bounds,
+    // shadow or hit box. Studio/champion buttons retain their own surfaces.
+    let palette = palette.map(|primary| {
+        let state = if !ui.is_enabled() {
+            theme::PillState::Idle
+        } else if pressed {
+            theme::PillState::Pressed
+        } else if response.hovered() {
+            theme::PillState::Hovered
+        } else {
+            theme::PillState::Idle
+        };
+        theme::pill_palette(primary, state)
+    });
+    theme::capsule(ui, r, palette.map_or(colors, |p| p.0), 1.);
+    if palette.is_none() && !compact && ui.is_enabled() {
         let [hover, press] = fade.unwrap_or([
             if response.hovered() { 1. } else { 0. },
             if pressed { 1. } else { 0. },
@@ -312,8 +327,12 @@ pub fn button(
             }
         }
     }
+    let mut style = style;
+    if let Some((_, color)) = palette {
+        style.color = [color.r(), color.g(), color.b()];
+    }
     label(
-        ui.painter(),
+        &theme::text_painter(ui),
         text,
         r.shrink2(vec2(
             slither_client::menu_theme::STUDIO_ACTION_PADDING_X as f32 * scale,

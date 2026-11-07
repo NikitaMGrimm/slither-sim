@@ -12,6 +12,16 @@ pub fn ink(rgb: [u8; 3]) -> Color32 {
     Color32::from_rgb(rgb[0], rgb[1], rgb[2])
 }
 
+/// Keep disabled text readable while the surface still signals inactivity.
+/// Undo only the disabled multiplier, preserving the parent panel's fade.
+pub fn text_painter(ui: &egui::Ui) -> egui::Painter {
+    let mut painter = ui.painter().clone();
+    if !ui.is_enabled() && ui.visuals().disabled_alpha > 0. {
+        painter.set_opacity(painter.opacity() / ui.visuals().disabled_alpha);
+    }
+    painter
+}
+
 pub fn install(context: &egui::Context) -> Result<()> {
     let theme = MenuTheme::default();
     let mut fonts = egui::FontDefinitions::empty();
@@ -331,7 +341,7 @@ fn painted_pill(
             ));
         }
     }
-    ui.painter().galley(
+    text_painter(ui).galley(
         pos2(left + extra, rect.center().y - galley.size().y / 2.),
         galley,
         text,

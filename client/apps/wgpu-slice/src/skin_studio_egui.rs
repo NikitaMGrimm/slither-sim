@@ -205,7 +205,8 @@ impl StudioUi {
                                     ControlKind::Label { .. } | ControlKind::Surface
                                 )
                             {
-                                ui.multiply_opacity(tokens.disabled_opacity(control.style) as f32);
+                                ui.visuals_mut().disabled_alpha =
+                                    tokens.disabled_opacity(control.style) as f32;
                             }
                             if !interactive || !enabled {
                                 ui.disable();
@@ -278,6 +279,7 @@ impl StudioUi {
                 self.keyboard_focus,
                 None,
                 tokens,
+                None,
             )),
             ControlKind::SectionTab {
                 label: text,
@@ -294,6 +296,7 @@ impl StudioUi {
                     self.keyboard_focus,
                     None,
                     tokens,
+                    None,
                 );
                 if *selected {
                     ui.painter().rect_filled(
