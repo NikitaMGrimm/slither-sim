@@ -396,6 +396,7 @@ mod tests {
                         .connect(
                             2,
                             PlayerAppearance {
+                                owner: false,
                                 nickname: b"Reused".to_vec(),
                                 skin: 9,
                                 custom_skin: vec![]
@@ -818,6 +819,7 @@ mod tests {
                     if !sim.world().snakes()[slot].alive {
                         sim.0.disconnect(slot).unwrap();
                         let appearance = PlayerAppearance {
+                            owner: false,
                             nickname: format!("Again {slot}").into_bytes(),
                             skin: slot as u8,
                             custom_skin: vec![],
