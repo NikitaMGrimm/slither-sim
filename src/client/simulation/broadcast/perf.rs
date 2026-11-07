@@ -679,6 +679,512 @@ mod tests {
         replay
     }
 
+    /// Shift a living snake's whole pose a little, so its viewers have news.
+    fn nudge(world: &mut Simulator, slot: usize) {
+        let snake = &world.snakes()[slot];
+        if !snake.alive {
+            return;
+        }
+        let shift = |p: &Point| Point {
+            x: p.x + 30.,
+            y: p.y - 20.,
+        };
+        let head = shift(&snake.head);
+        let body = snake.body.iter().map(shift).collect();
+        let heading = snake.heading;
+        world.correct_pose(slot, head, body, heading).unwrap();
+    }
+
+    /// Pose `victim`'s head on the middle of `into`'s body, so it dies in
+    /// the next step.
+    fn crash(world: &mut Simulator, victim: usize, into: usize) {
+        let snakes = world.snakes();
+        if !snakes[victim].alive || !snakes[into].alive {
+            return;
+        }
+        let target = &snakes[into].body;
+        let head = target[target.len() / 2];
+        let body = (0..snakes[victim].body.len())
+            .map(|i| Point {
+                x: head.x + i as f64 * 40.,
+                y: head.y,
+            })
+            .collect();
+        world.correct_pose(victim, head, body, TAU / 2.).unwrap();
+    }
+
+    /// Synthetic Battledome scene: steered and boosting recipients through
+    /// the decorated pit, mixed 13/19 adapters, deaths and slot reuse, and
+    /// injected failures each followed by more ticks. With `adaptive`, dt
+    /// alternates so report gates run on seconds. Injected errors, coverage
+    /// counts and the terminal state all enter the replay. A regression
+    /// scene, not a fitted model or an official capture.
+    fn faults(views: Views, adaptive: bool) -> RawReplay {
+        const N: usize = 12;
+        const EARLY: usize = 4;
+        let config = SimulationConfig {
+            agents: N,
+            world: Config::battledome(),
+            delivery: DeliveryProfile::Official,
+            latency: LatencyConfig::measured_route(),
+            minimap_interval_seconds: 0.1,
+            leaderboard_interval_seconds: 0.1,
+            ..Default::default()
+        };
+        let mut world = Simulator::new(WorldOptions {
+            seed: 5,
+            config: config.world.clone(),
+            population: InitialPopulation::Placed {
+                ids: (0..N).map(|i| i.to_string()).collect(),
+                placement: Placement::TestRing,
+            },
+        })
+        .unwrap();
+        world.record_events(crate::EventRecording {
+            pickups: true,
+            food_births: true,
+        });
+        for k in 0..3u64 {
+            let a = k as f64 * TAU / 3.;
+            world
+                .insert_prey(crate::ReplayPrey {
+                    prey: crate::Prey {
+                        id: 800_000 + k,
+                        position: Point {
+                            x: 1500. * a.cos(),
+                            y: 1500. * a.sin(),
+                        },
+                        heading: a,
+                        target_heading: a + 1.,
+                        speed: 2.,
+                        size: 10.,
+                    },
+                    mode: crate::prey::PreyMode::Roaming,
+                })
+                .unwrap();
+        }
+        let mut sim = RawWorld::new(5, config, world).unwrap();
+        with_views(&mut sim, views);
+        sim.0.protocol13(2);
+        sim.0.protocol13(5);
+        sim.0.full_minimap(5);
+        sim.0.physical_food(9);
+        let mut replay = RawReplay::default();
+        let mut errors = Vec::new();
+        let (mut deaths, mut pickups, mut rejoins, mut decorated) = (0, 0, 0, 0);
+        let mut maintenance = false;
+        let mut living = Vec::new();
+        // A closed session has no queue to drain; close it as a host would.
+        let record = |sim: &mut RawWorld, replay: &mut RawReplay, errors: &mut Vec<String>| {
+            for slot in 0..N {
+                if let Some(fault) = sim.0.backend.slots[slot].connection.output_fault.clone() {
+                    errors.push(fault);
+                    sim.0.disconnect(slot).unwrap();
+                }
+            }
+            sim.record(replay).unwrap();
+        };
+        record(&mut sim, &mut replay, &mut errors);
+        for tick in 0..200u64 {
+            let actions: Vec<_> = sim
+                .world()
+                .snakes()
+                .iter()
+                .enumerate()
+                .map(|(slot, snake)| {
+                    let inward = (-snake.head.y).atan2(-snake.head.x);
+                    // The first half circles the spawn ring; the rest dive
+                    // through the pit, boosting, and meet there.
+                    Some(if slot < N / 2 {
+                        Action {
+                            heading: inward - TAU / 4. + 0.05,
+                            boost: false,
+                        }
+                    } else {
+                        Action {
+                            heading: inward + 0.9 * (tick as f64 * 0.07 + slot as f64).sin(),
+                            boost: (tick / 25 + slot as u64).is_multiple_of(2),
+                        }
+                    })
+                })
+                .collect();
+            sim.controls(&actions).unwrap();
+            if adaptive && tick % 20 == 10 {
+                let dt = if tick % 40 == 10 { 0.006 } else { 0.007 };
+                sim.0.set_dt(dt).unwrap();
+            }
+            if tick % 30 == 15 {
+                for slot in 0..N {
+                    if !sim.world().snakes()[slot].alive {
+                        sim.0.disconnect(slot).unwrap();
+                        let appearance = PlayerAppearance {
+                            nickname: format!("Again {slot}").into_bytes(),
+                            skin: slot as u8,
+                            custom_skin: vec![],
+                        };
+                        match sim.0.connect(slot, appearance) {
+                            Ok(_) => rejoins += 1,
+                            Err(error) => errors.push(error),
+                        }
+                        if slot % 4 == 2 {
+                            sim.0.protocol13(slot);
+                        }
+                        if slot % 3 == 0 {
+                            sim.0.request_session_id(slot).unwrap();
+                        }
+                    }
+                }
+                record(&mut sim, &mut replay, &mut errors);
+            }
+            if tick.is_multiple_of(9) {
+                for slot in 0..N {
+                    // A closed or just-reused session may refuse the ping.
+                    let _ = sim.0.receive(slot, &[251]);
+                }
+            }
+            if tick.is_multiple_of(20) {
+                living.push(sim.world().living());
+            }
+            if tick == 20 || tick == 120 {
+                let victim = N - 1 - (tick / 100) as usize;
+                crash(&mut sim.0.backend.world, victim, N / 2);
+            }
+            if tick == 40 {
+                // Queue pressure on a local recipient mid-range, after a pose
+                // edit gives every recipient something to send.
+                let b = &mut sim.0.backend;
+                let full = (EARLY + 2..N)
+                    .find(|&slot| b.slots[slot].connection.setup)
+                    .unwrap_or(N - 1);
+                nudge(&mut b.world, 3);
+                let held = b.slots[full].connection.downlink.len();
+                b.slots[full].remote = false;
+                b.slots[full].connection.pongs = 1;
+                b.slots[full].connection.downlink.resize(
+                    crate::client::simulation::connection::MAX_IN_FLIGHT,
+                    (f64::MAX, vec![0]),
+                );
+                if let Err(error) = b.broadcast() {
+                    errors.push(error);
+                }
+                b.slots[full].connection.downlink.truncate(held);
+                b.slots[full].remote = true;
+                record(&mut sim, &mut replay, &mut errors);
+            }
+            if tick == 30 {
+                // Pellets just ahead of each head, registered by a standalone
+                // broadcast as a diagnostic edit is, for pickups next step.
+                let b = &mut sim.0.backend;
+                let ahead: Vec<_> = b
+                    .world
+                    .snakes()
+                    .iter()
+                    .filter(|s| s.alive)
+                    .map(|s| Point {
+                        x: s.head.x + 12. * s.heading.cos(),
+                        y: s.head.y + 12. * s.heading.sin(),
+                    })
+                    .collect();
+                for at in ahead {
+                    b.world
+                        .insert_food(Food {
+                            x: at.x,
+                            y: at.y,
+                            value: 1.,
+                            size: None,
+                            origin: None,
+                        })
+                        .unwrap();
+                }
+                if let Err(error) = b.broadcast() {
+                    errors.push(error);
+                }
+                record(&mut sim, &mut replay, &mut errors);
+            }
+            if tick == 80 {
+                // Every snake's motion is encoded before recipients, but a
+                // prey only in recipient assembly: pose one recipient just
+                // inside the wire's edge with a prey just beyond it, so it
+                // fails after its own snake and a requested session ID. The
+                // pose and prey are undone before resuming.
+                let near = (EARLY..N)
+                    .find(|&slot| {
+                        sim.world().snakes()[slot].alive
+                            && sim.0.backend.slots[slot].connection.setup
+                    })
+                    .unwrap_or(N - 1);
+                for slot in 0..N {
+                    if sim.0.backend.slots[slot].connection.setup {
+                        sim.0.request_session_id(slot).unwrap();
+                    }
+                }
+                let b = &mut sim.0.backend;
+                let snake = &b.world.snakes()[near];
+                let saved = (snake.head, snake.body.clone(), snake.heading);
+                let edge = 10. - f64::from(crate::client::encode::GRID_CENTER);
+                let body = (0..saved.1.len())
+                    .map(|i| Point {
+                        x: edge + i as f64 * 40.,
+                        y: 0.,
+                    })
+                    .collect();
+                b.world
+                    .correct_pose(near, Point { x: edge, y: 0. }, body, TAU / 2.)
+                    .unwrap();
+                b.world
+                    .insert_prey(crate::ReplayPrey {
+                        prey: crate::Prey {
+                            id: 900_000,
+                            position: Point {
+                                x: edge - 30.,
+                                y: 0.,
+                            },
+                            heading: 0.,
+                            target_heading: 0.,
+                            speed: 2.,
+                            size: 10.,
+                        },
+                        mode: crate::prey::PreyMode::Roaming,
+                    })
+                    .unwrap();
+                if let Err(error) = b.broadcast() {
+                    errors.push(error);
+                }
+                b.world.remove_prey(900_000).unwrap();
+                b.world
+                    .correct_pose(near, saved.0, saved.1, saved.2)
+                    .unwrap();
+                record(&mut sim, &mut replay, &mut errors);
+            }
+            if tick == 100 {
+                // A fresh legacy adapter has no anchors, so this recipient's
+                // next moves fail conversion and close only its session.
+                sim.0.protocol13(5);
+            }
+            let epoch = sim.0.backend.food_epoch;
+            let result = if tick == 60 {
+                // Queued pongs give the socket prefix frames to hand over.
+                for slot in &mut sim.0.backend.slots[..EARLY] {
+                    slot.connection.pongs += 1;
+                }
+                sim.0
+                    .advance_tick_with(EARLY, &mut |_| Err("Early handoff failed".into()))
+            } else if tick % 2 == 1 {
+                let tick = sim.0.backend.tick + 1;
+                sim.0.advance_tick_with(EARLY, &mut |frames| {
+                    for (slot, frames) in frames {
+                        replay.frames.extend(
+                            frames
+                                .into_iter()
+                                .map(|(at, bytes)| (slot, tick, at.to_bits(), bytes)),
+                        );
+                    }
+                    Ok(())
+                })
+            } else {
+                sim.tick()
+            };
+            if let Err(error) = result {
+                errors.push(error);
+            }
+            maintenance |= sim.0.backend.food_epoch > epoch;
+            deaths += sim.world().deaths().len();
+            pickups += sim.world().pickup_events().unwrap().len();
+            decorated = decorated.max(
+                sim.0
+                    .backend
+                    .slots
+                    .iter()
+                    .filter(|s| s.connection.decorations)
+                    .map(|s| s.connection.decorated_food.perf_len())
+                    .sum::<usize>(),
+            );
+            record(&mut sim, &mut replay, &mut errors);
+        }
+        assert_views_ran(&sim, views);
+        sim.finish(&mut replay).unwrap();
+        replay.terminal["scene"] = json!({
+            "errors": errors, "deaths": deaths, "pickups": pickups, "rejoins": rejoins,
+            "decorated": decorated, "maintenance": maintenance, "living": living,
+        });
+        replay
+    }
+
+    /// The fault scene reaches every injected failure and the coverage it
+    /// claims, so a parallel match is not a match of two empty runs.
+    fn assert_fault_coverage(replay: &RawReplay, adaptive: bool) {
+        let scene = &replay.terminal["scene"];
+        let errors: Vec<&str> = scene["errors"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|e| e.as_str().unwrap())
+            .collect();
+        for expected in [
+            "Downlink queue is full",
+            "Early handoff failed",
+            "Coordinate is outside the protocol-19 wire range",
+            "Protocol-13 output failed: Protocol-13 anchor before appearance",
+        ] {
+            assert!(errors.contains(&expected), "{expected} missing: {errors:?}");
+        }
+        for count in ["deaths", "pickups", "rejoins", "decorated"] {
+            assert!(scene[count].as_u64().unwrap() > 0, "no {count}");
+        }
+        assert_eq!(scene["maintenance"], json!(true));
+        assert_eq!(replay.terminal["variableDt"], json!(adaptive));
+    }
+
+    #[test]
+    fn the_fault_scene_reaches_its_failures_and_coverage() {
+        for adaptive in [false, true] {
+            let replay = faults(None, adaptive);
+            assert_fault_coverage(&replay, adaptive);
+            replay.compare(&faults(None, adaptive)).unwrap();
+        }
+    }
+
+    #[cfg(feature = "parallel")]
+    #[test]
+    fn parallel_views_match_serial_through_failures_and_resume() {
+        for adaptive in [false, true] {
+            let serial = faults(None, adaptive);
+            for (threads, chunk) in [(1, 64), (2, 1), (3, 2), (4, 3), (7, 64), (8, 5)] {
+                serial
+                    .compare(&faults(Some((threads, chunk)), adaptive))
+                    .unwrap_or_else(|e| {
+                        panic!("adaptive {adaptive}, {threads} threads, chunk {chunk}: {e}")
+                    });
+            }
+        }
+    }
+
+    /// A pinned motion report gate: slot 1's heading changes and is reported
+    /// at once, returns, and changes back to the reported value just before
+    /// the gate reopens. Slot 4 first sees slot 1 between those changes, so
+    /// only its stale-report observation makes the reopened gate report.
+    /// Synthetic poses on a fixed open world, not a capture.
+    fn rearm(views: Views) -> RawReplay {
+        const N: usize = 6;
+        const X: usize = 1;
+        const R: usize = 4;
+        const E: u64 = 20;
+        let mut world_config = Config::official(N);
+        world_config.radius = 21_000.;
+        world_config.dynamic_radius = false;
+        world_config.size_to_population = false;
+        let config = SimulationConfig {
+            agents: N,
+            world: world_config,
+            delivery: DeliveryProfile::Official,
+            ..Default::default()
+        };
+        let mut world = Simulator::new(WorldOptions {
+            seed: 13,
+            config: config.world.clone(),
+            population: InitialPopulation::Placed {
+                ids: (0..N).map(|i| i.to_string()).collect(),
+                placement: Placement::TestRing,
+            },
+        })
+        .unwrap();
+        let straight = |head: Point, heading: f64, points: usize| {
+            (0..points)
+                .map(|i| Point {
+                    x: head.x - i as f64 * 40. * heading.cos(),
+                    y: head.y - i as f64 * 40. * heading.sin(),
+                })
+                .collect::<Vec<_>>()
+        };
+        for slot in 0..N {
+            let head = Point {
+                x: (slot % 3) as f64 * 6000. - 6000.,
+                y: (slot / 3) as f64 * 6000. - 3000.,
+            };
+            let body = straight(head, 0., 24);
+            world.correct_mass(slot, body.clone(), 0.25).unwrap();
+            world.correct_pose(slot, head, body, 0.).unwrap();
+        }
+        let mut sim = RawWorld::new(13, config, world).unwrap();
+        with_views(&mut sim, views);
+        let mut replay = RawReplay::default();
+        sim.record(&mut replay).unwrap();
+        let mut controls = vec![
+            Some(Action {
+                heading: 0.,
+                boost: false,
+            });
+            N
+        ];
+        for tick in 0..E + 20 {
+            // Reported at once (the gate is open), back for four ticks, then
+            // the reported value again before the gate reopens at E + 6.
+            let pinned = if tick == E || tick >= E + 5 { 0.5 } else { 0. };
+            let b = &mut sim.0.backend;
+            let snake = &b.world.snakes()[X];
+            let (head, body) = (snake.head, snake.body.clone());
+            b.world.correct_pose(X, head, body, pinned).unwrap();
+            controls[X] = Some(Action {
+                heading: pinned,
+                boost: false,
+            });
+            if tick == E + 2 {
+                // Bring slot 4 within vision of slot 1, beside its path.
+                let head = Point {
+                    x: head.x + 200.,
+                    y: head.y + 800.,
+                };
+                let body = straight(head, 0., b.world.snakes()[R].body.len());
+                b.world.correct_pose(R, head, body, 0.).unwrap();
+            }
+            sim.controls(&controls).unwrap();
+            sim.tick().unwrap();
+            sim.record(&mut replay).unwrap();
+        }
+        assert!(sim.world().snakes().iter().all(|s| s.alive));
+        assert!(sim.0.backend.slots[R].connection.snakes.contains_key(X));
+        assert_views_ran(&sim, views);
+        sim.finish(&mut replay).unwrap();
+        replay
+    }
+
+    #[cfg(feature = "parallel")]
+    #[test]
+    fn parallel_views_match_serial_through_report_gate_rearming() {
+        let serial = rearm(None);
+        for (threads, chunk) in [(1, 64), (2, 1), (3, 2), (4, 64), (7, 1), (8, 3)] {
+            serial
+                .compare(&rearm(Some((threads, chunk))))
+                .unwrap_or_else(|e| panic!("{threads} threads, chunk {chunk}: {e}"));
+        }
+    }
+
+    /// Each deliberate coordinator fault must change a replay (or abort it):
+    /// stale folds against the rearming scene, commit order and failed
+    /// partial views against the fault scene.
+    #[cfg(feature = "parallel")]
+    #[test]
+    fn the_view_oracle_detects_perturbed_commits() {
+        use super::super::views::{PERTURB, Perturb};
+        type Scene = fn(Views) -> RawReplay;
+        let scenes: [(Perturb, Scene); 3] = [
+            (Perturb::DropStale, rearm),
+            (Perturb::SwapCommit, |views| faults(views, false)),
+            (Perturb::DropFailedView, |views| faults(views, false)),
+        ];
+        for (perturb, scene) in scenes {
+            let serial = scene(None);
+            serial.compare(&scene(Some((4, 2)))).unwrap();
+            PERTURB.set(perturb);
+            let run = std::panic::catch_unwind(|| scene(Some((4, 2))));
+            PERTURB.set(Perturb::None);
+            assert!(
+                run.map_or(true, |run| serial.compare(&run).is_err()),
+                "{perturb:?} went undetected"
+            );
+        }
+    }
+
     #[cfg(feature = "parallel")]
     #[test]
     fn parallel_views_match_the_serial_replay() {

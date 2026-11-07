@@ -35,6 +35,26 @@ const WAVE_CHUNKS_PER_THREAD: usize = 4;
 /// Recipient ranges shorter than this keep the serial updates.
 const MIN_RANGE: usize = 1024;
 
+/// Deliberate coordinator faults the oracle tests must detect.
+#[cfg(test)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub(super) enum Perturb {
+    #[default]
+    None,
+    /// Discard stale-report contributions instead of folding them.
+    DropStale,
+    /// Commit each recipient's job in its successor's place.
+    SwapCommit,
+    /// Keep a failing job's error but not its partial view.
+    DropFailedView,
+}
+
+#[cfg(test)]
+thread_local! {
+    /// Read on the coordinator thread only, so each test sets its own.
+    pub(super) static PERTURB: std::cell::Cell<Perturb> = const { std::cell::Cell::new(Perturb::None) };
+}
+
 /// A recipient's view as the job found it. Only shared references cross to
 /// workers; connection queues and decoders are never touched.
 struct Base<'a> {
@@ -232,6 +252,12 @@ impl Job {
         reports: &mut [SnakeReports],
         query: &ViewQuery<'_>,
     ) -> Result<PacketViews, String> {
+        #[cfg(test)]
+        let perturb = PERTURB.get();
+        #[cfg(test)]
+        if perturb == Perturb::DropFailedView && self.result.is_err() {
+            return self.result;
+        }
         let View {
             over,
             snakes,
@@ -267,6 +293,10 @@ impl Job {
                 query.decorated_food,
                 query.food_changes,
             );
+        }
+        #[cfg(test)]
+        if perturb == Perturb::DropStale {
+            return self.result;
         }
         for (slot, stale) in self.stale {
             reports[slot as usize].fold(stale);
@@ -398,6 +428,14 @@ impl Waves {
     }
 
     pub(super) fn take(&mut self, slot: usize) -> Option<Job> {
-        self.wave.get_mut(slot.checked_sub(self.start)?)?.take()
+        let index = slot.checked_sub(self.start)?;
+        #[cfg(test)]
+        if PERTURB.get() == Perturb::SwapCommit
+            && self.wave.get(index + 1).is_some_and(Option::is_some)
+            && self.wave[index].is_some()
+        {
+            self.wave.swap(index, index + 1);
+        }
+        self.wave.get_mut(index)?.take()
     }
 }
