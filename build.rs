@@ -8,6 +8,19 @@ fn main() {
     {
         println!("cargo:rustc-cfg=slither_host_world_threads");
     }
+    println!("cargo:rustc-check-cfg=cfg(slither_host_view_threads)");
+    if std::fs::read_to_string("src/client/server.rs")
+        .is_ok_and(|source| source.contains("\n    pub view_threads: usize,"))
+    {
+        println!("cargo:rustc-cfg=slither_host_view_threads");
+    }
+    println!("cargo:rustc-check-cfg=cfg(slither_raw_view_threads)");
+    println!("cargo:rerun-if-changed=src/client/simulation/broadcast/perf.rs");
+    if std::fs::read_to_string("src/client/simulation/broadcast/perf.rs")
+        .is_ok_and(|source| source.contains("pub fn set_view_threads("))
+    {
+        println!("cargo:rustc-cfg=slither_raw_view_threads");
+    }
     println!("cargo:rustc-check-cfg=cfg(slither_world_rules)");
     println!("cargo:rerun-if-changed=src/transport/frame.rs");
     if std::fs::read_to_string("src/transport/frame.rs")

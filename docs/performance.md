@@ -214,6 +214,76 @@ The last line of each file is the report: the mean step is
 p95 and p99. Run `official-500-step` the same way to check that small worlds
 are not slowed down. For a host, compare `host_load --world-threads N`.
 
+## Parallel visibility
+
+The host's [`viewThreads`](hosting.md#view-threads) prepares part of each
+recipient's update on a separate pool after physics. For every set-up
+recipient a worker merges the coverage-grid cell with the snakes the
+recipient already shows, runs the exact coverage test on each candidate and
+lists the prey within vision in world order. The simulation thread then runs
+the unchanged per-recipient loop in slot order, taking eligibility and prey
+from those results: histories, delta caches, food diffs, stale-report
+observations, minimap, HUD and frame emission stay serial. Workers read only
+the tick's immutable query and the recipient's own snake history, which
+nothing else changes during the broadcast, so frames are identical for any
+pool size.
+
+Recipients go to workers in tasks of 64, in waves of four tasks per thread.
+The socket-player prefix and the bot range are separate, so early socket
+frames never wait for bot views. A range shorter than 1,024 recipients keeps
+the serial queries. With `viewThreads` 1 there is no pool and the loop runs
+the serial queries as before.
+
+`src/client/simulation/broadcast/perf.rs` replays two raw host scenes with 1,
+2, 3, 4, 7 and 8 view threads and chunks of 1 to 64 recipients, splitting
+even the smallest ranges, and requires every frame, scheduled time and the
+terminal host and view state to match the serial replay. One scene holds
+grown recipients with pickups, a death, slot reuse and mixed protocols; the
+other has long crossing bodies, recipients on coverage-cell corners, bodies
+and prey exactly at vision distance and one ULP beyond, and signed-zero
+heads.
+
+### Measured visibility scaling
+
+On an AWS c8a.4xlarge (16 cores) on 2026-11-07, release builds without
+CPU-specific flags, alternating the base revision and each thread count.
+`host_load` used `--bot-threads 7`, one world thread and one watcher; the
+values are simulation busy time per tick, median of 3 runs of 40 s (4,500
+bots) or 30 s (500 bots). The 500-bot rows below were measured with an
+earlier 256-recipient threshold, so they split; with the current threshold
+these hosts stay serial.
+
+| Workload | Base | 1 (default) | 2 | 4 | 8 |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| `host_load --bots 4500 --radius 32000` | 16.53 ms | 16.78 ms | 17.41 ms | 16.83 ms | 15.97 ms |
+| `host_load --bots 500`, split | 0.84 ms | 0.85 ms | 0.99 ms | 0.97 ms | 0.93 ms |
+| `engine-raw-official-500`, split, mean | 0.881 ms | 0.875 ms | 0.965 ms | 0.874 ms | 0.870 ms |
+
+Eight threads saved about 5% at 4,500 bots (run ranges 15.87–16.00 against
+16.38–16.95 ms); the host still fell far behind its 8 ms tick. Two threads
+were slower everywhere, and at 500 recipients splitting cost 8–15% on the
+host and gained nothing in the raw row, whose p99 rose from 1.6 to 1.9–2.0 ms.
+The coverage queries are only part of the loop, and moving them off the
+simulation thread also moves the first reads of each candidate snake, which
+the serial encoding then repeats. Spreading the encoding itself is the next
+step.
+
+Forced splits at other sizes, two 30 s runs each: 1,000 bots took 1.78 ms
+(4 threads) and 1.85 ms (8) against 1.89 ms serial, inside the run-to-run
+spread; 2,000 bots took 4.33 and 4.37 ms against 4.71 ms. That set the
+1,024-recipient threshold.
+
+The default is neutral in the deterministic raw row: 0.875 against 0.881 ms,
+with 0.8% fewer instructions per process. An earlier candidate that called
+the coverage test from two places stopped inlining it into the serial loop
+and ran 4.7% more instructions and 4% slower; `covered` is now inlined at both
+sites. With the default, 500-bot host busy time matched the base (0.843
+against 0.842 ms, median of 5 alternating 30 s runs). Traces of
+`engine-raw-official-500` (150 operations, 4 lines, 237 MB) hashed identically
+for the base and every view-thread count tried with splitting forced: 2, 3,
+4, 8 and 16 on the final code, and 1 to 16 including 7 on an earlier
+revision, apart from the report's `viewThreads` field.
+
 ## Controller transport
 
 `cargo run --release --locked --example perf_session` writes an untimed JSONL

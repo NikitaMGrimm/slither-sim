@@ -8,6 +8,19 @@
   frames and terminal host/view state (`RawReplay`, `RawWorld::{record, finish}`),
   and the optional `engine-raw-official-500` row times 500 grown recipients
   without sockets. Host behavior is unchanged.
+- A new host setting, `viewThreads` (default 1), finds which snakes and prey
+  each player sees on its own pool of that many threads, with frames identical
+  to a single thread. Only ranges of at least 1,024 bots or players split, and
+  the gain is small so far: eight threads saved about 5% of simulation time at
+  4,500 bots on a 16-core machine, and two threads were slower
+  ([measurements](https://github.com/NikitaMGrimm/slither-sim/blob/main/docs/performance.md#measured-visibility-scaling)).
+  `host_load` and the `engine-raw-official-500` row take `--view-threads`.
+
+### Breaking
+
+- `HostConfig` has a new public field, `view_threads` (default 1), so Rust
+  code that builds a `HostConfig` with a struct literal must set it or end
+  with `..HostConfig::default()`. JSON configs need no change.
 
 ## [0.11.0](https://github.com/NikitaMGrimm/slither-sim/compare/v0.10.0...v0.11.0) - 2026-11-06
 

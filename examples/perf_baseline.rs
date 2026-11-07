@@ -1,4 +1,4 @@
-//! Run in release mode: perf_baseline CASE ITERATIONS [--profile|--trace|--blocks M] [--parallel].
+//! Run in release mode: perf_baseline CASE ITERATIONS [--profile|--trace|--blocks M] [--parallel] [--view-threads N].
 //! `perf_baseline --list` prints the workload catalog as one canonical JSON line;
 //! REGISTRATIONS below is the only case list. See docs/performance-workloads.md.
 //! --profile is a separate timed step case; --trace emits untimed canonical JSONL.
@@ -634,6 +634,8 @@ struct Args {
     trace: bool,
     /// `Simulator::set_parallel(true)` on the timed world.
     parallel: bool,
+    /// Raw host view workers; 1 keeps recipient queries serial.
+    view_threads: usize,
     /// Reset-identical timed blocks in this process; None is the ordinary single run.
     blocks: Option<usize>,
     driver: Driver,
@@ -655,11 +657,11 @@ impl Args {
         let usage = || {
             let names: Vec<_> = workloads.iter().map(|w| w.name.as_str()).collect();
             format!(
-                "perf_baseline CASE ITERATIONS [--profile|--trace|--blocks M] [--parallel] | perf_baseline --list; CASE = {}; ITERATIONS = 1..{MAX_ITERATIONS}; M = 1..{MAX_BLOCKS}; --profile requires a profiled case (see --list); --parallel requires the parallel feature",
+                "perf_baseline CASE ITERATIONS [--profile|--trace|--blocks M] [--parallel] [--view-threads N] | perf_baseline --list; CASE = {}; ITERATIONS = 1..{MAX_ITERATIONS}; M = 1..{MAX_BLOCKS}; --profile requires a profiled case (see --list); --parallel requires the parallel feature; --view-threads above 1 requires an engine-raw case and the parallel feature",
                 names.join("|")
             )
         };
-        if !(2..=5).contains(&args.len()) {
+        if !(2..=7).contains(&args.len()) {
             return Err(usage());
         }
         let workload = workloads
@@ -671,10 +673,15 @@ impl Args {
             return Err(usage());
         }
         let (mut option, mut parallel, mut blocks) = (None, false, None);
+        let mut view_threads = None;
         let mut rest = args[2..].iter();
         while let Some(arg) = rest.next() {
             match arg.as_str() {
                 "--parallel" if !parallel => parallel = true,
+                "--view-threads" if view_threads.is_none() => {
+                    let count = rest.next().and_then(|count| count.parse::<usize>().ok());
+                    view_threads = Some(count.filter(|&count| count > 0).ok_or_else(usage)?);
+                }
                 "--profile" | "--trace" if option.is_none() => option = Some(arg.as_str()),
                 "--blocks" if option.is_none() => {
                     option = Some("--blocks");
@@ -690,6 +697,12 @@ impl Args {
         if parallel && !cfg!(feature = "parallel") {
             return Err(usage());
         }
+        let view_threads = view_threads.unwrap_or(1);
+        if view_threads > 1
+            && (!cfg!(feature = "parallel") || !workload.name.starts_with("engine-raw-"))
+        {
+            return Err(usage());
+        }
         let profile = option == Some("--profile");
         if profile && !workload.driver.profile() {
             return Err(usage());
@@ -700,6 +713,7 @@ impl Args {
             profile,
             trace: option == Some("--trace"),
             parallel,
+            view_threads,
             blocks,
             driver: workload.driver,
             operation: workload.operation,
@@ -999,6 +1013,9 @@ fn report(args: &Args, meter: Meter, operation: &str, details: Value) -> Value {
     // Present only when set, so default trace bytes stay comparable with older harnesses.
     if args.parallel {
         report["parallel"] = json!(true);
+    }
+    if args.view_threads > 1 {
+        report["viewThreads"] = json!(args.view_threads);
     }
     report
 }
@@ -2402,6 +2419,7 @@ mod tests {
             profile: false,
             trace: false,
             parallel: false,
+            view_threads: 1,
             blocks: None,
             driver,
             operation,

@@ -58,6 +58,7 @@ fn config(max_clients: usize, bots: usize) -> HostConfig {
         seed: 7,
         max_tick: None,
         world_threads: 1,
+        view_threads: 1,
         players: PlayerConfig {
             max: max_clients,
             ..Default::default()
@@ -297,6 +298,34 @@ fn world_threads_are_validated_and_a_pooled_world_serves_players() {
     }
     let host = Running::start(pooled);
     let mut bot = network(host.url(), "Pooled", Handshake::Challenge);
+    until(&mut bot, "self and every bot", |f| {
+        f.status == ClientStatus::Playing
+            && f.observation
+                .as_ref()
+                .is_some_and(|o| o.opponents.len() == 4)
+    });
+    bot.disconnect();
+    assert!(host.finish() > 0);
+}
+
+#[test]
+fn view_threads_are_validated_and_split_views_serve_players() {
+    assert_eq!(HostConfig::default().view_threads, 1);
+    let mut none = config(1, 0);
+    none.view_threads = 0;
+    assert!(none.validate().unwrap_err().contains("viewThreads"));
+    let parsed: HostConfig = serde_json::from_str(r#"{"viewThreads":3}"#).unwrap();
+    assert_eq!((parsed.view_threads, parsed.world_threads), (3, 1));
+    assert!(serde_json::from_str::<HostConfig>(r#"{"viewThreads":-1}"#).is_err());
+    let mut pooled = config(1, 4);
+    pooled.view_threads = 3;
+    pooled.world_threads = 2;
+    if !cfg!(feature = "parallel") {
+        assert!(pooled.validate().unwrap_err().contains("parallel"));
+        return;
+    }
+    let host = Running::start(pooled);
+    let mut bot = network(host.url(), "Views", Handshake::Challenge);
     until(&mut bot, "self and every bot", |f| {
         f.status == ClientStatus::Playing
             && f.observation

@@ -5,7 +5,7 @@ use slither_sim::client::{
     simulation::{RawReplay, RawWorld},
 };
 
-fn fixture(kind: EngineWorld) -> Result<RawWorld, String> {
+fn fixture(args: &Args, kind: EngineWorld) -> Result<RawWorld, String> {
     let config = kind.config();
     let mut world = runtime::ring(SEED, config.clone(), 500)?;
     for slot in 0..500 {
@@ -30,7 +30,7 @@ fn fixture(kind: EngineWorld) -> Result<RawWorld, String> {
             .map_err(|e| e.to_string())?;
     }
     runtime::record_events(&mut world);
-    RawWorld::new(
+    let mut sim = RawWorld::new(
         SEED,
         SimulationConfig {
             agents: 500,
@@ -39,7 +39,28 @@ fn fixture(kind: EngineWorld) -> Result<RawWorld, String> {
             ..Default::default()
         },
         world,
-    )
+    )?;
+    views(&mut sim, args)?;
+    Ok(sim)
+}
+
+/// Host-default view splitting after the serial setup broadcast. Workers are
+/// started and joined outside the operation timer, once per epoch. The 500
+/// recipients are below the host's 1,024-recipient minimum split, so every
+/// view stays serial and a pool started by `--view-threads` above 1 is idle.
+#[cfg(all(slither_raw_view_threads, feature = "parallel"))]
+fn views(sim: &mut RawWorld, args: &Args) -> Result<(), String> {
+    sim.set_view_threads(args.view_threads, None, None)
+}
+
+/// Older runtimes and serial builds prepare every view on this thread.
+#[cfg(not(all(slither_raw_view_threads, feature = "parallel")))]
+fn views(_: &mut RawWorld, args: &Args) -> Result<(), String> {
+    if args.view_threads == 1 {
+        Ok(())
+    } else {
+        Err("this runtime has no raw view threads".into())
+    }
 }
 
 fn drain(sim: &mut RawWorld, trace: bool, replay: &mut RawReplay) -> Result<usize, String> {
@@ -73,7 +94,7 @@ pub(super) fn run(args: &Args, kind: EngineWorld, out: &mut impl Write) -> Resul
     if args.profile {
         return Err("raw host phase profiles are unavailable".into());
     }
-    let mut sim = fixture(kind)?;
+    let mut sim = fixture(args, kind)?;
     let mut replay = RawReplay::default();
     warm(&mut sim, args.trace, &mut replay)?;
     let initial = sim.composition();
@@ -96,7 +117,7 @@ pub(super) fn run(args: &Args, kind: EngineWorld, out: &mut impl Write) -> Resul
                 )?;
                 replay = RawReplay::default();
             }
-            sim = fixture(kind)?;
+            sim = fixture(args, kind)?;
             warm(&mut sim, args.trace, &mut replay)?;
         }
         sim.controls(&controls)?;
