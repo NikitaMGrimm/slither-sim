@@ -19,6 +19,25 @@ fn host(count: usize, behavior: BotBehavior, seed: u32) -> RawSimulator {
     raw
 }
 
+/// Compares a live snake with a state recorded on x86-64 Linux. Other targets'
+/// libm rounds differently, so after thousands of ticks coordinates drift by
+/// ~1e-13 (macOS CI); numbers match within 1e-6, everything else exactly.
+fn assert_recorded(snake: &impl serde::Serialize, recorded: &serde_json::Value) {
+    fn close(a: &serde_json::Value, b: &serde_json::Value) -> bool {
+        use serde_json::Value::*;
+        match (a, b) {
+            (Number(a), Number(b)) => (a.as_f64().unwrap() - b.as_f64().unwrap()).abs() <= 1e-6,
+            (Array(a), Array(b)) => a.len() == b.len() && a.iter().zip(b).all(|(a, b)| close(a, b)),
+            (Object(a), Object(b)) => {
+                a.len() == b.len() && a.iter().all(|(k, v)| b.get(k).is_some_and(|w| close(v, w)))
+            }
+            _ => a == b,
+        }
+    }
+    let live = serde_json::to_value(snake).unwrap();
+    assert!(close(&live, recorded), "live {live}\nrecorded {recorded}");
+}
+
 /// Slot 0 is the only socket seat; every later slot is a host bot.
 fn bots(raw: &mut RawSimulator, behavior: BotBehavior) {
     let profiles = (0..raw.backend.slots.len() - 1)
@@ -608,14 +627,8 @@ fn scenario(
             owner["head"] = case["ownerHead"].clone();
             bot["head"] = case["botHead"].clone();
             bot["heading"] = case["botHeading"].clone();
-            assert_eq!(
-                serde_json::to_value(&raw.backend.world.snakes()[0]).unwrap(),
-                owner
-            );
-            assert_eq!(
-                serde_json::to_value(&raw.backend.world.snakes()[206]).unwrap(),
-                bot
-            );
+            assert_recorded(&raw.backend.world.snakes()[0], &owner);
+            assert_recorded(&raw.backend.world.snakes()[206], &bot);
             let snake = &raw.backend.world.snakes()[206];
             let ticks = (crate::client::host_bots::release_time(snake.segments, snake.fam) / dt)
                 .ceil() as usize;
