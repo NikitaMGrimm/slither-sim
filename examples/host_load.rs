@@ -135,8 +135,9 @@ fn run(options: Options) -> Result<(), String> {
         },
         bots: BotConfig {
             count: options.bots,
-            threads: options.bot_threads,
-            latency: LatencyConfig::fixed(options.round_trip),
+            threads: Some(options.bot_threads),
+            latency: Some(LatencyConfig::fixed(options.round_trip)),
+            ..Default::default()
         },
         simulation: SimulationConfig {
             world,
@@ -480,6 +481,7 @@ pub fn benchmark(
         bind: "127.0.0.1:0".parse().map_err(|_| "bad address")?,
         seed: 7,
         max_tick: None,
+        owner_key: None,
         players: PlayerConfig {
             max: clients,
             latency: LatencyConfig::fixed(0.),

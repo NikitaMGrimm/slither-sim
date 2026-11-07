@@ -12,6 +12,7 @@
 //! anchor, tail, mass and motion deltas. Native and remote coverage is shared.
 use super::{
     Backend, Bot, ClientFrame, ClientState, ClientStatus, ForagerBot, WireEvent, WireRecord,
+    host_bots::InWorldBots,
     latency::{LatencyConfig, Random},
     presentation::FoodPresentation,
 };
@@ -21,6 +22,10 @@ use std::{collections::BTreeMap, f64::consts::TAU, sync::Arc};
 /// Official candidate budget. A failed random search does not prove that no
 /// legal pose exists; circular worlds use their larger cached-query budget.
 const SPAWN_ATTEMPTS: usize = 64;
+const NO_CLEAR_SPAWN: &str =
+    "Spawn candidate search exhausted: no sampled position is clear of other snakes";
+const NO_FITTING_SPAWN: &str =
+    "Spawn candidate search exhausted: no sampled position fits inside the arena";
 /// Undelivered input messages per remote connection. Output has a separate byte
 /// budget: legacy messages must not consume the client's input allowance.
 pub(super) const REMOTE_IN_FLIGHT: usize = connection::MAX_IN_FLIGHT / 2;
@@ -39,6 +44,7 @@ pub(crate) const MAX_NICKNAME: usize = 24;
 /// the record packet carries the remainder without a length field.
 pub(crate) const MAX_VICTORY_TEXT: usize = 140;
 static NATIVE_PROFILE: PlayerAppearance = PlayerAppearance {
+    owner: false,
     nickname: Vec::new(),
     skin: 0,
     custom_skin: Vec::new(),
@@ -47,6 +53,9 @@ static NATIVE_PROFILE: PlayerAppearance = PlayerAppearance {
 /// Profile a remote player sends at login, repeated in its snake's appearance.
 #[derive(Clone, Debug, Default)]
 pub(crate) struct PlayerAppearance {
+    /// The login ended with the host's `ownerKey` marker, already stripped
+    /// from `nickname`. Admission reads it; it is never sent or recorded.
+    pub owner: bool,
     pub nickname: Vec<u8>,
     pub skin: u8,
     pub custom_skin: Vec<u8>,
@@ -62,6 +71,8 @@ pub use broadcast::perf::{RawReplay, RawWorld};
 mod config;
 mod connection;
 mod food;
+#[cfg(test)]
+mod host_bot_tests;
 mod markers;
 mod minimap;
 #[cfg(test)]
@@ -92,6 +103,11 @@ use snakes::{BodyBounds, CoverageGrid, SnakeReports};
 /// `Simulator::respawn_body` at a clear pose drawn from `spawn::spawn_distance`.
 /// A living snake is first removed without death food.
 pub struct SimulatorBackend {
+    /// Slot and life of the newest admitted session that presented the
+    /// host's `ownerKey`. An older owner session is not restored.
+    owner: Option<(usize, u64)>,
+    /// World-thread `center`/`follow` bot slots; `None` on forager hosts.
+    in_world_bots: Option<InWorldBots>,
     #[cfg(feature = "frame-bench")]
     frame_bench: bool,
     config: SimulationConfig,
@@ -204,6 +220,8 @@ impl SimulatorBackend {
             food_births: true,
         });
         let mut backend = Self {
+            owner: None,
+            in_world_bots: None,
             #[cfg(feature = "frame-bench")]
             frame_bench: false,
             random: Random::new(u64::from(seed) ^ 0x6c61_7465_6e63_7900),
@@ -295,6 +313,14 @@ impl SimulatorBackend {
 
     pub fn config(&self) -> &SimulationConfig {
         &self.config
+    }
+
+    /// The owner's living slot. Binding the life keeps a later ordinary life
+    /// in the same slot from inheriting ownership.
+    pub(super) fn owner_slot(&self) -> Option<usize> {
+        self.owner.and_then(|(slot, life)| {
+            (self.slots[slot].life == life && self.world.snakes()[slot].alive).then_some(slot)
+        })
     }
     /// Local and server virtual time in seconds.
     pub fn time(&self) -> f64 {
@@ -490,6 +516,16 @@ impl SimulatorBackend {
     }
 
     fn spawn_pose_waited(&mut self, slot: usize, waited: f64) -> Result<(Vec<Point>, f64), String> {
+        self.spawn_pose_vetoed(slot, waited, &mut |_, _| true)
+    }
+
+    /// `spawn_pose_waited`, also skipping candidate bodies `allowed` rejects.
+    fn spawn_pose_vetoed(
+        &mut self,
+        slot: usize,
+        waited: f64,
+        allowed: &mut dyn FnMut(&[Point], f64) -> bool,
+    ) -> Result<(Vec<Point>, f64), String> {
         let circular = self.world.config().spawn_radius.is_some();
         let mut safety: Option<spawn::Safety> = None;
         let mut floor = None;
@@ -532,6 +568,9 @@ impl SimulatorBackend {
                 .world
                 .spawn_body(head, heading)
                 .map_err(|error| error.to_string())?;
+            if !allowed(&body, heading) {
+                continue;
+            }
             let clear = if circular {
                 let query = safety.get_or_insert_with(|| {
                     spawn::Safety::new_excluding(
@@ -590,14 +629,8 @@ impl SimulatorBackend {
         }
         match open {
             Some((margin, body, heading)) if margin > 0. => Ok((body, heading)),
-            Some(_) => Err(
-                "Spawn candidate search exhausted: no sampled position is clear of other snakes"
-                    .into(),
-            ),
-            None => Err(
-                "Spawn candidate search exhausted: no sampled position fits inside the arena"
-                    .into(),
-            ),
+            Some(_) => Err(NO_CLEAR_SPAWN.into()),
+            None => Err(NO_FITTING_SPAWN.into()),
         }
     }
 
@@ -629,6 +662,62 @@ impl SimulatorBackend {
                     }
                 }
                 _ => {}
+            }
+        }
+        Ok(())
+    }
+
+    /// Respawn and steer `center`/`follow` slots. Forager hosts return at
+    /// once: no owner sampling, scans or allocations on their path.
+    fn drive_in_world_bots(&mut self) -> Result<(), String> {
+        let Some(mut bots) = self.in_world_bots.take() else {
+            return Ok(());
+        };
+        let driven = self.drive_with(&mut bots);
+        self.in_world_bots = Some(bots);
+        driven
+    }
+
+    fn drive_with(&mut self, bots: &mut InWorldBots) -> Result<(), String> {
+        bots.observe(&self.world, self.owner_slot());
+        for slot in bots.slots() {
+            if !self.world.snakes()[slot].alive {
+                if !bots.decides(slot, self.tick) {
+                    continue;
+                }
+                // The ordinary search, also skipping bodies in the owner's path.
+                match self.spawn_pose_vetoed(slot, 0., &mut |body, heading| {
+                    bots.spawn_is_safe(body, heading)
+                }) {
+                    Ok((body, heading)) => {
+                        self.world
+                            .respawn_body(slot, body, heading)
+                            .map_err(|error| error.to_string())?;
+                        let s = &mut self.slots[slot];
+                        s.life += 1;
+                        s.control = Action {
+                            heading,
+                            boost: false,
+                        };
+                        bots.born(slot, heading);
+                    }
+                    // A crowded arena may have no clear pose yet; retry next decision.
+                    Err(reason)
+                        if matches!(
+                            reason.as_str(),
+                            spawn::WAITING | NO_CLEAR_SPAWN | NO_FITTING_SPAWN
+                        ) =>
+                    {
+                        continue;
+                    }
+                    Err(reason) => return Err(reason),
+                }
+            }
+            if let Some(heading) = bots.heading(&self.world, slot, self.tick) {
+                self.slots[slot].control = Action {
+                    heading,
+                    boost: false,
+                };
             }
         }
         Ok(())

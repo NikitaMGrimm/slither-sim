@@ -11,6 +11,8 @@ mod encode;
 mod encode13;
 mod fast_hash;
 mod forager;
+mod host_bots;
+mod owner;
 pub use forager::ForagerBot;
 pub mod hud;
 pub mod latency;
@@ -27,6 +29,7 @@ pub mod simulation;
 pub mod transport;
 mod visibility;
 
+pub use host_bots::BotBehavior;
 pub use hud::{
     ClientHud, DailyRecord, KillReport, Leaderboard, LeaderboardEntry, MinimapTeams,
     SessionIdentifiers, SnakeProfile, SnakeRemoval, TeamScores,
@@ -34,6 +37,7 @@ pub use hud::{
 pub use latency::{LatencyConfig, Pauses, Variation};
 pub use minimap::{MAX_FRAME_MINIMAP_CELLS, MAX_TEAM_MINIMAP_CELLS, Minimap};
 pub use network::{NetworkBackend, NetworkConfig};
+pub use owner::OwnerKey;
 pub use protocol::ClientState;
 pub use received::{
     CategoryKnowledge, ReceivedField, ReceivedHistory, ReceivedMetadata, ReceivedSnake,

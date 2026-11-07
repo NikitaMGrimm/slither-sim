@@ -30,6 +30,24 @@ impl RawSimulator {
     pub(crate) fn set_view_pool(&mut self, pool: crate::client::server::HostPool) {
         self.backend.views = Some(super::broadcast::ViewWorkers::new(pool));
     }
+    /// Hand slots `first..` to world-thread `center`/`follow` bots with these
+    /// fixed profiles. Their connections stay closed for the whole host run.
+    pub(crate) fn set_in_world_bots(
+        &mut self,
+        first: usize,
+        behavior: crate::client::BotBehavior,
+        profiles: Vec<PlayerAppearance>,
+    ) {
+        let b = &mut self.backend;
+        let slots = first..b.slots.len();
+        assert_eq!(profiles.len(), slots.len(), "one profile per bot slot");
+        for (slot, profile) in slots.clone().zip(profiles) {
+            b.food_presentation
+                .register(slot, profile.skin, &profile.custom_skin);
+            b.profiles[slot] = profile;
+        }
+        b.in_world_bots = Some(crate::client::host_bots::InWorldBots::new(slots, behavior));
+    }
     #[cfg(feature = "frame-bench")]
     pub(crate) fn set_frame_bench(&mut self, enabled: bool) {
         self.backend.frame_bench = enabled;
@@ -167,6 +185,14 @@ impl RawSimulator {
         b.world
             .respawn_body(slot, body, heading)
             .map_err(|error| error.to_string())?;
+        if appearance.owner {
+            // The newest key-bearing session replaces any earlier owner; an
+            // ordinary life in the owner's slot ends ownership by its life.
+            b.owner = Some((slot, b.slots[slot].life + 1));
+            if let Some(bots) = &mut b.in_world_bots {
+                bots.reset_owner();
+            }
+        }
         b.profiles[slot] = appearance;
         let s = &mut b.slots[slot];
         s.life += 1;

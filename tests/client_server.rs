@@ -4,9 +4,9 @@
 use slither_sim::{
     Action,
     client::{
-        Backend, BotConfig, ClientFrame, ClientStatus, Host, HostConfig, LatencyConfig,
-        NetworkBackend, NetworkConfig, PlayerConfig, RunningHost, SimulationConfig,
-        challenge::solve_challenge, network::Handshake, network::login_packet,
+        Backend, BotBehavior, BotConfig, ClientFrame, ClientStatus, Host, HostConfig,
+        LatencyConfig, NetworkBackend, NetworkConfig, OwnerKey, PlayerConfig, RunningHost,
+        SimulationConfig, challenge::solve_challenge, network::Handshake, network::login_packet,
     },
 };
 use std::{
@@ -52,6 +52,7 @@ fn config(max_clients: usize, bots: usize) -> HostConfig {
     // Every snake is covered, so all players receive each other.
     simulation.world.vision = 3000.;
     HostConfig {
+        owner_key: None,
         #[cfg(feature = "frame-bench")]
         frame_bench: false,
         bind: "127.0.0.1:0".parse().unwrap(),
@@ -339,7 +340,7 @@ fn view_threads_are_validated_and_split_views_serve_players() {
 #[test]
 fn bot_threads_steer_their_snakes() {
     let mut config = config(1, 4);
-    config.bots.threads = 2;
+    config.bots.threads = Some(2);
     let host = Running::start(config);
     let mut watcher = network(host.url(), "Watcher", Handshake::Direct);
     let first = until(&mut watcher, "every bot", |f| {
@@ -364,6 +365,38 @@ fn bot_threads_steer_their_snakes() {
         }
     }
     watcher.disconnect();
+    assert!(host.finish() > 0);
+}
+
+#[test]
+fn world_thread_bots_play_for_a_socket_owner() {
+    let mut config = config(1, 4);
+    config.owner_key = Some(OwnerKey::from("bananatest".to_owned()));
+    config.bots.behavior = BotBehavior::Follow;
+    let host = Running::start(config);
+    // The owner's own socket sees all four bots, driven without bot clients:
+    // each one turns away from its random spawn heading at some point.
+    let mut owner = network(host.url(), "Name !bananatest", Handshake::Direct);
+    let first = until(&mut owner, "every bot", |f| {
+        f.observation
+            .as_ref()
+            .is_some_and(|o| o.opponents.len() == 4)
+    })
+    .observation
+    .unwrap();
+    let mut turned = std::collections::BTreeSet::new();
+    let start = Instant::now();
+    while turned.len() < 4 {
+        assert!(start.elapsed() < WAIT, "only {} bots turned", turned.len());
+        let frame = owner.next_frame().unwrap();
+        for snake in frame.observation.iter().flat_map(|o| &o.opponents) {
+            let spawned = first.opponents.iter().find(|o| o.id == snake.id);
+            if spawned.is_some_and(|o| (o.heading - snake.heading).abs() > 0.2) {
+                turned.insert(snake.id.clone());
+            }
+        }
+    }
+    owner.disconnect();
     assert!(host.finish() > 0);
 }
 
@@ -1253,9 +1286,9 @@ fn configuration_is_bounded_and_documents_derived_fields() {
     assert_eq!(default.bind, "127.0.0.1:8766".parse().unwrap());
     assert_eq!(default.players.max, 4);
     assert_eq!(default.bots.count, 4);
-    assert_eq!(default.bots.threads, 2);
+    assert_eq!(default.bots.threads, None);
     assert_eq!(default.players.latency, LatencyConfig::default());
-    assert_eq!(default.bots.latency, LatencyConfig::default());
+    assert_eq!(default.bots.latency, None);
     default.validate().unwrap();
     assert!(config(0, 4).validate().is_err());
     // Protocol-19 rank and population are u16: 65535 slots, not a policy cap of 128.
@@ -1271,7 +1304,7 @@ fn configuration_is_bounded_and_documents_derived_fields() {
     derived.simulation.controlled_slot = 50;
     derived.validate().unwrap();
     let mut threadless = config(1, 2);
-    threadless.bots.threads = 0;
+    threadless.bots.threads = Some(0);
     assert!(threadless.validate().unwrap_err().contains("bots.threads"));
     threadless.bots.count = 0;
     threadless.validate().unwrap();
@@ -1299,15 +1332,18 @@ fn host_latency_validation_names_the_role_and_rejects_player_processing() {
         assert!(error.contains("must be zero"), "{error}");
     }
     host.players.latency = LatencyConfig::fixed(0.06);
-    host.bots.latency.processing_seconds = [0.01, 0.02];
-    host.bots.latency.processing_jitter_seconds = 0.003;
+    host.bots.latency.get_or_insert_default().processing_seconds = [0.01, 0.02];
+    host.bots
+        .latency
+        .get_or_insert_default()
+        .processing_jitter_seconds = 0.003;
     host.validate().unwrap();
     for player in [true, false] {
         let mut invalid = host.clone();
         let (latency, field) = if player {
             (&mut invalid.players.latency, "players.latency")
         } else {
-            (&mut invalid.bots.latency, "bots.latency")
+            (invalid.bots.latency.as_mut().unwrap(), "bots.latency")
         };
         latency.round_trip_seconds = vec![-1.];
         assert!(invalid.validate().unwrap_err().contains(field));

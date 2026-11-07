@@ -25,6 +25,8 @@ include = [
     "/examples/bot.mjs",
     "/examples/ffi_bot.py",
     "/tests/fixtures/forager-native-parity.json",
+    "/tests/fixtures/follow-frozen-geometry.json",
+    "/tests/fixtures/follow-gentle-contacts.json",
     "/tests/fixtures/forager-conformance.json",
     "/tests/fixtures/forager-oracle-windows-x86_64-msvc.json",
     "/tests/fixtures/forager-oracle-linux-x86_64-gnu.json",
@@ -100,3 +102,14 @@ sha2 = "0.11"
 [profile.release]
 lto = "thin"
 codegen-units = 1
+
+# The long follow-bot scenarios in host_bot_tests.rs skip unoptimized builds,
+# where they take minutes; tools/check.py runs them once with this
+# quick-to-build optimized profile.
+[profile.scenarios]
+inherits = "dev"
+opt-level = 1
+debug = false
+debug-assertions = false
+overflow-checks = false
+incremental = false

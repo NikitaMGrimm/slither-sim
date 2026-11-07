@@ -179,6 +179,20 @@ cargo test --locked --features networking --test client_protocol --test client_h
 
 ## Selecting and updating cases
 
+`follow-frozen-geometry.json` is a synthetic reduction of a host-follow diagnostic
+bound hit. It pins the snapshot/replay source hashes, fixed input phase and
+zero engine contacts against that frozen line. The unit test also checks
+deliberately lethal body-segment and head-tip geometries. This is not a complete
+world checkpoint or proof of follow safety under later growth or contraction.
+
+`follow-gentle-contacts.json` selects the three consecutive seed-73 fitted
+contacts at ticks 14266–14268. It preserves the shared full snake states,
+per-case changes, raw snapshot hashes and exact input phase. Both fitted and
+engine-driven owner paths can reach the frozen line; the scenario regression
+replays the full physical host state with moving bots through each release
+horizon and checks its final checkpoint against the original host. Frozen-line
+hits remain advisory for this gentle-circle scenario; actual owner deaths fail.
+
 Keep bounded selected cases in `tests/fixtures/`; full recordings/study bundles
 stay outside Git. Add cases for new scenarios, preserve valid regressions and
 avoid wholesale reformatting. Record source study/window; distinguish raw
