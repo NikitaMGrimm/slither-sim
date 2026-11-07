@@ -19,24 +19,27 @@
   `host_load` and the `engine-raw-official-500` row take `--view-threads`.
 - Hosts can set `bots.behavior` to `center` or `follow` for cheap bots that
   the world thread drives directly, with no bot workers or packets. Center bots
-  head for the arena center. Follow bots chase the owner and crash into the
-  owner's body. They plan around a steady heading or turn rate, including very
-  gentle quantized turns; eventual owner safety remains unproven because
-  future growth and missed predicted strikes can invalidate body lifetimes.
-  Active follow bots require fixed ticks (`maxTick` omitted).
-  Collisions and death food work as usual. The
-  owner is the newest player whose nickname ends in `!` and the new `ownerKey`,
-  which the host removes from the name at login. The default `forager` bots are
+  head for the arena center. Follow bots chase the server owner and crash into
+  the owner's body, leaving ordinary death food. The owner is the newest player
+  whose nickname ends in `!` plus the new `ownerKey`; the host removes that
+  marker at login. Follow bots steer around an owner who holds a steady heading
+  or turn, but cannot guarantee the owner's safety
+  ([limits](https://github.com/NikitaMGrimm/slither-sim/blob/main/docs/hosting.md#what-is-and-isnt-guaranteed)),
+  and they need fixed ticks (no `maxTick`). The default `forager` bots are
   unchanged.
 
 ### Breaking
 
-- `HostConfig` has a new public field, `view_threads` (default 1), so Rust
-  code that builds a `HostConfig` with a struct literal must set it or end
-  with `..HostConfig::default()`. JSON configs need no change.
+- `HostConfig` has new public fields, `view_threads` (default 1) and
+  `owner_key` (default `None`), and `BotConfig` has `behavior` (default
+  `Forager`). Rust code that builds either with a struct literal must set them
+  or end with `..Default::default()`. JSON configs need no change.
 - `BotConfig::threads` and `BotConfig::latency` are now `Option`s; `None`
   keeps the forager defaults. In JSON, an explicit `null` for either is
   rejected.
+- With the default `parallel` feature, `Host` and `SimulatorBackend` are no
+  longer `UnwindSafe` or `RefUnwindSafe`, because they hold the `viewThreads`
+  pool. Wrap them in `AssertUnwindSafe` to pass them through `catch_unwind`.
 
 ## [0.11.0](https://github.com/NikitaMGrimm/slither-sim/compare/v0.10.0...v0.11.0) - 2026-11-06
 
