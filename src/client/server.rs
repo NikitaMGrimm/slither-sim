@@ -133,9 +133,9 @@ pub struct HostConfig {
     /// Threads that step the world, including the simulation thread. Above 1,
     /// the world gets its own pool of this size; results are unchanged.
     pub world_threads: usize,
-    /// Threads that prepare per-player visibility after each world step,
-    /// including the simulation thread. Above 1, views get their own pool of
-    /// this size; frames are unchanged.
+    /// Threads that prepare per-player visibility after each world step.
+    /// Above 1, views get their own pool of this size while the simulation
+    /// thread waits; frames are unchanged.
     pub view_threads: usize,
 }
 
