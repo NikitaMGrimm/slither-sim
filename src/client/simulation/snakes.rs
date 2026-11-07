@@ -329,6 +329,23 @@ impl SnakeReports {
         self.motion_stale |= [known.heading, known.wanted, known.speed] != self.motion;
         self.fam_stale |= known.fam != self.fam;
     }
+
+    /// `observe`'s contribution, for a view worker to return. Within a
+    /// broadcast nothing reads the stale flags, so folding contributions
+    /// later in slot order leaves the same flags.
+    #[cfg(feature = "parallel")]
+    pub(super) fn stale(&self, known: &KnownSnake) -> (bool, bool) {
+        (
+            [known.heading, known.wanted, known.speed] != self.motion,
+            known.fam != self.fam,
+        )
+    }
+
+    #[cfg(feature = "parallel")]
+    pub(super) fn fold(&mut self, (motion, fam): (bool, bool)) {
+        self.motion_stale |= motion;
+        self.fam_stale |= fam;
+    }
 }
 
 /// What one connection has been told about each snake slot.
@@ -521,7 +538,10 @@ impl CoverageGrid {
 /// Recipient updates and view workers both call this per candidate. With a
 /// second caller the compiler stopped inlining it into the serial loop, which
 /// cost the default single-thread host about 4.7% more instructions in
-/// `engine-raw-official-500`; keep it inlined at both sites.
+/// `engine-raw-official-500`; keep it inlined at both sites. The edge scans
+/// are plain loops for the same reason: an `any` closure is one generic
+/// instance shared by both callers, and was left out of line (about 9% of
+/// that row's samples in a separate symbol).
 #[inline(always)]
 pub(super) fn covered(
     head: Point,
@@ -546,10 +566,7 @@ pub(super) fn covered(
         return true;
     }
     if body_bounds.is_empty() || !boundable(head) || !(0. ..=BODY_BOUND_LIMIT).contains(&vision) {
-        return snake
-            .body
-            .windows(2)
-            .any(|pair| physics::segment_distance_le(head, pair[0], pair[1], vision));
+        return near_edge(head, &snake.body, vision);
     }
     // As in the admission bounds, one unit safely exceeds projection/hypot
     // roundoff at this finite scale. This only skips impossible blocks; the
@@ -569,10 +586,18 @@ pub(super) fn covered(
         }
         let first = block * BODY_BOUND_EDGES;
         let end = (first + BODY_BOUND_EDGES + 1).min(snake.body.len());
-        if snake.body[first..end]
-            .windows(2)
-            .any(|pair| physics::segment_distance_le(head, pair[0], pair[1], vision))
-        {
+        if near_edge(head, &snake.body[first..end], vision) {
+            return true;
+        }
+    }
+    false
+}
+
+/// Whether any edge between consecutive `points` lies within `vision`.
+#[inline(always)]
+fn near_edge(head: Point, points: &[Point], vision: f64) -> bool {
+    for pair in points.windows(2) {
+        if physics::segment_distance_le(head, pair[0], pair[1], vision) {
             return true;
         }
     }

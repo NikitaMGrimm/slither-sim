@@ -214,75 +214,98 @@ The last line of each file is the report: the mean step is
 p95 and p99. Run `official-500-step` the same way to check that small worlds
 are not slowed down. For a host, compare `host_load --world-threads N`.
 
-## Parallel visibility
+## Parallel views
 
-The host's [`viewThreads`](hosting.md#view-threads) prepares part of each
-recipient's update on a separate pool after physics. For every set-up
-recipient a worker merges the coverage-grid cell with the snakes the
-recipient already shows, runs the exact coverage test on each candidate and
-lists the prey within vision in world order. The simulation thread then runs
-the unchanged per-recipient loop in slot order, taking eligibility and prey
-from those results: histories, delta caches, food diffs, stale-report
-observations, minimap, HUD and frame emission stay serial. Workers read only
-the tick's immutable query and the recipient's own snake history, which
-nothing else changes during the broadcast, so frames are identical for any
-pool size.
+The host's [`viewThreads`](hosting.md#view-threads) assembles each player's
+update on a separate pool after physics. For every set-up recipient a worker
+runs the same code as the serial loop: game over, radius and rules, which
+snakes it sees and their packets, food and decorated food, then prey. It works
+on a copy of that recipient's view (its snake and prey histories and a few
+scalars) and reads its held food listings without changing them, returning
+the listing changes as an edit. Delta caches and food-diff memoization are
+local to each task; they only reuse identical encodings, so the bytes match a
+shared cache. Stale-report observations are recorded instead of written.
+
+The simulation thread still walks recipients in slot order. At the point
+where it used to build a recipient's update, it commits that recipient's job:
+the view, the food edits and the stale observations. Nothing reads those
+flags during a broadcast, so folding them in later gives the same flags.
+Minimap, HUD and frame emission then run unchanged. Workers never touch
+queues, decoders or the world, and the world never advances while a wave is
+out. A failing job carries its partial view: the commit applies it, as the
+serial path would leave it, and returns the error. Later jobs of the wave are
+dropped, so those recipients stay as the serial path leaves them.
 
 Recipients go to workers in tasks of 64, in waves of four tasks per thread.
 The socket-player prefix and the bot range are separate, so early socket
-frames never wait for bot views. A range shorter than 1,024 recipients keeps
-the serial queries. With `viewThreads` 1 there is no pool and the loop runs
-the serial queries as before.
+frames never wait for bot views. A range shorter than 1,024 recipients stays
+serial. With `viewThreads` 1 there is no pool and no staging; the serial loop
+moves the view out of the connection, assembles and moves it back.
 
-`src/client/simulation/broadcast/perf.rs` replays two raw host scenes with 1,
-2, 3, 4, 7 and 8 view threads and chunks of 1 to 64 recipients, splitting
+`src/client/simulation/broadcast/perf.rs` replays four raw host scenes with
+1, 2, 3, 4, 7 and 8 view threads and chunks of 1 to 64 recipients, splitting
 even the smallest ranges, and requires every frame, scheduled time and the
-terminal host and view state to match the serial replay. One scene holds
-grown recipients with pickups, a death, slot reuse and mixed protocols; the
-other has long crossing bodies, recipients on coverage-cell corners, bodies
-and prey exactly at vision distance and one ULP beyond, and signed-zero
-heads.
+terminal host and view state to match the serial replay:
 
-### Measured visibility scaling
+- grown recipients with pickups, maintenance, a death, slot reuse and mixed
+  protocols 13 and 19;
+- long crossing bodies, recipients on coverage-cell corners, bodies and prey
+  exactly at vision distance and one ULP beyond, and signed-zero heads;
+- a Battledome scene with decorated food, measured-route jitter, deaths,
+  rejoins and session IDs, with fixed and adaptive dt, and four injected
+  failures, each followed by more ticks: a full local queue, a failing early
+  socket handoff, a legacy conversion fault that closes one session, and an
+  encoding error inside one recipient's assembly;
+- a report gate that a newly appearing viewer rearms.
+
+Test-only faults (dropping stale observations, committing jobs in a
+neighbour's place, or dropping a failed job's partial view) each change a
+replay.
+
+### Measured view scaling
 
 On an AWS c8a.4xlarge (16 cores) on 2026-11-07, release builds without
 CPU-specific flags, alternating the base revision and each thread count.
 `host_load` used `--bot-threads 7`, one world thread and one watcher; the
 values are simulation busy time per tick, median of 3 runs of 40 s (4,500
-bots) or 30 s (500 bots). The 500-bot rows below were measured with an
-earlier 256-recipient threshold, so they split; with the current threshold
-these hosts stay serial.
+bots) or 5 runs of 30 s (500 bots). The raw row is the median of 5 alternating
+runs; its split columns force splitting below the 1,024 threshold with
+`perf_baseline engine-raw-official-500 N --view-threads T --force-view-split`
+(release, `--features perf-internals`). Without `--force-view-split` its 500
+recipients stay serial.
 
 | Workload | Base | 1 (default) | 2 | 4 | 8 |
 | --- | ---: | ---: | ---: | ---: | ---: |
-| `host_load --bots 4500 --radius 32000` | 16.53 ms | 16.78 ms | 17.41 ms | 16.83 ms | 15.97 ms |
-| `host_load --bots 500`, split | 0.84 ms | 0.85 ms | 0.99 ms | 0.97 ms | 0.93 ms |
-| `engine-raw-official-500`, split, mean | 0.881 ms | 0.875 ms | 0.965 ms | 0.874 ms | 0.870 ms |
+| `host_load --bots 4500 --radius 32000` | 17.12 ms | 16.99 ms | 18.20 ms | 12.96 ms | 11.50 ms |
+| `host_load --bots 500` | 0.843 ms | 0.842 ms | — | — | — |
+| `engine-raw-official-500`, mean | 0.882 ms | 0.867 ms | 1.005 ms | 0.863 ms | 0.803 ms |
+| `engine-raw-official-500`, p99 | 1.61 ms | 1.60 ms | 2.01 ms | 1.89 ms | 1.82 ms |
 
-Eight threads saved about 5% at 4,500 bots (run ranges 15.87–16.00 against
-16.38–16.95 ms); the host still fell far behind its 8 ms tick. Two threads
-were slower everywhere, and at 500 recipients splitting cost 8–15% on the
-host and gained nothing in the raw row, whose p99 rose from 1.6 to 1.9–2.0 ms.
-The coverage queries are only part of the loop, and moving them off the
-simulation thread also moves the first reads of each candidate snake, which
-the serial encoding then repeats. Spreading the encoding itself is the next
-step.
+Eight threads cut simulation time at 4,500 bots by a third (run ranges
+11.37–11.69 against 17.10–17.24 ms) and four threads by a quarter. The host
+still fell behind its 8 ms tick. Two threads were slower everywhere: the
+simulation thread waits while the pool works, so two workers barely cover the
+copying, commits and wave dispatch. In the raw row splitting raised p99 even
+where the mean fell. Forced splits on the first revision of this code, at
+1,000 bots, ran 1.92 ms (8 threads) against
+1.91 ms serial and 2.20 ms (4 threads); at 2,000 bots 3.70 and 4.20 ms against
+4.77 ms, so the 1,024 threshold stays.
 
-Forced splits at other sizes, two 30 s runs each: 1,000 bots took 1.78 ms
-(4 threads) and 1.85 ms (8) against 1.89 ms serial, inside the run-to-run
-spread; 2,000 bots took 4.33 and 4.37 ms against 4.71 ms. That set the
-1,024-recipient threshold.
+With eight threads, most of the simulation thread's remaining time goes to
+memory copies, allocation and frame grouping during emission, applying food
+listing edits, and physics. These stay serial.
 
-The default is neutral in the deterministic raw row: 0.875 against 0.881 ms,
-with 0.8% fewer instructions per process. An earlier candidate that called
-the coverage test from two places stopped inlining it into the serial loop
-and ran 4.7% more instructions and 4% slower; `covered` is now inlined at both
-sites. With the default, 500-bot host busy time matched the base (0.843
-against 0.842 ms, median of 5 alternating 30 s runs). Traces of
+The default is not slower. The raw row ran 0.867 against 0.882 ms with 1.0%
+fewer instructions and 1.5% fewer cycles, and 500-bot host busy time matched
+the base. Two inlining regressions were found and fixed on the way. A second
+caller stopped the compiler inlining the coverage test into the serial loop,
+which cost 4.7% more instructions; `covered` is now always inlined. Later its
+body-edge `any` closures, one generic instance shared by both callers, were
+left out of line: 9% of the raw row's samples sat in a separate symbol and the
+row ran 1% slower. Plain loops fixed that. Traces of
 `engine-raw-official-500` (150 operations, 4 lines, 237 MB) hashed identically
-for the base and every view-thread count tried with splitting forced: 2, 3,
-4, 8 and 16 on the final code, and 1 to 16 including 7 on an earlier
-revision, apart from the report's `viewThreads` field.
+for the base, the default, and 2, 3, 4, 7, 8 and 16 view threads with
+splitting forced, apart from the report's `viewThreads` field.
 
 ## Controller transport
 

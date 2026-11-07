@@ -25,7 +25,7 @@ impl RawSimulator {
     pub(crate) fn set_parallel(&mut self, parallel: bool) {
         self.backend.world.set_parallel(parallel);
     }
-    /// Prepare recipient visibility on `pool`, with frames unchanged.
+    /// Build recipient updates on `pool`, with frames unchanged.
     #[cfg(feature = "parallel")]
     pub(crate) fn set_view_pool(&mut self, pool: crate::client::server::HostPool) {
         self.backend.views = Some(super::broadcast::ViewWorkers::new(pool));

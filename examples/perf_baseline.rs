@@ -1,4 +1,4 @@
-//! Run in release mode: perf_baseline CASE ITERATIONS [--profile|--trace|--blocks M] [--parallel] [--view-threads N].
+//! Run in release mode: perf_baseline CASE ITERATIONS [--profile|--trace|--blocks M] [--parallel] [--view-threads N [--force-view-split]].
 //! `perf_baseline --list` prints the workload catalog as one canonical JSON line;
 //! REGISTRATIONS below is the only case list. See docs/performance-workloads.md.
 //! --profile is a separate timed step case; --trace emits untimed canonical JSONL.
@@ -636,6 +636,8 @@ struct Args {
     parallel: bool,
     /// Raw host view workers; 1 keeps recipient queries serial.
     view_threads: usize,
+    /// Split every recipient range, below the host's 1,024-recipient minimum.
+    force_view_split: bool,
     /// Reset-identical timed blocks in this process; None is the ordinary single run.
     blocks: Option<usize>,
     driver: Driver,
@@ -657,11 +659,11 @@ impl Args {
         let usage = || {
             let names: Vec<_> = workloads.iter().map(|w| w.name.as_str()).collect();
             format!(
-                "perf_baseline CASE ITERATIONS [--profile|--trace|--blocks M] [--parallel] [--view-threads N] | perf_baseline --list; CASE = {}; ITERATIONS = 1..{MAX_ITERATIONS}; M = 1..{MAX_BLOCKS}; --profile requires a profiled case (see --list); --parallel requires the parallel feature; --view-threads above 1 requires an engine-raw case and the parallel feature",
+                "perf_baseline CASE ITERATIONS [--profile|--trace|--blocks M] [--parallel] [--view-threads N [--force-view-split]] | perf_baseline --list; CASE = {}; ITERATIONS = 1..{MAX_ITERATIONS}; M = 1..{MAX_BLOCKS}; --profile requires a profiled case (see --list); --parallel requires the parallel feature; --view-threads above 1 requires an engine-raw case and the parallel feature; --force-view-split requires --view-threads above 1",
                 names.join("|")
             )
         };
-        if !(2..=7).contains(&args.len()) {
+        if !(2..=8).contains(&args.len()) {
             return Err(usage());
         }
         let workload = workloads
@@ -673,7 +675,7 @@ impl Args {
             return Err(usage());
         }
         let (mut option, mut parallel, mut blocks) = (None, false, None);
-        let mut view_threads = None;
+        let (mut view_threads, mut force_view_split) = (None, false);
         let mut rest = args[2..].iter();
         while let Some(arg) = rest.next() {
             match arg.as_str() {
@@ -682,6 +684,7 @@ impl Args {
                     let count = rest.next().and_then(|count| count.parse::<usize>().ok());
                     view_threads = Some(count.filter(|&count| count > 0).ok_or_else(usage)?);
                 }
+                "--force-view-split" if !force_view_split => force_view_split = true,
                 "--profile" | "--trace" if option.is_none() => option = Some(arg.as_str()),
                 "--blocks" if option.is_none() => {
                     option = Some("--blocks");
@@ -703,6 +706,9 @@ impl Args {
         {
             return Err(usage());
         }
+        if force_view_split && view_threads == 1 {
+            return Err(usage());
+        }
         let profile = option == Some("--profile");
         if profile && !workload.driver.profile() {
             return Err(usage());
@@ -714,6 +720,7 @@ impl Args {
             trace: option == Some("--trace"),
             parallel,
             view_threads,
+            force_view_split,
             blocks,
             driver: workload.driver,
             operation: workload.operation,
@@ -1016,6 +1023,9 @@ fn report(args: &Args, meter: Meter, operation: &str, details: Value) -> Value {
     }
     if args.view_threads > 1 {
         report["viewThreads"] = json!(args.view_threads);
+    }
+    if args.force_view_split {
+        report["forceViewSplit"] = json!(true);
     }
     report
 }
@@ -2420,6 +2430,7 @@ mod tests {
             trace: false,
             parallel: false,
             view_threads: 1,
+            force_view_split: false,
             blocks: None,
             driver,
             operation,
