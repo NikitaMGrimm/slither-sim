@@ -22,7 +22,7 @@ use std::{
 };
 use tungstenite::{Message, connect};
 
-const USAGE: &str = "Usage: host_load [--bots N] [--bot-threads N] [--world-threads N] [--radius R] [--seconds N] [--round-trip-ms N]";
+const USAGE: &str = "Usage: host_load [--bots N] [--bot-threads N] [--world-threads N] [--view-threads N] [--radius R] [--seconds N] [--round-trip-ms N]";
 /// Excess delays are measured against the smallest within this many frames.
 const WINDOW: usize = 1200;
 
@@ -30,6 +30,7 @@ struct Options {
     bots: usize,
     bot_threads: usize,
     world_threads: usize,
+    view_threads: usize,
     /// Fixed arena radius; seat-following official sizing when absent.
     radius: Option<f64>,
     seconds: f64,
@@ -45,6 +46,7 @@ fn parse_options(args: &[String]) -> Result<Options, String> {
         bots: 500,
         bot_threads: 2,
         world_threads: 1,
+        view_threads: 1,
         radius: None,
         seconds: 60.,
         round_trip: 0.04,
@@ -59,6 +61,9 @@ fn parse_options(args: &[String]) -> Result<Options, String> {
             "--bot-threads" => options.bot_threads = number(value)? as usize,
             "--world-threads" => {
                 options.world_threads = value.parse::<usize>().map_err(|_| USAGE.to_string())?;
+            }
+            "--view-threads" => {
+                options.view_threads = value.parse::<usize>().map_err(|_| USAGE.to_string())?;
             }
             "--radius" => options.radius = Some(number(value)?),
             "--seconds" => options.seconds = number(value)?,
@@ -81,10 +86,13 @@ fn world_threads_requires_an_integer() {
         "18446744073709551616",
     ] {
         assert!(parse_options(&["--world-threads".into(), value.into()]).is_err());
+        assert!(parse_options(&["--view-threads".into(), value.into()]).is_err());
     }
     for value in ["1", "2", "7"] {
         let options = parse_options(&["--world-threads".into(), value.into()]).unwrap();
         assert_eq!(options.world_threads, value.parse::<usize>().unwrap());
+        let options = parse_options(&["--view-threads".into(), value.into()]).unwrap();
+        assert_eq!(options.view_threads, value.parse::<usize>().unwrap());
     }
 }
 
@@ -96,6 +104,10 @@ fn run(options: Options) -> Result<(), String> {
     #[cfg(not(slither_host_world_threads))]
     if options.world_threads != 1 {
         return Err("this runtime does not support --world-threads above 1".into());
+    }
+    #[cfg(not(slither_host_view_threads))]
+    if options.view_threads != 1 {
+        return Err("this runtime does not support --view-threads above 1".into());
     }
     println!(
         "policy=A4-mean parameter_manifest_sha256={}",
@@ -132,6 +144,8 @@ fn run(options: Options) -> Result<(), String> {
         },
         #[cfg(slither_host_world_threads)]
         world_threads: options.world_threads,
+        #[cfg(slither_host_view_threads)]
+        view_threads: options.view_threads,
         ..Default::default()
     };
     let host = Host::bind(config)?.start()?;
@@ -199,9 +213,10 @@ fn run(options: Options) -> Result<(), String> {
         return Err("The watcher received no frames".into());
     }
     println!(
-        "bots={} world_threads={} frames={} ticks={ticks} deferred={deferred} simulation load={:.0}% busy per tick ms={:.3}",
+        "bots={} world_threads={} view_threads={} frames={} ticks={ticks} deferred={deferred} simulation load={:.0}% busy per tick ms={:.3}",
         options.bots,
         options.world_threads,
+        options.view_threads,
         relative.len(),
         load * 100.,
         busy_seconds * 1000. / ticks.max(1) as f64
@@ -479,6 +494,8 @@ pub fn benchmark(
         },
         #[cfg(slither_host_world_threads)]
         world_threads: 1,
+        #[cfg(slither_host_view_threads)]
+        view_threads: 1,
     })?
     .start()?;
     let executable = std::env::current_exe().map_err(|e| e.to_string())?;

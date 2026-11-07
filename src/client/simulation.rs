@@ -134,6 +134,9 @@ pub struct SimulatorBackend {
     /// and the next one rebuilds it without changing recipient state.
     coverage_grid: Option<CoverageGrid>,
     coverage_bounds: BodyBounds,
+    /// Optional view workers; `None` keeps every recipient query serial.
+    #[cfg(feature = "parallel")]
+    views: Option<broadcast::ViewWorkers>,
     food_subscriptions: FoodSubscriptions,
     tick: u64,
     variable_dt: bool,
@@ -228,6 +231,8 @@ impl SimulatorBackend {
             reports: vec![SnakeReports::default(); config.agents],
             coverage_grid: None,
             coverage_bounds: BodyBounds::default(),
+            #[cfg(feature = "parallel")]
+            views: None,
             food_subscriptions: FoodSubscriptions::default(),
             slots: Vec::with_capacity(config.agents),
             background_policy: None,

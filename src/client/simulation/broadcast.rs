@@ -2,6 +2,7 @@
 #[cfg(any(test, feature = "perf-internals"))]
 #[doc(hidden)]
 pub mod perf;
+mod views;
 use super::{
     EarlyFrames, MAX_PREY, NATIVE_PROFILE, PlayerAppearance, SimulatorBackend,
     connection::{KnownPrey, Slot},
@@ -20,6 +21,9 @@ use std::{
     collections::{BTreeMap, BTreeSet},
     sync::Arc,
 };
+#[cfg(feature = "parallel")]
+pub(super) use views::ViewWorkers;
+use views::Visibility;
 
 /// Immutable inputs retained for this tick's recipient preparation. Borrow
 /// individual fields, never the backend or connection queues. Lazy caches,
@@ -494,6 +498,10 @@ impl SimulatorBackend {
         );
         let mut board = None;
         let mut map = None;
+        // Only configured view workers prepare visibility; otherwise every
+        // recipient runs the serial query inside its updates.
+        #[cfg(feature = "parallel")]
+        let mut waves = self.views.as_mut().map(ViewWorkers::waves);
         for slot in 0..self.slots.len() {
             if slot == early {
                 self.hand_over_early(early, hand_over)?;
@@ -550,6 +558,16 @@ impl SimulatorBackend {
                 prey_wire: &self.prey_wire,
                 prey_clocks: &self.prey_clocks,
             };
+            #[cfg(feature = "parallel")]
+            let plan = match (&mut waves, &self.views) {
+                (Some(waves), Some(views)) => {
+                    waves.ensure(views, &query, &self.slots, slot, early);
+                    waves.get(slot)
+                }
+                _ => None,
+            };
+            #[cfg(not(feature = "parallel"))]
+            let plan = None;
             let (updates, presented_updates) = Self::updates(
                 &query,
                 slot,
@@ -558,6 +576,7 @@ impl SimulatorBackend {
                 &mut snakes.deltas,
                 &mut snakes.candidates,
                 &food_changes.diffs,
+                plan,
             )?;
             if minimap_due && let Some(packet) = self.minimap(slot, &mut map)? {
                 prefix.push(packet);
@@ -626,6 +645,10 @@ impl SimulatorBackend {
                 "aliveBots": self.world.snakes().iter().skip(self.player_latency.slots).filter(|s| s.alive).count(),
                 "wholeMapFood": self.world.config().pit.is_some()})
             );
+        }
+        #[cfg(feature = "parallel")]
+        if let (Some(views), Some(waves)) = (&mut self.views, waves) {
+            views.retain(waves);
         }
         self.coverage_grid = Some(grid);
         self.coverage_bounds = snakes.body_bounds;
@@ -759,7 +782,12 @@ impl SimulatorBackend {
         Ok(Some(packet))
     }
 
-    /// Changes since this connection's last frame, own snake first.
+    /// Changes since this connection's last frame, own snake first. `plan`
+    /// replaces the coverage and prey queries with their prepared results.
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "Disjoint borrows of the serial owner's fields"
+    )]
     fn updates(
         query: &ViewQuery<'_>,
         slot: usize,
@@ -768,6 +796,7 @@ impl SimulatorBackend {
         deltas: &mut [SnakeDeltaCache],
         candidates: &mut Vec<usize>,
         food_diffs: &FoodDiffs,
+        plan: Option<&Visibility>,
     ) -> Result<PacketViews, String> {
         let me = &query.snakes[slot];
         let record = query.record_life == Some((slot, slots[slot].life));
@@ -810,10 +839,22 @@ impl SimulatorBackend {
         let head = me.head;
         // Snakes that may cover the head, or that this connection shows and may
         // need removing; every other snake is neither shown nor eligible.
-        let known = &slots[slot].connection.snakes;
-        known.candidates(query.grid.near(head), candidates);
-        let order = std::iter::once(slot).chain(candidates.iter().copied().filter(|&i| i != slot));
-        for i in order {
+        if plan.is_none() {
+            let known = &slots[slot].connection.snakes;
+            known.candidates(query.grid.near(head), candidates);
+        }
+        // A prepared eligibility replaces the identical coverage test.
+        let serial = plan
+            .is_none()
+            .then_some(candidates.iter().map(|&i| (i, None)))
+            .into_iter()
+            .flatten()
+            .filter(|&(i, _)| i != slot);
+        let prepared = plan
+            .into_iter()
+            .flat_map(|plan| plan.snakes.iter().map(|&(i, eligible)| (i, Some(eligible))));
+        let order = std::iter::once((slot, None)).chain(serial).chain(prepared);
+        for (i, prepared) in order {
             // Compact life/control facts are copied on demand from the serial
             // owner; no world-sized snapshot or scan is added to this path.
             let SnakeQuery {
@@ -829,15 +870,17 @@ impl SimulatorBackend {
                 profile: query.profiles.get(i).unwrap_or(&NATIVE_PROFILE),
                 opportunity: &reports[i],
             };
-            let eligible = snake.alive
-                && (i == slot
-                    || covered(
-                        head,
-                        snake,
-                        query.bounds[i],
-                        vision,
-                        query.body_bounds.for_snake(i),
-                    ));
+            let eligible = prepared.unwrap_or_else(|| {
+                snake.alive
+                    && (i == slot
+                        || covered(
+                            head,
+                            snake,
+                            query.bounds[i],
+                            vision,
+                            query.body_bounds.for_snake(i),
+                        ))
+            });
             let own = i == slot;
             let id = i as u16;
             let connection = &mut slots[slot].connection;
@@ -917,10 +960,17 @@ impl SimulatorBackend {
             None
         };
         let mut visible = BTreeMap::new();
-        for index in query.prey_bounds.near(head) {
-            let prey = &query.prey[index];
-            if prey.position.distance_le(head, vision) {
+        if let Some(plan) = plan {
+            for &index in &plan.prey {
+                let prey = &query.prey[index];
                 visible.entry(prey.id).or_insert(prey);
+            }
+        } else {
+            for index in query.prey_bounds.near(head) {
+                let prey = &query.prey[index];
+                if prey.position.distance_le(head, vision) {
+                    visible.entry(prey.id).or_insert(prey);
+                }
             }
         }
         let gone: Vec<u64> = connection

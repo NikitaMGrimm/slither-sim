@@ -133,6 +133,10 @@ pub struct HostConfig {
     /// Threads that step the world, including the simulation thread. Above 1,
     /// the world gets its own pool of this size; results are unchanged.
     pub world_threads: usize,
+    /// Threads that prepare per-player visibility after each world step,
+    /// including the simulation thread. Above 1, views get their own pool of
+    /// this size; frames are unchanged.
+    pub view_threads: usize,
 }
 
 impl Default for HostConfig {
@@ -147,6 +151,7 @@ impl Default for HostConfig {
             simulation: SimulationConfig::default(),
             max_tick: None,
             world_threads: 1,
+            view_threads: 1,
         }
     }
 }
@@ -221,6 +226,12 @@ impl HostConfig {
         }
         if !cfg!(feature = "parallel") && self.world_threads > 1 {
             return Err("worldThreads above 1 needs the parallel build feature".into());
+        }
+        if self.view_threads == 0 {
+            return Err("viewThreads must be at least 1".into());
+        }
+        if !cfg!(feature = "parallel") && self.view_threads > 1 {
+            return Err("viewThreads above 1 needs the parallel build feature".into());
         }
         if self.bots.count > 0 && self.bots.threads == 0 {
             return Err("Bots need 1 or more bots.threads".into());
@@ -456,6 +467,8 @@ pub struct Host {
     max_tick: Option<f64>,
     #[cfg(feature = "parallel")]
     world_threads: usize,
+    #[cfg(feature = "parallel")]
+    view_threads: usize,
     #[cfg(feature = "latency-rig")]
     latency_truth: Option<super::latency_truth::Export>,
 }
@@ -492,6 +505,8 @@ impl Host {
             max_tick: config.max_tick,
             #[cfg(feature = "parallel")]
             world_threads: config.world_threads,
+            #[cfg(feature = "parallel")]
+            view_threads: config.view_threads,
             #[cfg(feature = "latency-rig")]
             latency_truth: None,
         })
@@ -558,7 +573,14 @@ impl Host {
         #[cfg(feature = "latency-rig")]
         world.start_latency_truth(shared.clock.epoch);
         #[cfg(not(feature = "latency-rig"))]
-        let world = self.world;
+        #[cfg_attr(not(feature = "parallel"), expect(unused_mut))]
+        let mut world = self.world;
+        // The world owns its view workers, so the simulation thread joins them
+        // when it ends; view and world phases of a tick never overlap.
+        #[cfg(feature = "parallel")]
+        if self.view_threads > 1 {
+            world.set_view_pool(HostPool::new(self.view_threads, "slither-view")?);
+        }
         let (commands, inbox) = mpsc::channel();
         let (to_sockets, socket_inbox) = mpsc::channel();
         let mut routes = vec![to_sockets];
@@ -601,7 +623,7 @@ impl Host {
         let agents = self.max_clients + self.bots;
         #[cfg(feature = "parallel")]
         let pool = (self.world_threads > 1)
-            .then(|| WorldPool::new(self.world_threads))
+            .then(|| HostPool::new(self.world_threads, "slither-world"))
             .transpose()?;
         let simulation = Simulation {
             world,
@@ -645,15 +667,15 @@ impl Host {
 /// Rayon pool drop signals termination; the host also owns the worker handles
 /// so stop, unwind and partial startup wait for actual thread termination.
 #[cfg(feature = "parallel")]
-struct WorldPool {
+pub(crate) struct HostPool {
     pool: Option<rayon::ThreadPool>,
     workers: Vec<JoinHandle<()>>,
 }
 
 #[cfg(feature = "parallel")]
-impl WorldPool {
-    fn new(threads: usize) -> Result<Self, String> {
-        Self::spawn_with(threads, |worker| {
+impl HostPool {
+    pub(crate) fn new(threads: usize, name: &'static str) -> Result<Self, String> {
+        Self::spawn_with(threads, name, |worker| {
             let mut builder = thread::Builder::new();
             if let Some(name) = worker.name() {
                 builder = builder.name(name.to_owned());
@@ -664,6 +686,7 @@ impl WorldPool {
 
     fn spawn_with(
         threads: usize,
+        name: &'static str,
         mut spawn: impl FnMut(rayon::ThreadBuilder) -> io::Result<JoinHandle<()>>,
     ) -> Result<Self, String> {
         let mut owned = Self {
@@ -672,7 +695,7 @@ impl WorldPool {
         };
         let pool = rayon::ThreadPoolBuilder::new()
             .num_threads(threads)
-            .thread_name(|i| format!("slither-world-{i}"))
+            .thread_name(move |i| format!("{name}-{i}"))
             .spawn_handler(|worker| {
                 owned.workers.push(spawn(worker)?);
                 Ok(())
@@ -682,10 +705,14 @@ impl WorldPool {
         owned.pool = Some(pool);
         Ok(owned)
     }
+
+    pub(crate) fn pool(&self) -> &rayon::ThreadPool {
+        self.pool.as_ref().expect("pool lives until drop")
+    }
 }
 
 #[cfg(feature = "parallel")]
-impl Drop for WorldPool {
+impl Drop for HostPool {
     fn drop(&mut self) {
         // Signal all workers before waiting, including after a partial build.
         drop(self.pool.take());

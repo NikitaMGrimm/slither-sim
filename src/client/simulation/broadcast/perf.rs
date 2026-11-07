@@ -171,6 +171,28 @@ impl RawWorld {
         &self.0.backend.world
     }
 
+    /// Prepare recipient visibility on `threads` view workers (1 is serial),
+    /// in tasks of `chunk` recipients for ranges of at least `min_range`;
+    /// `None` keeps the host defaults. Frames must not change.
+    #[cfg(feature = "parallel")]
+    pub fn set_view_threads(
+        &mut self,
+        threads: usize,
+        chunk: Option<usize>,
+        min_range: Option<usize>,
+    ) -> Result<(), String> {
+        self.0.backend.views = match threads {
+            0 => return Err("view threads must be at least 1".into()),
+            1 => None,
+            threads => Some(super::ViewWorkers::with_split(
+                crate::client::server::HostPool::new(threads, "slither-view")?,
+                chunk,
+                min_range,
+            )),
+        };
+        Ok(())
+    }
+
     pub fn controls(&mut self, actions: &[Option<Action>]) -> Result<(), String> {
         if actions.len() != self.0.backend.slots.len()
             || actions.iter().flatten().any(|a| !a.heading.is_finite())
@@ -229,9 +251,54 @@ mod tests {
     use crate::{Config, Food, InitialPopulation, Placement, WorldOptions};
     use std::f64::consts::TAU;
 
+    /// View workers for a replay as `(threads, chunk)`, splitting even the
+    /// smallest recipient range; `None` is the serial path.
+    type Views = Option<(usize, usize)>;
+
+    fn with_views(sim: &mut RawWorld, views: Views) {
+        #[cfg(feature = "parallel")]
+        if let Some((threads, chunk)) = views {
+            sim.set_view_threads(threads, Some(chunk), Some(0)).unwrap();
+        }
+        #[cfg(not(feature = "parallel"))]
+        assert!(views.is_none());
+    }
+
+    /// One tick handing frames of slots `..early` over mid-broadcast, as the
+    /// host's socket prefix does; handed frames enter the replay in order.
+    fn tick_split(sim: &mut RawWorld, early: usize, replay: &mut RawReplay) {
+        let tick = sim.0.backend.tick + 1;
+        sim.0
+            .advance_tick_with(early, &mut |frames| {
+                for (slot, frames) in frames {
+                    replay.frames.extend(
+                        frames
+                            .into_iter()
+                            .map(|(at, bytes)| (slot, tick, at.to_bits(), bytes)),
+                    );
+                }
+                Ok(())
+            })
+            .unwrap();
+    }
+
+    /// A split configuration must have prepared at least one wave.
+    fn assert_views_ran(sim: &RawWorld, views: Views) {
+        #[cfg(feature = "parallel")]
+        if views.is_some_and(|(threads, _)| threads > 1) {
+            assert!(sim.0.backend.views.as_ref().unwrap().retained() > 0);
+        }
+        #[cfg(not(feature = "parallel"))]
+        let _ = (sim, views);
+    }
+
+    fn replay() -> RawReplay {
+        replay_with(None, 0)
+    }
+
     // Synthetic grown bodies, then a complete tick-zero warmup. This is a
     // host regression scene, not a fitted model or an official capture.
-    fn replay() -> RawReplay {
+    fn replay_with(views: Views, early: usize) -> RawReplay {
         let config = SimulationConfig {
             agents: 8,
             world: Config::official(8),
@@ -272,6 +339,7 @@ mod tests {
             food_births: true,
         });
         let mut sim = RawWorld::new(7, config, world).unwrap();
+        with_views(&mut sim, views);
         // Start mixed adapters before the first latency-delayed connect emits
         // setup; use both full-map and ordinary map legacy recipients.
         sim.0.protocol13(1);
@@ -342,7 +410,11 @@ mod tests {
                 }
             }
             let epoch = sim.0.backend.food_epoch;
-            sim.tick().unwrap();
+            if tick % 2 == 1 {
+                tick_split(&mut sim, early, &mut replay);
+            } else {
+                sim.tick().unwrap();
+            }
             maintenance |= sim.0.backend.food_epoch > epoch;
             deaths += sim.world().deaths().len();
             pickups += sim.world().pickup_events().unwrap().len();
@@ -351,6 +423,7 @@ mod tests {
         assert!(deaths > 0 && pickups > 0 && maintenance);
         assert_eq!(sim.0.backend.slots[2].life, 1);
         assert!(sim.0.backend.slots.iter().all(|s| s.connection.setup));
+        assert_views_ran(&sim, views);
         sim.finish(&mut replay).unwrap();
         assert!((0..8).all(|slot| replay.frames.iter().any(|f| f.0 == slot)));
         for (slot, versions) in [
@@ -415,5 +488,216 @@ mod tests {
         negative_zero.terminal = json!(-0.0);
         positive_zero.terminal = json!(0.0);
         assert!(negative_zero.compare(&positive_zero).is_err());
+    }
+
+    /// Long bodies crossing near the origin, recipients posed on coverage-cell
+    /// corners, exactly at vision from bodies and prey, one ULP either side,
+    /// and on signed zeros. Poses repeat mid-run before standalone broadcasts,
+    /// so the edges reach split queries, not only the serial setup broadcast.
+    fn edges(views: Views) -> RawReplay {
+        const N: usize = 16;
+        const LONG: usize = 4;
+        let mut world_config = Config::official(N);
+        world_config.radius = 21_000.;
+        world_config.dynamic_radius = false;
+        world_config.size_to_population = false;
+        let vision = world_config.vision;
+        // CoverageGrid cells are max(vision + 1, 256) wide.
+        let cell = vision + 1.;
+        let config = SimulationConfig {
+            agents: N,
+            world: world_config,
+            delivery: DeliveryProfile::Official,
+            ..Default::default()
+        };
+        let mut world = Simulator::new(WorldOptions {
+            seed: 11,
+            config: config.world.clone(),
+            population: InitialPopulation::Placed {
+                ids: (0..N).map(|i| i.to_string()).collect(),
+                placement: Placement::TestRing,
+            },
+        })
+        .unwrap();
+        // Axis bodies sit 600 units off the axes, so signed-zero heads are
+        // within vision but never on a body.
+        let long = [
+            (Point { x: 6400., y: 600. }, 0.),
+            (Point { x: 600., y: 6400. }, TAU / 4.),
+            (Point { x: 4525., y: 4525. }, TAU / 8.),
+            (
+                Point {
+                    x: 4525.,
+                    y: -4525.,
+                },
+                -TAU / 8.,
+            ),
+        ];
+        let heads = [
+            Point { x: cell, y: cell },
+            Point {
+                x: cell.next_down(),
+                y: -cell,
+            },
+            Point {
+                x: -cell,
+                y: 600. + vision,
+            },
+            Point {
+                x: 2. * cell,
+                y: (600. + vision).next_up(),
+            },
+            Point {
+                x: -0.,
+                y: -2. * cell,
+            },
+            Point {
+                x: -2. * cell,
+                y: -0.,
+            },
+            Point {
+                x: 3. * cell,
+                y: (-cell).next_up(),
+            },
+            Point {
+                x: (-3. * cell).next_up(),
+                y: 2. * cell,
+            },
+            Point {
+                x: 600. - vision,
+                y: 6400.,
+            },
+            Point {
+                x: 5. * cell,
+                y: 600. + vision,
+            },
+            Point {
+                x: -4. * cell,
+                y: -4. * cell,
+            },
+            Point {
+                x: 0.5,
+                y: 2. * cell,
+            },
+        ];
+        let straight = |head: Point, heading: f64, points: usize| {
+            (0..points)
+                .map(|i| Point {
+                    x: head.x - i as f64 * 40. * heading.cos(),
+                    y: head.y - i as f64 * 40. * heading.sin(),
+                })
+                .collect::<Vec<_>>()
+        };
+        let pose = |world: &mut Simulator, slot: usize, fresh: bool| {
+            let (head, heading, points) = if slot < LONG {
+                (long[slot].0, long[slot].1, 320)
+            } else {
+                (heads[slot - LONG], 0., 24)
+            };
+            let body = straight(head, heading, points);
+            if fresh {
+                world.correct_mass(slot, body.clone(), 0.25).unwrap();
+            }
+            world.correct_pose(slot, head, body, heading).unwrap();
+        };
+        for slot in 0..N {
+            pose(&mut world, slot, true);
+        }
+        world.record_events(crate::EventRecording {
+            pickups: true,
+            food_births: true,
+        });
+        let mut sim = RawWorld::new(11, config, world).unwrap();
+        with_views(&mut sim, views);
+        let mut replay = RawReplay::default();
+        sim.record(&mut replay).unwrap();
+        let controls: Vec<_> = (0..N)
+            .map(|slot| {
+                Some(Action {
+                    heading: if slot < LONG { long[slot].1 } else { 0. },
+                    boost: false,
+                })
+            })
+            .collect();
+        for tick in 0..120 {
+            if tick % 40 == 0 {
+                let b = &mut sim.0.backend;
+                for slot in LONG..N {
+                    let snake = &b.world.snakes()[slot];
+                    if snake.alive && snake.body.len() == 24 {
+                        pose(&mut b.world, slot, false);
+                    }
+                }
+                // Prey exactly at vision, one ULP beyond, and on the corner.
+                let at = heads[0];
+                let positions = [
+                    Point {
+                        x: at.x + vision,
+                        y: at.y,
+                    },
+                    Point {
+                        x: at.x,
+                        y: (at.y - vision).next_down(),
+                    },
+                    at,
+                ];
+                for (k, position) in positions.into_iter().enumerate() {
+                    let id = 900_000 + k as u64;
+                    let _ = b.world.remove_prey(id);
+                    b.world
+                        .insert_prey(crate::ReplayPrey {
+                            prey: crate::Prey {
+                                id,
+                                position,
+                                heading: 0.,
+                                target_heading: 0.,
+                                speed: 0.,
+                                size: 10.,
+                            },
+                            mode: crate::prey::PreyMode::Roaming,
+                        })
+                        .unwrap();
+                }
+                b.broadcast().unwrap();
+                sim.record(&mut replay).unwrap();
+            }
+            sim.controls(&controls).unwrap();
+            if tick % 3 == 1 {
+                tick_split(&mut sim, 5, &mut replay);
+            } else {
+                sim.tick().unwrap();
+            }
+            sim.record(&mut replay).unwrap();
+        }
+        assert!(sim.world().snakes()[..LONG].iter().any(|s| s.alive));
+        assert_views_ran(&sim, views);
+        sim.finish(&mut replay).unwrap();
+        replay
+    }
+
+    #[cfg(feature = "parallel")]
+    #[test]
+    fn parallel_views_match_the_serial_replay() {
+        let serial = replay_with(None, 3);
+        serial.compare(&replay_with(Some((1, 64)), 3)).unwrap();
+        for (threads, chunk) in [(2, 1), (3, 2), (4, 3), (7, 64), (8, 5)] {
+            let parallel = replay_with(Some((threads, chunk)), 3);
+            serial
+                .compare(&parallel)
+                .unwrap_or_else(|e| panic!("{threads} threads, chunk {chunk}: {e}"));
+        }
+        // One undivided range as well as the socket-prefix/bot split.
+        replay().compare(&replay_with(Some((4, 2)), 0)).unwrap();
+    }
+
+    #[cfg(feature = "parallel")]
+    #[test]
+    fn parallel_views_match_serial_at_coverage_and_vision_edges() {
+        let serial = edges(None);
+        for (threads, chunk) in [(1, 64), (2, 1), (3, 4), (4, 64), (7, 2), (8, 3)] {
+            serial
+                .compare(&edges(Some((threads, chunk))))
+                .unwrap_or_else(|e| panic!("{threads} threads, chunk {chunk}: {e}"));
+        }
     }
 }

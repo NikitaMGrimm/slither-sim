@@ -12,7 +12,7 @@ fn assert_workers_joined(fail_startup: bool) {
     let gate = release.clone();
     let owner = thread::spawn(move || {
         let mut started = 0;
-        let pool = WorldPool::spawn_with(3, |worker| {
+        let pool = HostPool::spawn_with(3, "slither-world", |worker| {
             if fail_startup && started == 2 {
                 return Err(io::Error::other("injected world worker startup failure"));
             }
