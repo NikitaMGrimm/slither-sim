@@ -26,7 +26,7 @@ const CHUNK: usize = 64;
 #[cfg(feature = "parallel")]
 const WAVE_CHUNKS_PER_THREAD: usize = 4;
 /// Recipient ranges shorter than this keep the serial queries. On a 16-core
-/// c8a.4xlarge, forced splits made 500-bot hosts 9-16% slower, were
+/// c8a.4xlarge, forced splits made 500-bot hosts 8-15% slower, were
 /// inconclusive at 1,000 bots and 8% faster at 2,000; see docs/performance.md.
 #[cfg(feature = "parallel")]
 const MIN_RANGE: usize = 1024;

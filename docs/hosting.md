@@ -289,9 +289,28 @@ Protocol 19 caps the arena radius at 32,000, which official sizing reaches at
 to split. The example keeps official food and prey per area; a fixed radius
 does not rescale them. Smaller worlds don't split: a 500-player official step
 takes about 0.2–0.3 ms of its 7 ms tick. Most of a large server's time goes
-into per-player updates, which `worldThreads` doesn't spread yet. With 4,500
-bots, eight world threads cut simulation time per tick by about 10%
+into per-player updates, which `worldThreads` doesn't spread;
+[`viewThreads`](#view-threads) spreads only part of them. With 4,500 bots,
+eight world threads cut simulation time per tick by about 10%
 ([measurements](performance.md#measured-scaling)).
+
+### View threads
+
+`viewThreads` moves part of each tick's per-player work, finding which snakes
+and prey each player sees, onto its own pool of that many threads:
+
+```json
+{ "worldThreads": 1, "viewThreads": 8 }
+```
+
+The simulation thread waits while the pool works, then encodes each player's
+update in order as before, so frames are identical for every thread count.
+Only bot or player ranges of at least 1,024 seats split. On a 16-core machine
+eight view threads saved about 5% of simulation time at 4,500 bots and two
+threads were slower, so leave it at 1 unless measurements on your machine
+show a gain ([measurements](performance.md#measured-visibility-scaling)).
+Keep `bots.threads`, `worldThreads` and `viewThreads` together within the
+machine's cores.
 
 ### Build and allocator
 
