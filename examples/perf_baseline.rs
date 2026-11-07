@@ -15,6 +15,9 @@ use catalog_worlds::EngineWorld;
 #[cfg(feature = "perf-internals")]
 #[path = "support/catalog_collision.rs"]
 mod catalog_collision;
+#[cfg(feature = "perf-internals")]
+#[path = "support/catalog_raw.rs"]
+mod catalog_raw;
 #[cfg(feature = "networking")]
 #[allow(dead_code)]
 #[path = "host_load.rs"]
@@ -390,6 +393,7 @@ static REGISTRATIONS: &[Registration] = &[
     Registration::Socket("host-battledome-80", 80, true, op(286, 1, Full)),
     Registration::Engine(EngineWorld::SpawnOverload, op(192, 4, Full)),
     Registration::Engine(EngineWorld::CollisionGrid, op(512, 2, Full)),
+    Registration::Engine(EngineWorld::RawOfficial, op(576, 1, Full)),
 ];
 
 #[derive(Clone, Copy)]

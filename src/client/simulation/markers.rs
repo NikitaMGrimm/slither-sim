@@ -11,6 +11,7 @@ type Sectors = BTreeMap<u16, Vec<([u8; 2], KnownFood)>>;
 const FADE_SECONDS: f64 = 0.5;
 
 #[derive(Default)]
+#[cfg_attr(any(test, feature = "perf-internals"), derive(Debug))]
 pub(super) struct PitMarkers {
     sectors: Sectors,
     radius: f64,

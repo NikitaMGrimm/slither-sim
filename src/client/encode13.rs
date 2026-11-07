@@ -34,6 +34,37 @@ struct FullMapSnapshot {
 }
 
 impl FullMapCache {
+    #[cfg(any(test, feature = "perf-internals"))]
+    pub(super) fn oracle_state(&self, ids: &mut super::simulation::Identities) -> String {
+        // Pointer keys are lookup accelerators. Retain their equality relation
+        // through the strongly held baseline, rather than its address.
+        let mut entries: Vec<_> = self
+            .entries
+            .iter()
+            .map(|(&(grd, radius, _), packets)| {
+                let packets: Vec<_> = packets
+                    .iter()
+                    .map(|p| {
+                        (
+                            p._previous.as_ref().map(|p| ids.of(p)),
+                            &p.input,
+                            p.snapshot,
+                            &p.output,
+                        )
+                    })
+                    .collect();
+                (grd, radius, packets)
+            })
+            .collect();
+        entries.sort_unstable();
+        let snapshots: Vec<_> = self
+            .snapshots
+            .iter()
+            .map(|s| (ids.of(&s.source), &s.source, &s.projected))
+            .collect();
+        format!("{:?}", (entries, snapshots))
+    }
+
     pub(crate) fn clear(&mut self) {
         self.entries.clear();
         self.snapshots.clear();
