@@ -45,7 +45,9 @@ fn fixture(args: &Args, kind: EngineWorld) -> Result<RawWorld, String> {
 }
 
 /// Host-default view splitting after the serial setup broadcast. Workers are
-/// started and joined outside the operation timer, once per epoch.
+/// started and joined outside the operation timer, once per epoch. The 500
+/// recipients are below the host's 1,024-recipient minimum split, so every
+/// view stays serial and a pool started by `--view-threads` above 1 is idle.
 #[cfg(all(slither_raw_view_threads, feature = "parallel"))]
 fn views(sim: &mut RawWorld, args: &Args) -> Result<(), String> {
     sim.set_view_threads(args.view_threads, None, None)
