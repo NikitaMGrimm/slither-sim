@@ -1064,6 +1064,7 @@ mod tests {
     /// the gate reopens. Slot 4 first sees slot 1 between those changes, so
     /// only its stale-report observation makes the reopened gate report.
     /// Synthetic poses on a fixed open world, not a capture.
+    #[cfg(feature = "parallel")]
     fn rearm(views: Views) -> RawReplay {
         const N: usize = 6;
         const X: usize = 1;
