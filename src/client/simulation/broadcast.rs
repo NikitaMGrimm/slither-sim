@@ -553,8 +553,8 @@ impl SimulatorBackend {
         );
         let mut board = None;
         let mut map = None;
-        // Only configured view workers prepare visibility; otherwise every
-        // recipient runs the serial query inside its updates.
+        // Only configured view workers assemble updates in waves; otherwise
+        // every recipient runs the serial updates.
         #[cfg(feature = "parallel")]
         let mut waves = self.views.as_mut().map(ViewWorkers::waves);
         for slot in 0..self.slots.len() {

@@ -171,7 +171,7 @@ impl RawWorld {
         &self.0.backend.world
     }
 
-    /// Prepare recipient visibility on `threads` view workers (1 is serial),
+    /// Build recipient updates on `threads` view workers (1 is serial),
     /// in tasks of `chunk` recipients for ranges of at least `min_range`;
     /// `None` keeps the host defaults. Frames must not change.
     #[cfg(feature = "parallel")]

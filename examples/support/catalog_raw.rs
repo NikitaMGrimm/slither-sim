@@ -53,7 +53,7 @@ fn views(sim: &mut RawWorld, args: &Args) -> Result<(), String> {
     sim.set_view_threads(args.view_threads, None, None)
 }
 
-/// Older runtimes and serial builds prepare every view on this thread.
+/// Older runtimes and serial builds build every view on this thread.
 #[cfg(not(all(slither_raw_view_threads, feature = "parallel")))]
 fn views(_: &mut RawWorld, args: &Args) -> Result<(), String> {
     if args.view_threads == 1 {

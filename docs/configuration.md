@@ -45,7 +45,7 @@ both delays.
 | `bind` | `"127.0.0.1:8766"` | Literal IP and port; `--bind` overrides it. |
 | `seed` | `1` | Unsigned 32-bit simulation seed. |
 | `worldThreads` | `1` | Threads that step the world, at least 1. Above 1 the world gets its own pool of that many threads, separate from `bots.threads`, and ticks with at least 4,096 living snakes split across it with identical results. See [large bot worlds](hosting.md#world-threads). |
-| `viewThreads` | `1` | Threads that prepare per-player visibility after each world step, at least 1. Above 1 views get their own pool of that many threads, separate from `worldThreads` and `bots.threads`; frames are identical. See [view threads](hosting.md#view-threads). |
+| `viewThreads` | `1` | Threads that build per-player updates after each world step, at least 1. Above 1 views get their own pool of that many threads, separate from `worldThreads` and `bots.threads`; frames are identical. See [view threads](hosting.md#view-threads). |
 | `maxTick` | `null` (fixed ticks) | Optional maximum physics tick in seconds, finite and at least `simulation.world.dt`. Both endpoints must satisfy the world's dt limits (including the sliding-boundary limit). See [tick stretching](raw-server.md#vps-use). |
 | `players.max` | `4` | Reserved socket slots; at least 1. |
 | `players.latency` | Zero added delay | Server-side link delay added to socket connections; both processing fields must be zero. |
