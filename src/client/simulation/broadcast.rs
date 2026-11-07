@@ -1,29 +1,28 @@
 //! Shared tick scheduling and recipient-ordered broadcasts.
+mod assemble;
 #[cfg(any(test, feature = "perf-internals"))]
 #[doc(hidden)]
 pub mod perf;
+#[cfg(feature = "parallel")]
 mod views;
 use super::{
-    EarlyFrames, MAX_PREY, NATIVE_PROFILE, PlayerAppearance, SimulatorBackend,
-    connection::{KnownPrey, Slot},
-    food::{FoodDiffs, FoodQuery, SectorFood, food_identity, prepare_food},
+    EarlyFrames, MAX_PREY, PlayerAppearance, SimulatorBackend,
+    connection::Slot,
+    food::{FoodDiffs, FoodQuery, KnownSectors, SectorFood, food_identity, prepare_food},
     minimap::MinimapBroadcast,
     prey_visibility::PreyBounds,
-    snakes::{
-        BodyBounds, CoverageGrid, KnownSnake, SnakeBroadcast, SnakeDeltaCache, SnakeReports,
-        covered, full,
-    },
+    snakes::{BodyBounds, CoverageGrid, KnownSnake, SnakeBroadcast, SnakeDeltaCache, SnakeReports},
 };
 use crate::{
     Prey, Simulator, WorldRules, client::encode, model::Snake, physics, simulator::PickupItem,
 };
+use assemble::{Effects, Seat, View, assemble};
 use std::{
     collections::{BTreeMap, BTreeSet},
     sync::Arc,
 };
 #[cfg(feature = "parallel")]
 pub(super) use views::ViewWorkers;
-use views::Visibility;
 
 /// Immutable inputs retained for this tick's recipient preparation. Borrow
 /// individual fields, never the backend or connection queues. Lazy caches,
@@ -52,12 +51,11 @@ struct ViewQuery<'a> {
 
 /// Borrow one snake's frozen encoding inputs before mutating a recipient or
 /// observing its history. Life/control are scalars, not a borrow of its queue.
-struct SnakeQuery<'world, 'reports> {
+struct SnakeQuery<'world> {
     snake: &'world Snake,
     life: u64,
     heading: f64,
     profile: &'world PlayerAppearance,
-    opportunity: &'reports SnakeReports,
 }
 
 /// Rows the stock leaderboard shows.
@@ -65,30 +63,62 @@ pub(super) const LEADERBOARD_ROWS: usize = 10;
 /// Physical packets, plus a browser view when pit decoration is active.
 type PacketViews = (Vec<Vec<u8>>, Option<Vec<Vec<u8>>>);
 
-/// Where `updates` takes visibility from. Generic, so the serial instance
-/// compiles to the original queries with no prepared-view branches.
-trait Plan<'v>: Copy {
-    const PREPARED: bool;
-    fn visibility(self) -> &'v Visibility;
+/// The serial owner's effects: facts from the slots, the broadcast's shared
+/// delta caches and food diffs, and immediate stale-report observations.
+struct Serial<'a> {
+    slots: &'a [Slot],
+    reports: &'a mut [SnakeReports],
+    deltas: &'a mut [SnakeDeltaCache],
+    diffs: &'a FoodDiffs,
 }
 
-/// Query coverage and prey inside `updates`, as without view workers.
-#[derive(Clone, Copy)]
-struct SerialQuery;
-
-impl<'v> Plan<'v> for SerialQuery {
-    const PREPARED: bool = false;
-    fn visibility(self) -> &'v Visibility {
-        unreachable!("serial updates run their own queries")
+impl Effects for Serial<'_> {
+    type Food = KnownSectors;
+    fn life(&self, slot: usize) -> u64 {
+        self.slots[slot].life
+    }
+    fn heading(&self, slot: usize) -> f64 {
+        self.slots[slot].control.heading
+    }
+    fn changes(
+        &mut self,
+        slot: usize,
+        packets: &mut Vec<Vec<u8>>,
+        own: bool,
+        known: &mut KnownSnake,
+        snake: &Snake,
+        wanted: impl FnOnce() -> f64,
+        profile: &PlayerAppearance,
+    ) -> Result<(), String> {
+        self.deltas[slot].changes(
+            packets,
+            own,
+            slot as u16,
+            known,
+            snake,
+            wanted,
+            profile,
+            &self.reports[slot],
+        )
+    }
+    fn observe(&mut self, slot: usize, known: &KnownSnake) {
+        self.reports[slot].observe(known);
+    }
+    fn food(
+        &mut self,
+        packets: &mut Vec<Vec<u8>>,
+        known: &mut KnownSectors,
+        interest: &crate::client::visibility::SectorInterest,
+        sectors: &[Option<Arc<SectorFood>>],
+        changes: FoodQuery<'_>,
+        eaters: &BTreeMap<(u64, u64), u16>,
+    ) {
+        prepare_food(
+            packets, known, interest, sectors, changes, self.diffs, eaters,
+        );
     }
 }
 
-impl<'v> Plan<'v> for &'v Visibility {
-    const PREPARED: bool = true;
-    fn visibility(self) -> &'v Visibility {
-        self
-    }
-}
 /// One prey's correction clock, shared by every recipient: official
 /// corrections for one prey align across clients, and a new viewer does not
 /// restart it.
@@ -583,38 +613,42 @@ impl SimulatorBackend {
                 prey_wire: &self.prey_wire,
                 prey_clocks: &self.prey_clocks,
             };
+            // View workers assembled this wave ahead; commit this recipient's
+            // staged view in slot order, at the serial updates position.
             #[cfg(feature = "parallel")]
-            let plan = match (&mut waves, &self.views) {
+            let staged = match (&mut waves, &self.views) {
                 (Some(waves), Some(views)) => {
-                    waves.ensure(views, &query, &self.slots, slot, early);
-                    waves.get(slot)
+                    waves.ensure(views, &query, &self.slots, &self.reports, slot, early);
+                    waves.take(slot)
                 }
                 _ => None,
             };
+            #[cfg(feature = "parallel")]
+            let views = match staged {
+                Some(staged) => {
+                    staged.commit(&mut self.slots[slot].connection, &mut self.reports, &query)
+                }
+                None => Self::updates(
+                    &query,
+                    slot,
+                    &mut self.slots,
+                    &mut self.reports,
+                    &mut snakes.deltas,
+                    &mut snakes.candidates,
+                    &food_changes.diffs,
+                ),
+            };
             #[cfg(not(feature = "parallel"))]
-            let plan: Option<&Visibility> = None;
-            let (slots, reports, deltas, candidates, diffs) = (
+            let views = Self::updates(
+                &query,
+                slot,
                 &mut self.slots,
                 &mut self.reports,
                 &mut snakes.deltas,
                 &mut snakes.candidates,
                 &food_changes.diffs,
             );
-            let (updates, presented_updates) = match plan {
-                Some(plan) => Self::updates(
-                    &query, slot, slots, reports, deltas, candidates, diffs, plan,
-                ),
-                None => Self::updates(
-                    &query,
-                    slot,
-                    slots,
-                    reports,
-                    deltas,
-                    candidates,
-                    diffs,
-                    SerialQuery,
-                ),
-            }?;
+            let (updates, presented_updates) = views?;
             if minimap_due && let Some(packet) = self.minimap(slot, &mut map)? {
                 prefix.push(packet);
             }
@@ -819,241 +853,30 @@ impl SimulatorBackend {
         Ok(Some(packet))
     }
 
-    /// Changes since this connection's last frame, own snake first. A
-    /// prepared `plan` replaces the coverage and prey queries with their
-    /// results; the serial instance contains only the original queries.
-    #[expect(
-        clippy::too_many_arguments,
-        reason = "Disjoint borrows of the serial owner's fields"
-    )]
-    fn updates<'v, P: Plan<'v>>(
+    /// Changes since this connection's last frame, own snake first. The view
+    /// fields move out of the connection and back, so the slots stay readable
+    /// for other snakes' facts; an error keeps the partial view, as before.
+    fn updates(
         query: &ViewQuery<'_>,
         slot: usize,
         slots: &mut [Slot],
         reports: &mut [SnakeReports],
         deltas: &mut [SnakeDeltaCache],
         candidates: &mut Vec<usize>,
-        food_diffs: &FoodDiffs,
-        plan: P,
+        diffs: &FoodDiffs,
     ) -> Result<PacketViews, String> {
-        let me = &query.snakes[slot];
-        let record = query.record_life == Some((slot, slots[slot].life));
-        let mut packets = Vec::new();
-        let connection = &mut slots[slot].connection;
-        if !me.alive && !connection.over {
-            // Game over alone leaves the stock client predicting its snake: send
-            // the final mass, then game over, then the death removal.
-            connection.over = true;
-            let id = slot as u16;
-            let known = connection.snakes.remove(slot);
-            let fam = encode::fam_u24(me.fam);
-            if known.as_ref().is_some_and(|known| known.fam != fam) {
-                packets.push(encode::fam(id, fam));
-            }
-            // The stock game-over score adds the credit to the final mass.
-            let credit = encode::segment_credit(me.score, me.segments, fam);
-            if connection.credit != credit {
-                connection.credit = credit;
-                packets.push(encode::credit(credit));
-            }
-            // The local record rule qualifies this life; the stock v1 flag
-            // offers its player a victory-message input.
-            packets.push(encode::game_over(record));
-            if known.is_some() {
-                packets.push(encode::removal(id, true));
-            }
-        }
-        let radius = query.radius.round() as u32;
-        if connection.radius != radius {
-            connection.radius = radius;
-            packets.push(encode::radius(query.radius)?);
-        }
-        let rules = query.rules;
-        if connection.rules_enabled && connection.rules_sent != Some(rules) {
-            packets.push(crate::client::rules_packet::encode(rules));
-            connection.rules_sent = Some(rules);
-        }
-        let vision = query.vision;
-        let head = me.head;
-        // One snake's updates for this connection; expanded into the serial and
-        // prepared loops below so the serial loop keeps its own code.
-        macro_rules! visit {
-            ($i:expr, $eligible:expr) => {{
-                let i: usize = $i;
-                // Compact life/control facts are copied on demand from the serial
-                // owner; no world-sized snapshot or scan is added to this path.
-                let SnakeQuery {
-                    snake,
-                    life,
-                    heading: control,
-                    profile,
-                    opportunity,
-                } = SnakeQuery {
-                    snake: &query.snakes[i],
-                    life: slots[i].life,
-                    heading: slots[i].control.heading,
-                    profile: query.profiles.get(i).unwrap_or(&NATIVE_PROFILE),
-                    opportunity: &reports[i],
-                };
-                let eligible: bool = $eligible;
-                let own = i == slot;
-                let id = i as u16;
-                let connection = &mut slots[slot].connection;
-                let known = connection.snakes.get_mut(i);
-                match (known, eligible) {
-                    (Some(known), true) if known.life == life => {
-                        deltas[i].changes(
-                            &mut packets,
-                            own,
-                            id,
-                            known,
-                            snake,
-                            || physics::quantize_heading(control),
-                            profile,
-                            opportunity,
-                        )?;
-                        reports[i].observe(known);
-                    }
-                    (Some(known), false) => {
-                        let died = !snake.alive || known.life != life;
-                        packets.push(encode::removal(id, died));
-                        connection.snakes.remove(i);
-                    }
-                    (None, false) => {}
-                    (known, true) => {
-                        let wanted = physics::quantize_heading(control);
-                        if known.is_some() {
-                            packets.push(encode::removal(id, true));
-                        }
-                        full(&mut packets, own, id, snake, wanted, profile)?;
-                        let known = KnownSnake::new(life, snake, wanted)?;
-                        reports[i].observe(&known);
-                        connection.snakes.insert(i, known);
-                    }
-                }
-                let connection = &mut slots[slot].connection;
-                if own && connection.snakes.contains_key(slot) {
-                    // HUD packets wait for the client's own appearance; a
-                    // requested session ID follows it so the client knows itself.
-                    connection.appeared = true;
-                    let fam = encode::fam_u24(snake.fam);
-                    let credit = encode::segment_credit(snake.score, snake.segments, fam);
-                    if connection.credit != credit {
-                        connection.credit = credit;
-                        packets.push(encode::credit(credit));
-                    }
-                    if std::mem::take(&mut connection.session_pending) {
-                        packets.push(encode::session(id, connection.session));
-                    }
-                }
-            }};
-        }
-        if P::PREPARED {
-            // Eligibility prepared by the same coverage test, in the same order.
-            visit!(slot, me.alive);
-            for &(i, eligible) in &plan.visibility().snakes {
-                visit!(i, eligible);
-            }
-        } else {
-            // Snakes that may cover the head, or that this connection shows and
-            // may need removing; every other snake is neither shown nor eligible.
-            let known = &slots[slot].connection.snakes;
-            known.candidates(query.grid.near(head), candidates);
-            let order =
-                std::iter::once(slot).chain(candidates.iter().copied().filter(|&i| i != slot));
-            for i in order {
-                let snake = &query.snakes[i];
-                let eligible = snake.alive
-                    && (i == slot
-                        || covered(
-                            head,
-                            snake,
-                            query.bounds[i],
-                            vision,
-                            query.body_bounds.for_snake(i),
-                        ));
-                visit!(i, eligible);
-            }
-        }
-        let connection = &mut slots[slot].connection;
-        let food_start = packets.len();
-        prepare_food(
-            &mut packets,
-            &mut connection.food,
-            &connection.food_interest,
-            query.food,
-            query.food_changes,
-            food_diffs,
-            query.food_eaters,
-        );
-        let food_end = packets.len();
-        let mut presented = if connection.decorations && query.decorations {
-            let mut presented = packets[..food_start].to_vec();
-            prepare_food(
-                &mut presented,
-                &mut connection.decorated_food,
-                &connection.food_interest,
-                query.decorated_food,
-                query.food_changes,
-                food_diffs,
-                query.food_eaters,
-            );
-            Some(presented)
-        } else {
-            None
+        let mut view = View::take(&mut slots[slot].connection);
+        let shared: &[Slot] = slots;
+        let mut effects = Serial {
+            slots: shared,
+            reports,
+            deltas,
+            diffs,
         };
-        let mut visible = BTreeMap::new();
-        if P::PREPARED {
-            for &index in &plan.visibility().prey {
-                let prey = &query.prey[index];
-                visible.entry(prey.id).or_insert(prey);
-            }
-        } else {
-            for index in query.prey_bounds.near(head) {
-                let prey = &query.prey[index];
-                if prey.position.distance_le(head, vision) {
-                    visible.entry(prey.id).or_insert(prey);
-                }
-            }
-        }
-        let gone: Vec<u64> = connection
-            .prey
-            .keys()
-            .filter(|id| !visible.contains_key(id))
-            .copied()
-            .collect();
-        for id in gone {
-            let known = connection.prey.remove(&id).expect("known prey");
-            packets.push(encode::prey_removal(
-                known.wire,
-                query.prey_eaters.get(&id).copied(),
-            ));
-        }
-        for (id, prey) in visible {
-            let wire = query.prey_wire[&id];
-            let current = KnownPrey {
-                wire,
-                motion: [
-                    encode::angle_u24(prey.heading),
-                    encode::angle_u24(prey.target_heading),
-                    u32::from(encode::speed_u16(prey.speed)?),
-                ],
-            };
-            match connection.prey.get(&id) {
-                None => packets.push(encode::prey_appearance(wire, prey)?),
-                // Keep corrections even when quantized position is still.
-                Some(known) if query.prey_clocks[&id].due => {
-                    let changed = known.motion != current.motion;
-                    packets.push(encode::prey_motion(wire, prey, changed)?)
-                }
-                Some(_) => continue,
-            }
-            connection.prey.insert(id, current);
-        }
-        if let Some(presented) = &mut presented {
-            presented.extend_from_slice(&packets[food_end..]);
-        }
-        Ok((packets, presented))
+        let seat = Seat::of(&shared[slot].connection);
+        let result = assemble(query, slot, seat, &mut view, &mut effects, candidates);
+        view.put(&mut slots[slot].connection);
+        result
     }
 
     /// Leaderboard when `board` is given, then an unsent record. Both wait for
@@ -1120,7 +943,7 @@ mod tests {
     fn immutable_query_is_shareable() {
         fn assert_sync<T: Sync>() {}
         assert_sync::<ViewQuery<'_>>();
-        assert_sync::<SnakeQuery<'_, '_>>();
+        assert_sync::<SnakeQuery<'_>>();
     }
 
     fn backend() -> SimulatorBackend {

@@ -329,6 +329,23 @@ impl SnakeReports {
         self.motion_stale |= [known.heading, known.wanted, known.speed] != self.motion;
         self.fam_stale |= known.fam != self.fam;
     }
+
+    /// `observe`'s contribution, for a view worker to return. Within a
+    /// broadcast nothing reads the stale flags, so folding contributions
+    /// later in slot order leaves the same flags.
+    #[cfg(feature = "parallel")]
+    pub(super) fn stale(&self, known: &KnownSnake) -> (bool, bool) {
+        (
+            [known.heading, known.wanted, known.speed] != self.motion,
+            known.fam != self.fam,
+        )
+    }
+
+    #[cfg(feature = "parallel")]
+    pub(super) fn fold(&mut self, (motion, fam): (bool, bool)) {
+        self.motion_stale |= motion;
+        self.fam_stale |= fam;
+    }
 }
 
 /// What one connection has been told about each snake slot.

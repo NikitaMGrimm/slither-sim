@@ -643,6 +643,149 @@ pub(super) fn prepare_food(
     known.food_revision = Some(changes.current.clone());
 }
 
+#[cfg(feature = "parallel")]
+/// How a view worker's food packets change the recipient's held listings,
+/// applied by the coordinator in slot order. Either way every held listing
+/// ends as the current one, with the identities `prepare_food` would leave.
+pub(super) enum FoodEdit {
+    /// Revisions matched: these held entries take the current listing.
+    Refresh(Vec<u32>),
+    /// Subscribed sectors, each holding the current listing.
+    Rebuild,
+}
+
+#[cfg(feature = "parallel")]
+/// `prepare_food` against a borrowed base: the same packets in the same
+/// order, with the held-listing changes returned as an edit. `diffs` belongs
+/// to the calling worker; memoized diffs equal recomputed ones.
+pub(super) fn stage_food(
+    packets: &mut Vec<Vec<u8>>,
+    known: &KnownSectors,
+    interest: &SectorInterest,
+    sectors: &[Option<Arc<SectorFood>>],
+    changes: FoodQuery<'_>,
+    diffs: &FoodDiffs,
+    eaters: &BTreeMap<(u64, u64), u16>,
+) -> FoodEdit {
+    let subscribed = interest.subscribed();
+    let current = |sector: [u8; 2]| {
+        sectors[usize::from(u16::from_be_bytes(sector))]
+            .as_ref()
+            .expect("subscribed sectors are listed")
+    };
+    if known
+        .subscription_revision
+        .as_ref()
+        .is_some_and(|revision| Arc::ptr_eq(revision, interest.revision()))
+        && known
+            .food_revision
+            .as_ref()
+            .is_some_and(|revision| Arc::ptr_eq(revision, changes.previous))
+    {
+        let mut refreshed = Vec::new();
+        let mut update = |index: usize| {
+            let (sector, previous) = &known.entries[index];
+            let current = current(*sector);
+            if !Arc::ptr_eq(previous, current) || changes.eaten.contains(sector) {
+                append_diff(diffs, packets, *sector, previous, current, eaters);
+                if !Arc::ptr_eq(previous, current) {
+                    refreshed.push(index as u32);
+                }
+            }
+        };
+        // The same range-limited sparse search or dense walk as `prepare_food`.
+        let changed = match (known.entries.first(), known.entries.last()) {
+            (Some((first, _)), Some((last, _))) => {
+                let start = changes.changed.partition_point(|sector| sector < first);
+                let end = changes.changed.partition_point(|sector| sector <= last);
+                &changes.changed[start..end]
+            }
+            _ => &[],
+        };
+        if changed.len() < known.entries.len() {
+            for sector in changed {
+                if let Ok(index) = known.entries.binary_search_by_key(sector, |(key, _)| *key) {
+                    update(index);
+                }
+            }
+        } else {
+            for index in 0..known.entries.len() {
+                update(index);
+            }
+        }
+        return FoodEdit::Refresh(refreshed);
+    }
+    let held = &known.entries;
+    let mut subscriptions = subscribed.iter().peekable();
+    for (sector, _) in held {
+        while subscriptions.next_if(|next| *next < sector).is_some() {}
+        if subscriptions.peek() != Some(&sector) {
+            packets.push(encode::sector_clear(*sector));
+        }
+    }
+    let mut held = held.iter().peekable();
+    for &sector in subscribed {
+        while held.next_if(|(old, _)| *old < sector).is_some() {}
+        let previous = held
+            .next_if(|(old, _)| *old == sector)
+            .map(|(_, food)| food);
+        let current = current(sector);
+        match previous {
+            None => {
+                let foods: Vec<_> = current.0.iter().map(|(k, v)| (*k, v.style)).collect();
+                if !foods.is_empty() {
+                    packets.extend(encode::food_sector(sector, &foods));
+                }
+            }
+            Some(previous) => {
+                if !Arc::ptr_eq(previous, current) || changes.eaten.contains(&sector) {
+                    append_diff(diffs, packets, sector, previous, current, eaters);
+                }
+            }
+        }
+    }
+    FoodEdit::Rebuild
+}
+
+#[cfg(feature = "parallel")]
+impl KnownSectors {
+    /// Commit a staged `FoodEdit` from the same broadcast inputs.
+    pub(super) fn apply(
+        &mut self,
+        edit: FoodEdit,
+        interest: &SectorInterest,
+        sectors: &[Option<Arc<SectorFood>>],
+        changes: FoodQuery<'_>,
+    ) {
+        let current = |sector: [u8; 2]| {
+            sectors[usize::from(u16::from_be_bytes(sector))]
+                .as_ref()
+                .expect("subscribed sectors are listed")
+        };
+        match edit {
+            FoodEdit::Refresh(indices) => {
+                for index in indices {
+                    let (sector, held) = &mut self.entries[index as usize];
+                    held.clone_from(current(*sector));
+                }
+            }
+            FoodEdit::Rebuild => {
+                // An unchanged held listing is the current allocation, so
+                // cloning the current handle keeps every identity.
+                self.entries.clear();
+                self.entries.extend(
+                    interest
+                        .subscribed()
+                        .iter()
+                        .map(|&sector| (sector, current(sector).clone())),
+                );
+                self.subscription_revision = Some(interest.revision().clone());
+            }
+        }
+        self.food_revision = Some(changes.current.clone());
+    }
+}
+
 fn sector_changes(
     packets: &mut Vec<Vec<u8>>,
     sector: [u8; 2],
