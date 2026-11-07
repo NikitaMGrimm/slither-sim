@@ -794,16 +794,19 @@ fn assert_safe_and_feeding(drive: Drive, seed: u32) {
 }
 
 #[test]
+#[cfg_attr(debug_assertions, ignore = "long; run with --profile scenarios")]
 fn host_bots_safety_straight_forever() {
     assert_safe_and_feeding(Drive::Straight, 73);
 }
 
 #[test]
+#[cfg_attr(debug_assertions, ignore = "long; run with --profile scenarios")]
 fn host_bots_safety_tightest_circle_forever() {
     assert_safe_and_feeding(Drive::Tightest, 73);
 }
 
 #[test]
+#[cfg_attr(debug_assertions, ignore = "long; run with --profile scenarios")]
 fn host_bots_safety_gentle_circle_forever() {
     assert_safe_and_feeding(Drive::Gentle, 73);
 }
@@ -811,16 +814,19 @@ fn host_bots_safety_gentle_circle_forever() {
 /// Review repro: a turn so gentle that its heading steps seconds apart, with
 /// bots long enough to outlast a few seconds of fit window.
 #[test]
+#[cfg_attr(debug_assertions, ignore = "long; run with --profile scenarios")]
 fn host_bots_safety_very_gentle_circle_with_long_bots() {
     assert_safe_and_feeding(Drive::VeryGentle, 73);
 }
 
 #[test]
+#[cfg_attr(debug_assertions, ignore = "long; run with --profile scenarios")]
 fn host_bots_safety_after_maneuvers_and_a_steady_hold() {
     assert_safe_and_feeding(Drive::Maneuvers, 73);
 }
 
 #[test]
+#[cfg_attr(debug_assertions, ignore = "long; run with --profile scenarios")]
 fn host_bots_sensitivity_control() {
     // Without avoidance, bots chasing the head kill the circling owner: the
     // matched crowd is dangerous, so the safety runs above are meaningful.
