@@ -269,7 +269,10 @@ CPU-specific flags, alternating the base revision and each thread count.
 `host_load` used `--bot-threads 7`, one world thread and one watcher; the
 values are simulation busy time per tick, median of 3 runs of 40 s (4,500
 bots) or 5 runs of 30 s (500 bots). The raw row is the median of 5 alternating
-runs; its split columns force splitting below the 1,024 threshold.
+runs; its split columns force splitting below the 1,024 threshold with
+`perf_baseline engine-raw-official-500 N --view-threads T --force-view-split`
+(release, `--features perf-internals`). Without `--force-view-split` its 500
+recipients stay serial.
 
 | Workload | Base | 1 (default) | 2 | 4 | 8 |
 | --- | ---: | ---: | ---: | ---: | ---: |
