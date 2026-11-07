@@ -19,8 +19,10 @@ pub const MAX_FRAME_MINIMAP_CELLS: usize = MAX_TEAM_MINIMAP_CELLS + MAX_SIDE * M
 
 /// Backend-local pit mask, independent of snakes and recipient wire histories.
 #[derive(Default)]
+#[cfg_attr(any(test, feature = "perf-internals"), derive(Debug))]
 pub(super) struct PitProjectionCache(Option<PitProjection>);
 
+#[cfg_attr(any(test, feature = "perf-internals"), derive(Debug))]
 struct PitProjection {
     side: usize,
     outside: Vec<usize>,

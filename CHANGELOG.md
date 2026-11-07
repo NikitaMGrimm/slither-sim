@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+### Added
+
+- The hidden `perf-internals` harness records and compares ordered raw host
+  frames and terminal host/view state (`RawReplay`, `RawWorld::{record, finish}`),
+  and the optional `engine-raw-official-500` row times 500 grown recipients
+  without sockets. Host behavior is unchanged.
+
 ## [0.11.0](https://github.com/NikitaMGrimm/slither-sim/compare/v0.10.0...v0.11.0) - 2026-11-06
 
 ### Added

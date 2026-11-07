@@ -5,37 +5,56 @@ use super::*;
 pub(super) enum EngineWorld {
     SpawnOverload,
     CollisionGrid,
+    RawOfficial,
 }
 
 impl EngineWorld {
     pub(super) fn epoch_ticks(self) -> usize {
+        if matches!(self, Self::RawOfficial) {
+            return 72;
+        }
         16
     }
     pub(super) fn name(self) -> &'static str {
+        if matches!(self, Self::RawOfficial) {
+            return "engine-raw-official-500";
+        }
         if matches!(self, Self::CollisionGrid) {
             return "engine-collision-grid-4096";
         }
         "engine-battledome-spawn-318"
     }
     pub(super) fn mode(self) -> &'static str {
+        if matches!(self, Self::RawOfficial) {
+            return "official";
+        }
         if matches!(self, Self::CollisionGrid) {
             return "sandbox";
         }
         "battledome"
     }
     pub(super) fn operation(self) -> &'static str {
+        if matches!(self, Self::RawOfficial) {
+            return "raw-tick";
+        }
         if matches!(self, Self::CollisionGrid) {
             return "step";
         }
         "admission-searches+raw-tick"
     }
     pub(super) fn synthetic(self) -> &'static str {
+        if matches!(self, Self::RawOfficial) {
+            return "500 synthetic coiled grown bodies (64..127 anchors); official preset and delivery; straight controls; 144-tick warmup from tick zero; no sockets or decoded clients";
+        }
         if matches!(self, Self::CollisionGrid) {
             return "4096 separated straight bodies on a 64 by 64 lattice; 4095 eight-anchor snakes and one 532-anchor snake; fixed heading, no food or prey; 16-tick epochs";
         }
         "study-derived 318-snake geometry at time zero; fresh ambient ecology; constant boost; frozen refused/successful search seeds; no live-capacity claim"
     }
     pub(super) fn config(self) -> Config {
+        if matches!(self, Self::RawOfficial) {
+            return pinned_config(self.name(), Config::official(500));
+        }
         if matches!(self, Self::CollisionGrid) {
             let mut config = Config::sandbox();
             config.radius = 60000.;
@@ -62,6 +81,13 @@ impl EngineWorld {
         pinned_config(self.name(), config)
     }
     pub(super) fn definition(self) -> Value {
+        if matches!(self, Self::RawOfficial) {
+            return json!({"version":1,"config":self.config(),"protocol":19,"delivery":"official",
+                "construction":self.synthetic(),"population":500,"warmupTicks":144,
+                "epochTicks":self.epoch_ticks(),"heading":0,"boost":false,
+                "lattice":[25,20],"pitchRadiusFraction":0.055,"coilRadius":200,
+                "trace":"ordered raw slot/tick/scheduled-time-bits/frame bytes from tick zero and terminal host/view state"});
+        }
         if matches!(self, Self::CollisionGrid) {
             return json!({"version":1, "config":self.config(),
                 "construction":self.synthetic(), "population":4096,
@@ -90,6 +116,9 @@ pub(super) fn run(args: &Args, world: EngineWorld, out: &mut impl Write) -> Resu
     use crate::catalog_backend::Fixture;
     if args.parallel {
         return Err("simulation-thread rows are serial".into());
+    }
+    if matches!(world, EngineWorld::RawOfficial) {
+        return catalog_raw::run(args, world, out);
     }
     if matches!(world, EngineWorld::CollisionGrid) {
         return catalog_collision::run(args, world, out);

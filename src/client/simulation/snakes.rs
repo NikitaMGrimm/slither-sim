@@ -78,11 +78,13 @@ const BODY_BOUND_LIMIT: f64 = 1e7;
 /// point before reuse. Anchor insertion contracts interior points too, so a
 /// matching head/tail or length alone cannot validate this cache.
 #[derive(Default)]
+#[cfg_attr(any(test, feature = "perf-internals"), derive(Debug))]
 pub(super) struct BodyBounds {
     snakes: Vec<CachedBodyBounds>,
 }
 
 #[derive(Default)]
+#[cfg_attr(any(test, feature = "perf-internals"), derive(Debug))]
 struct CachedBodyBounds {
     body: Vec<Point>,
     blocks: Vec<physics::Bounds>,
@@ -406,6 +408,7 @@ pub(super) struct CoverageGrid {
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(any(test, feature = "perf-internals"), derive(Debug))]
 struct CoverageSpan {
     first: (i64, i64),
     last: (i64, i64),
@@ -422,6 +425,12 @@ impl CoverageSpan {
     }
 }
 impl CoverageGrid {
+    #[cfg(any(test, feature = "perf-internals"))]
+    pub(super) fn oracle_state(&self) -> String {
+        let cells: std::collections::BTreeMap<_, _> = self.cells.iter().collect();
+        format!("{:?}", (self.cell, cells, &self.spans))
+    }
+
     pub(super) fn new(snakes: &[Snake], bounds: &[[f64; 4]], vision: f64) -> Self {
         let mut grid = Self::default();
         grid.update(snakes, bounds, vision);

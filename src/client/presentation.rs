@@ -111,6 +111,7 @@ fn identity(food: &Food) -> (u64, u64) {
     (bits(food.x), bits(food.y))
 }
 
+#[cfg_attr(any(test, feature = "perf-internals"), derive(Debug))]
 struct Source {
     palette: Vec<u8>,
     cursor: usize,
@@ -127,6 +128,13 @@ pub(super) struct FoodPresentation {
 }
 
 impl FoodPresentation {
+    #[cfg(any(test, feature = "perf-internals"))]
+    pub(super) fn oracle_state(&self) -> String {
+        let colors: std::collections::BTreeMap<_, _> = self.colors.iter().collect();
+        let live: std::collections::BTreeMap<_, _> = self.live.iter().collect();
+        format!("{:?}", (&self.random, &self.sources, colors, live))
+    }
+
     pub(super) fn new(seed: u32, slots: usize) -> Self {
         Self {
             random: Random::new(u64::from(seed) ^ 0x0063_6f6c_6f72),

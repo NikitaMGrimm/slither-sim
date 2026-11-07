@@ -1,17 +1,60 @@
 //! Shared tick scheduling and recipient-ordered broadcasts.
-#[cfg(feature = "perf-internals")]
+#[cfg(any(test, feature = "perf-internals"))]
 #[doc(hidden)]
 pub mod perf;
 use super::{
     EarlyFrames, MAX_PREY, NATIVE_PROFILE, PlayerAppearance, SimulatorBackend,
-    connection::KnownPrey,
-    food::{FoodChanges, food_identity, food_updates},
+    connection::{KnownPrey, Slot},
+    food::{FoodDiffs, FoodQuery, SectorFood, food_identity, prepare_food},
     minimap::MinimapBroadcast,
     prey_visibility::PreyBounds,
-    snakes::{CoverageGrid, KnownSnake, SnakeBroadcast, covered, full},
+    snakes::{
+        BodyBounds, CoverageGrid, KnownSnake, SnakeBroadcast, SnakeDeltaCache, SnakeReports,
+        covered, full,
+    },
 };
-use crate::{Simulator, client::encode, model::Snake, physics, simulator::PickupItem};
-use std::collections::{BTreeMap, BTreeSet};
+use crate::{
+    Prey, Simulator, WorldRules, client::encode, model::Snake, physics, simulator::PickupItem,
+};
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    sync::Arc,
+};
+
+/// Immutable inputs retained for this tick's recipient preparation. Borrow
+/// individual fields, never the backend or connection queues. Lazy caches,
+/// recipient histories and stale-report observations stay on the serial owner.
+struct ViewQuery<'a> {
+    snakes: &'a [Snake],
+    prey: &'a [Prey],
+    radius: f64,
+    rules: WorldRules,
+    vision: f64,
+    profiles: &'a [PlayerAppearance],
+    record_life: Option<(usize, u64)>,
+    bounds: &'a [[f64; 4]],
+    grid: &'a CoverageGrid,
+    body_bounds: &'a BodyBounds,
+    prey_bounds: &'a PreyBounds,
+    food: &'a [Option<Arc<SectorFood>>],
+    decorated_food: &'a [Option<Arc<SectorFood>>],
+    decorations: bool,
+    food_changes: FoodQuery<'a>,
+    food_eaters: &'a BTreeMap<(u64, u64), u16>,
+    prey_eaters: &'a BTreeMap<u64, u16>,
+    prey_wire: &'a BTreeMap<u64, u16>,
+    prey_clocks: &'a BTreeMap<u64, PreyClock>,
+}
+
+/// Borrow one snake's frozen encoding inputs before mutating a recipient or
+/// observing its history. Life/control are scalars, not a borrow of its queue.
+struct SnakeQuery<'world, 'reports> {
+    snake: &'world Snake,
+    life: u64,
+    heading: f64,
+    profile: &'world PlayerAppearance,
+    opportunity: &'reports SnakeReports,
+}
 
 /// Rows the stock leaderboard shows.
 pub(super) const LEADERBOARD_ROWS: usize = 10;
@@ -484,13 +527,37 @@ impl SimulatorBackend {
             } else {
                 vec![encode::pong(); pongs]
             };
-            let (updates, presented_updates) = self.updates(
+            // Reborrow at the original updates position: map/HUD/emission and
+            // early socket handoff keep their existing serial ownership/order.
+            let query = ViewQuery {
+                snakes: self.world.snakes(),
+                prey: self.world.prey(),
+                radius: self.world.radius(),
+                rules: self.world.rules(),
+                vision: self.world.config().vision,
+                profiles: &self.profiles,
+                record_life: self.record.as_ref().map(|r| (r.slot, r.life)),
+                bounds: &bounds,
+                grid: &grid,
+                body_bounds: &snakes.body_bounds,
+                prey_bounds: &prey_bounds,
+                food: &self.food_sectors,
+                decorated_food: &self.decorated_food_sectors,
+                decorations: self.pit_markers.is_some(),
+                food_changes: food_changes.query(),
+                food_eaters: &self.food_eaters,
+                prey_eaters: &self.prey_eaters,
+                prey_wire: &self.prey_wire,
+                prey_clocks: &self.prey_clocks,
+            };
+            let (updates, presented_updates) = Self::updates(
+                &query,
                 slot,
-                &food_changes,
-                &bounds,
-                &grid,
-                &prey_bounds,
-                &mut snakes,
+                &mut self.slots,
+                &mut self.reports,
+                &mut snakes.deltas,
+                &mut snakes.candidates,
+                &food_changes.diffs,
             )?;
             if minimap_due && let Some(packet) = self.minimap(slot, &mut map)? {
                 prefix.push(packet);
@@ -694,22 +761,18 @@ impl SimulatorBackend {
 
     /// Changes since this connection's last frame, own snake first.
     fn updates(
-        &mut self,
+        query: &ViewQuery<'_>,
         slot: usize,
-        food_changes: &FoodChanges,
-        bounds: &[[f64; 4]],
-        grid: &CoverageGrid,
-        prey_bounds: &PreyBounds,
-        snakes: &mut SnakeBroadcast,
+        slots: &mut [Slot],
+        reports: &mut [SnakeReports],
+        deltas: &mut [SnakeDeltaCache],
+        candidates: &mut Vec<usize>,
+        food_diffs: &FoodDiffs,
     ) -> Result<PacketViews, String> {
-        let world = &self.world;
-        let me = &world.snakes()[slot];
-        let record = self
-            .record
-            .as_ref()
-            .is_some_and(|record| record.slot == slot && record.life == self.slots[slot].life);
+        let me = &query.snakes[slot];
+        let record = query.record_life == Some((slot, slots[slot].life));
         let mut packets = Vec::new();
-        let connection = &mut self.slots[slot].connection;
+        let connection = &mut slots[slot].connection;
         if !me.alive && !connection.over {
             // Game over alone leaves the stock client predicting its snake: send
             // the final mass, then game over, then the death removal.
@@ -733,42 +796,54 @@ impl SimulatorBackend {
                 packets.push(encode::removal(id, true));
             }
         }
-        let radius = world.radius().round() as u32;
+        let radius = query.radius.round() as u32;
         if connection.radius != radius {
             connection.radius = radius;
-            packets.push(encode::radius(world.radius())?);
+            packets.push(encode::radius(query.radius)?);
         }
-        let rules = world.rules();
+        let rules = query.rules;
         if connection.rules_enabled && connection.rules_sent != Some(rules) {
             packets.push(crate::client::rules_packet::encode(rules));
             connection.rules_sent = Some(rules);
         }
-        let vision = world.config().vision;
+        let vision = query.vision;
         let head = me.head;
         // Snakes that may cover the head, or that this connection shows and may
         // need removing; every other snake is neither shown nor eligible.
-        let known = &self.slots[slot].connection.snakes;
-        let SnakeBroadcast {
-            deltas,
-            candidates,
-            body_bounds,
-        } = snakes;
-        known.candidates(grid.near(head), candidates);
+        let known = &slots[slot].connection.snakes;
+        known.candidates(query.grid.near(head), candidates);
         let order = std::iter::once(slot).chain(candidates.iter().copied().filter(|&i| i != slot));
         for i in order {
-            let snake = &world.snakes()[i];
-            let life = self.slots[i].life;
-            let control = self.slots[i].control.heading;
+            // Compact life/control facts are copied on demand from the serial
+            // owner; no world-sized snapshot or scan is added to this path.
+            let SnakeQuery {
+                snake,
+                life,
+                heading: control,
+                profile,
+                opportunity,
+            } = SnakeQuery {
+                snake: &query.snakes[i],
+                life: slots[i].life,
+                heading: slots[i].control.heading,
+                profile: query.profiles.get(i).unwrap_or(&NATIVE_PROFILE),
+                opportunity: &reports[i],
+            };
             let eligible = snake.alive
-                && (i == slot || covered(head, snake, bounds[i], vision, body_bounds.for_snake(i)));
+                && (i == slot
+                    || covered(
+                        head,
+                        snake,
+                        query.bounds[i],
+                        vision,
+                        query.body_bounds.for_snake(i),
+                    ));
             let own = i == slot;
             let id = i as u16;
-            let profile = self.profiles.get(i).unwrap_or(&NATIVE_PROFILE);
-            let connection = &mut self.slots[slot].connection;
+            let connection = &mut slots[slot].connection;
             let known = connection.snakes.get_mut(i);
             match (known, eligible) {
                 (Some(known), true) if known.life == life => {
-                    let reports = &self.reports[i];
                     deltas[i].changes(
                         &mut packets,
                         own,
@@ -777,9 +852,9 @@ impl SimulatorBackend {
                         snake,
                         || physics::quantize_heading(control),
                         profile,
-                        reports,
+                        opportunity,
                     )?;
-                    self.reports[i].observe(known);
+                    reports[i].observe(known);
                 }
                 (Some(known), false) => {
                     let died = !snake.alive || known.life != life;
@@ -794,11 +869,11 @@ impl SimulatorBackend {
                     }
                     full(&mut packets, own, id, snake, wanted, profile)?;
                     let known = KnownSnake::new(life, snake, wanted)?;
-                    self.reports[i].observe(&known);
+                    reports[i].observe(&known);
                     connection.snakes.insert(i, known);
                 }
             }
-            let connection = &mut self.slots[slot].connection;
+            let connection = &mut slots[slot].connection;
             if own && connection.snakes.contains_key(slot) {
                 // HUD packets wait for the client's own appearance; a
                 // requested session ID follows it so the client knows itself.
@@ -814,34 +889,36 @@ impl SimulatorBackend {
                 }
             }
         }
-        let connection = &mut self.slots[slot].connection;
+        let connection = &mut slots[slot].connection;
         let food_start = packets.len();
-        food_updates(
+        prepare_food(
             &mut packets,
             &mut connection.food,
             &connection.food_interest,
-            &self.food_sectors,
-            food_changes,
-            &self.food_eaters,
+            query.food,
+            query.food_changes,
+            food_diffs,
+            query.food_eaters,
         );
         let food_end = packets.len();
-        let mut presented = if connection.decorations && self.pit_markers.is_some() {
+        let mut presented = if connection.decorations && query.decorations {
             let mut presented = packets[..food_start].to_vec();
-            food_updates(
+            prepare_food(
                 &mut presented,
                 &mut connection.decorated_food,
                 &connection.food_interest,
-                &self.decorated_food_sectors,
-                food_changes,
-                &self.food_eaters,
+                query.decorated_food,
+                query.food_changes,
+                food_diffs,
+                query.food_eaters,
             );
             Some(presented)
         } else {
             None
         };
         let mut visible = BTreeMap::new();
-        for index in prey_bounds.near(head) {
-            let prey = &world.prey()[index];
+        for index in query.prey_bounds.near(head) {
+            let prey = &query.prey[index];
             if prey.position.distance_le(head, vision) {
                 visible.entry(prey.id).or_insert(prey);
             }
@@ -856,11 +933,11 @@ impl SimulatorBackend {
             let known = connection.prey.remove(&id).expect("known prey");
             packets.push(encode::prey_removal(
                 known.wire,
-                self.prey_eaters.get(&id).copied(),
+                query.prey_eaters.get(&id).copied(),
             ));
         }
         for (id, prey) in visible {
-            let wire = self.prey_wire[&id];
+            let wire = query.prey_wire[&id];
             let current = KnownPrey {
                 wire,
                 motion: [
@@ -872,7 +949,7 @@ impl SimulatorBackend {
             match connection.prey.get(&id) {
                 None => packets.push(encode::prey_appearance(wire, prey)?),
                 // Keep corrections even when quantized position is still.
-                Some(known) if self.prey_clocks[&id].due => {
+                Some(known) if query.prey_clocks[&id].due => {
                     let changed = known.motion != current.motion;
                     packets.push(encode::prey_motion(wire, prey, changed)?)
                 }
@@ -945,6 +1022,13 @@ mod tests {
         client::{SimulationConfig, visibility::SectorInterest},
         model::Point,
     };
+
+    #[test]
+    fn immutable_query_is_shareable() {
+        fn assert_sync<T: Sync>() {}
+        assert_sync::<ViewQuery<'_>>();
+        assert_sync::<SnakeQuery<'_, '_>>();
+    }
 
     fn backend() -> SimulatorBackend {
         let mut config = SimulationConfig {

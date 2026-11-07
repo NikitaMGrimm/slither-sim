@@ -111,6 +111,44 @@ Sandbox, official and Battledome registrations expand into `<id>-step` (one
 buffer through `observe_all_into`). When `perf_compare --base` targets an older
 API without it, the harness falls back to `observe_all`.
 
+## Raw official recipients
+
+`engine-raw-official-500` is an optional `full` row requiring `perf-internals`.
+It starts 500 synthetic grown snakes with 64–127 coiled anchors on a 25 by 20
+lattice (pitch `0.055 * radius`, coil radius 200), using the official preset,
+official delivery, seed 7, heading zero and no boost. It warms the complete raw
+backend from tick zero for 144 ticks and rebuilds after each 72 measured ticks,
+including the next shared food-maintenance boundary before the fixture drifts.
+It requires all 500 recipients and living snakes throughout. These constructed
+bodies exercise mature histories; they are not a captured population or a
+live-capacity claim.
+
+One operation includes physics, shared broadcast preparation, every recipient's
+queries/encoding, and serial frame emission. Construction, control generation,
+wire drains and trace serialization are outside the operation timer. There are
+no sockets, client decoders or bot workers; this row does not isolate broadcast
+from physics. Its default sample is 576 operations. `--parallel` and `--profile`
+are unsupported.
+
+`--trace` retains each epoch's complete ordered raw
+`(slot, tick, scheduled_time_bits, frame_bytes)` sequence, including tick-zero
+setup and warmup, plus terminal authoritative world and persistent host/view
+diagnostics. Scheduled times are the exact `f64::to_bits()` values, not receipt
+times. Vector order is significant even for identical bytes. Terminal allocation
+identities are numbered by first encounter, preserving sharing/revision
+relationships without recording process addresses. Diagnostics are unstable
+comparison output, with no restore or host-checkpoint contract.
+
+The library regression `raw_host_replay_detects_bytes_order_and_terminal_state`
+uses a separate eight-recipient grown official scene: 144 warmup ticks, pickup,
+boundary death, reconnect/slot reuse, mixed protocols 13/19, jitter, pongs and
+maintenance. It compares repeated runs and rejects changed bytes, reordered or
+missing frames and changed terminal state. To compare a pinned serial runtime,
+overlay the same oracle-only harness on that revision, export each run with
+`SLITHER_RAW_REPLAY_PATH=PATH cargo test --locked --lib raw_host_replay_detects_bytes_order_and_terminal_state`,
+then compare the complete files byte for byte. Do not overlay recipient runtime
+changes on the baseline. No generated recording is required in Git.
+
 ## Battledome spawn row
 
 `engine-battledome-spawn-318` is an optional `full` row for spawn admission and

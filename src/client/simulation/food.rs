@@ -55,6 +55,16 @@ struct HeldSubscription {
 }
 
 impl FoodSubscriptions {
+    #[cfg(any(test, feature = "perf-internals"))]
+    pub(super) fn oracle_state(&self, ids: &mut super::Identities) -> String {
+        let held: Vec<_> = self
+            .held
+            .iter()
+            .map(|s| (s.revision.as_ref().map(|r| ids.of(r)), &s.sectors))
+            .collect();
+        format!("{:?}", (held, &self.counts, &self.sectors, &self.entered))
+    }
+
     fn sync<'a>(
         &mut self,
         interests: impl ExactSizeIterator<Item = Option<&'a SectorInterest>>,
@@ -124,7 +134,17 @@ pub(super) struct KnownSectors {
     subscription_revision: Option<Arc<()>>,
     food_revision: Option<Arc<()>>,
 }
-#[cfg(any(feature = "perf-internals", feature = "frame-bench"))]
+#[cfg(any(test, feature = "perf-internals"))]
+impl KnownSectors {
+    pub(super) fn oracle_identities(&self, ids: &mut super::Identities) -> serde_json::Value {
+        serde_json::json!({
+            "subscription": self.subscription_revision.as_ref().map(|r| ids.of(r)),
+            "food": self.food_revision.as_ref().map(|r| ids.of(r)),
+            "listings": self.entries.iter().map(|(key, food)| (key, ids.of(food))).collect::<Vec<_>>()
+        })
+    }
+}
+#[cfg(any(test, feature = "perf-internals", feature = "frame-bench"))]
 impl KnownSectors {
     pub(super) fn perf_len(&self) -> usize {
         self.entries.iter().map(|(_, sector)| sector.0.len()).sum()
@@ -156,7 +176,19 @@ pub(super) struct FoodChanges {
     // broadcast error must fall back to the full diff against its older view.
     pub(super) previous: Arc<()>,
     pub(super) current: Arc<()>,
-    pub(super) diffs: RefCell<FastMap<(u16, usize), SectorDiff>>,
+    pub(super) diffs: FoodDiffs,
+}
+
+pub(super) type FoodDiffs = RefCell<FastMap<(u16, usize), SectorDiff>>;
+
+/// Borrowed transition metadata is shareable; lazy diff memoization is not.
+/// The owner retains the revision handles for the whole broadcast.
+#[derive(Clone, Copy)]
+pub(super) struct FoodQuery<'a> {
+    changed: &'a [[u8; 2]],
+    eaten: &'a BTreeSet<[u8; 2]>,
+    previous: &'a Arc<()>,
+    current: &'a Arc<()>,
 }
 
 /// One transition per current listing, shared only within this broadcast, when
@@ -170,6 +202,16 @@ pub(super) struct SectorDiff {
 }
 
 impl FoodChanges {
+    pub(super) fn query(&self) -> FoodQuery<'_> {
+        FoodQuery {
+            changed: &self.changed,
+            eaten: &self.eaten,
+            previous: &self.previous,
+            current: &self.current,
+        }
+    }
+
+    #[cfg(test)]
     fn append_diff(
         &self,
         packets: &mut Vec<Vec<u8>>,
@@ -178,24 +220,35 @@ impl FoodChanges {
         current: &Arc<SectorFood>,
         eaters: &BTreeMap<(u64, u64), u16>,
     ) {
-        let mut diffs = self.diffs.borrow_mut();
-        let diff = diffs
-            .entry((u16::from_be_bytes(sector), Arc::as_ptr(current) as usize))
-            .or_insert_with(|| {
-                let mut packets = Vec::new();
-                sector_changes(&mut packets, sector, previous, current, eaters);
-                SectorDiff {
-                    previous: previous.clone(),
-                    current: current.clone(),
-                    packets,
-                }
-            });
-        if Arc::ptr_eq(previous, &diff.previous) && Arc::ptr_eq(current, &diff.current) {
-            packets.extend_from_slice(&diff.packets);
-        } else {
-            // A recipient skipped an earlier broadcast and holds an older view.
-            sector_changes(packets, sector, previous, current, eaters);
-        }
+        append_diff(&self.diffs, packets, sector, previous, current, eaters);
+    }
+}
+
+fn append_diff(
+    diffs: &FoodDiffs,
+    packets: &mut Vec<Vec<u8>>,
+    sector: [u8; 2],
+    previous: &Arc<SectorFood>,
+    current: &Arc<SectorFood>,
+    eaters: &BTreeMap<(u64, u64), u16>,
+) {
+    let mut diffs = diffs.borrow_mut();
+    let diff = diffs
+        .entry((u16::from_be_bytes(sector), Arc::as_ptr(current) as usize))
+        .or_insert_with(|| {
+            let mut packets = Vec::new();
+            sector_changes(&mut packets, sector, previous, current, eaters);
+            SectorDiff {
+                previous: previous.clone(),
+                current: current.clone(),
+                packets,
+            }
+        });
+    if Arc::ptr_eq(previous, &diff.previous) && Arc::ptr_eq(current, &diff.current) {
+        packets.extend_from_slice(&diff.packets);
+    } else {
+        // A recipient skipped an earlier broadcast and holds an older view.
+        sector_changes(packets, sector, previous, current, eaters);
     }
 }
 #[cfg(test)]
@@ -232,6 +285,7 @@ pub(super) struct FoodIndex {
 /// One pellet lifetime, with the color it was born with: a listing may show
 /// a newer pellet while an older one at its position is still hidden.
 #[derive(Clone)]
+#[cfg_attr(any(test, feature = "perf-internals"), derive(Debug))]
 struct IndexedFood {
     offset: [u8; 2],
     food: Food,
@@ -239,6 +293,15 @@ struct IndexedFood {
     color: u8,
 }
 impl FoodIndex {
+    #[cfg(any(test, feature = "perf-internals"))]
+    pub(super) fn oracle_state(&self) -> String {
+        let sectors: BTreeMap<_, _> = self.sectors.iter().collect();
+        format!(
+            "{:?}",
+            (sectors, self.count, self.stale, &self.dirty, &self.hidden)
+        )
+    }
+
     pub(super) fn rebuild(&mut self, food: &[Food], presentation: &FoodPresentation) {
         self.dirty.extend(self.sectors.keys());
         self.sectors.clear();
@@ -483,12 +546,13 @@ impl SimulatorBackend {
 /// Keep empty subscriptions internally. Retained receipts introduce food with
 /// nonempty `F`, then births/pickups; see docs/server-rules.md#food-sector-delivery.
 /// `sectors` lists every subscribed sector.
-pub(super) fn food_updates(
+pub(super) fn prepare_food(
     packets: &mut Vec<Vec<u8>>,
     known: &mut KnownSectors,
     interest: &SectorInterest,
     sectors: &[Option<Arc<SectorFood>>],
-    changes: &FoodChanges,
+    changes: FoodQuery<'_>,
+    diffs: &FoodDiffs,
     eaters: &BTreeMap<(u64, u64), u16>,
 ) {
     let subscribed = interest.subscribed();
@@ -499,14 +563,14 @@ pub(super) fn food_updates(
         && known
             .food_revision
             .as_ref()
-            .is_some_and(|revision| Arc::ptr_eq(revision, &changes.previous))
+            .is_some_and(|revision| Arc::ptr_eq(revision, changes.previous))
     {
         let mut update = |sector, previous: &mut Arc<SectorFood>| {
             let current = sectors[usize::from(u16::from_be_bytes(sector))]
                 .as_ref()
                 .expect("subscribed sectors are listed");
             if !Arc::ptr_eq(previous, current) || changes.eaten.contains(&sector) {
-                changes.append_diff(packets, sector, previous, current, eaters);
+                append_diff(diffs, packets, sector, previous, current, eaters);
                 if !Arc::ptr_eq(previous, current) {
                     previous.clone_from(current);
                 }
@@ -566,7 +630,7 @@ pub(super) fn food_updates(
             Some(previous) => {
                 let unchanged = Arc::ptr_eq(&previous, current);
                 if !unchanged || changes.eaten.contains(&sector) {
-                    changes.append_diff(packets, sector, &previous, current, eaters);
+                    append_diff(diffs, packets, sector, &previous, current, eaters);
                 }
                 // A membership edit does not replace unchanged listings. Move
                 // the held handle instead of dropping and cloning that Arc.
@@ -648,6 +712,26 @@ fn sector_reach(sector: u16) -> f64 {
 pub(super) fn food_identity(point: Point) -> (u64, u64) {
     let bits = |v: f64| if v == 0. { 0 } else { v.to_bits() };
     (bits(point.x), bits(point.y))
+}
+
+#[cfg(test)]
+pub(super) fn food_updates(
+    packets: &mut Vec<Vec<u8>>,
+    known: &mut KnownSectors,
+    interest: &SectorInterest,
+    sectors: &[Option<Arc<SectorFood>>],
+    changes: &FoodChanges,
+    eaters: &BTreeMap<(u64, u64), u16>,
+) {
+    prepare_food(
+        packets,
+        known,
+        interest,
+        sectors,
+        changes.query(),
+        &changes.diffs,
+        eaters,
+    );
 }
 
 #[cfg(test)]
