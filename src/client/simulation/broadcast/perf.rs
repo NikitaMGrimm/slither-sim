@@ -261,7 +261,10 @@ mod tests {
             sim.set_view_threads(threads, Some(chunk), Some(0)).unwrap();
         }
         #[cfg(not(feature = "parallel"))]
-        assert!(views.is_none());
+        {
+            let _ = sim;
+            assert!(views.is_none());
+        }
     }
 
     /// One tick handing frames of slots `..early` over mid-broadcast, as the
@@ -494,6 +497,7 @@ mod tests {
     /// corners, exactly at vision from bodies and prey, one ULP either side,
     /// and on signed zeros. Poses repeat mid-run before standalone broadcasts,
     /// so the edges reach split queries, not only the serial setup broadcast.
+    #[cfg(feature = "parallel")]
     fn edges(views: Views) -> RawReplay {
         const N: usize = 16;
         const LONG: usize = 4;
