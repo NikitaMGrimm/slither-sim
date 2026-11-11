@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## [0.13.0](https://github.com/NikitaMGrimm/slither-sim/compare/v0.12.0...v0.13.0) - 2026-11-11
+
 ### Breaking
 
 - `follow` bots now steer straight at the owner's head every tick. The planner
