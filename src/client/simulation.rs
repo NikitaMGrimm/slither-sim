@@ -516,16 +516,6 @@ impl SimulatorBackend {
     }
 
     fn spawn_pose_waited(&mut self, slot: usize, waited: f64) -> Result<(Vec<Point>, f64), String> {
-        self.spawn_pose_vetoed(slot, waited, &mut |_, _| true)
-    }
-
-    /// `spawn_pose_waited`, also skipping candidate bodies `allowed` rejects.
-    fn spawn_pose_vetoed(
-        &mut self,
-        slot: usize,
-        waited: f64,
-        allowed: &mut dyn FnMut(&[Point], f64) -> bool,
-    ) -> Result<(Vec<Point>, f64), String> {
         let circular = self.world.config().spawn_radius.is_some();
         let mut safety: Option<spawn::Safety> = None;
         let mut floor = None;
@@ -568,9 +558,6 @@ impl SimulatorBackend {
                 .world
                 .spawn_body(head, heading)
                 .map_err(|error| error.to_string())?;
-            if !allowed(&body, heading) {
-                continue;
-            }
             let clear = if circular {
                 let query = safety.get_or_insert_with(|| {
                     spawn::Safety::new_excluding(
@@ -667,28 +654,25 @@ impl SimulatorBackend {
         Ok(())
     }
 
-    /// Respawn and steer `center`/`follow` slots. Forager hosts return at
+    /// Respawn and steer world-thread bot slots. Forager hosts return at
     /// once: no owner sampling, scans or allocations on their path.
     fn drive_in_world_bots(&mut self) -> Result<(), String> {
-        let Some(mut bots) = self.in_world_bots.take() else {
+        let Some(bots) = self.in_world_bots.take() else {
             return Ok(());
         };
-        let driven = self.drive_with(&mut bots);
+        let driven = self.drive_with(&bots);
         self.in_world_bots = Some(bots);
         driven
     }
 
-    fn drive_with(&mut self, bots: &mut InWorldBots) -> Result<(), String> {
-        bots.observe(&self.world, self.owner_slot());
+    fn drive_with(&mut self, bots: &InWorldBots) -> Result<(), String> {
+        let owner = self.owner_slot();
         for slot in bots.slots() {
             if !self.world.snakes()[slot].alive {
                 if !bots.decides(slot, self.tick) {
                     continue;
                 }
-                // The ordinary search, also skipping bodies in the owner's path.
-                match self.spawn_pose_vetoed(slot, 0., &mut |body, heading| {
-                    bots.spawn_is_safe(body, heading)
-                }) {
+                match self.spawn_pose(slot) {
                     Ok((body, heading)) => {
                         self.world
                             .respawn_body(slot, body, heading)
@@ -699,7 +683,6 @@ impl SimulatorBackend {
                             heading,
                             boost: false,
                         };
-                        bots.born(slot, heading);
                     }
                     // A crowded arena may have no clear pose yet; retry next decision.
                     Err(reason)
@@ -713,7 +696,7 @@ impl SimulatorBackend {
                     Err(reason) => return Err(reason),
                 }
             }
-            if let Some(heading) = bots.heading(&self.world, slot, self.tick) {
+            if let Some(heading) = bots.heading(&self.world, slot, self.tick, owner) {
                 self.slots[slot].control = Action {
                     heading,
                     boost: false,

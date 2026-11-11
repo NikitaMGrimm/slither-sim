@@ -46,12 +46,12 @@ both delays.
 | `seed` | `1` | Unsigned 32-bit simulation seed. |
 | `worldThreads` | `1` | Threads that step the world, at least 1. Above 1 the world gets its own pool of that many threads, separate from `bots.threads`, and ticks with at least 4,096 living snakes split across it with identical results. See [large bot worlds](hosting.md#world-threads). |
 | `viewThreads` | `1` | Threads that build per-player updates after each world step, at least 1. Above 1 views get their own pool of that many threads, separate from `worldThreads` and `bots.threads`; frames are identical. See [view threads](hosting.md#view-threads). |
-| `maxTick` | `null` (fixed ticks) | Optional maximum physics tick in seconds, finite and at least `simulation.world.dt`. Both endpoints must satisfy the world's dt limits (including the sliding-boundary limit). Not accepted with active `follow` bots; their planner requires fixed ticks. See [tick stretching](raw-server.md#vps-use). |
+| `maxTick` | `null` (fixed ticks) | Optional maximum physics tick in seconds, finite and at least `simulation.world.dt`. Both endpoints must satisfy the world's dt limits (including the sliding-boundary limit). See [tick stretching](raw-server.md#vps-use). |
 | `players.max` | `4` | Reserved socket slots; at least 1. |
 | `players.latency` | Zero added delay | Server-side link delay added to socket connections; both processing fields must be zero. |
 | `ownerKey` | `null` | Optional host key: 1–23 printable Latin-1 characters without whitespace. Keys under 6 characters warn. Debug output redacts it; see [owner key](#owner-key). |
 | `bots.count` | `4` | Background bot slots; players + bots must be at most 65,535. |
-| `bots.behavior` | `"forager"` | `forager`: A4 food seekers on worker threads. `center`: steer to the arena center. `follow`: crash into the owner's body; needs `ownerKey` and acts as `center` while no owner is alive. `center` and `follow` need a world without circular spawning, so not Battledome. |
+| `bots.behavior` | `"forager"` | `forager`: A4 food seekers on worker threads. `center`: steer to the arena center. `follow`: steer at the owner's head every tick, with no avoidance, so bots can kill the owner; needs `ownerKey` and acts as `center` while no owner is alive. `center` and `follow` need a world without circular spawning, so not Battledome. |
 | `bots.threads` | `2` | Forager worker threads, apart from simulation and sockets; at least 1 when `bots.count > 0`. At most `bots.count` start. Setting it with `center` or `follow` is an error. |
 | `bots.latency` | Zero added delay | Forager link and processing delay. Setting it (even `{}`) with `center` or `follow` is an error. |
 | `simulation` | Defaults below | Host derives `agents` and `controlledSlot`; `recordWire` must be false and `latency` must stay at its default. |
@@ -83,11 +83,9 @@ disconnects there is no owner until a session presents the key again. With
 
 `center` and `follow` bots run on the world thread: no bot clients, worker
 threads, frames, latency model or broadcasts to bot slots. They respawn through
-the ordinary spawn search and re-aim on staggered six-tick decisions; follow
-bots close to the owner's predicted path plan every tick. See
-[what is and isn't guaranteed](hosting.md#what-is-and-isnt-guaranteed).
-Active `follow` bots require fixed ticks: omit `maxTick`. `center` and `forager`
-support tick stretching; with `bots.count: 0`, no follow planner is constructed.
+the ordinary spawn search on staggered six-tick decisions. Center bots re-aim
+on those decisions; follow bots with a living owner re-aim every tick. See
+[bots that follow the owner](hosting.md#bots-that-follow-the-owner).
 
 ## SimulationConfig
 

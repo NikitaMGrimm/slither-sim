@@ -90,8 +90,9 @@ setting is in the [configuration reference](configuration.md#hostconfig).
 
 ## Bots that follow the owner
 
-Follow bots chase the server owner and crash into the owner's body, dying there
-and leaving ordinary death food. For a local play test, save this as
+Follow bots steer straight at the server owner's head every tick. They do not
+predict or avoid anything, so they can kill the owner; collisions and death
+food work as usual. For a local play test, save this as
 `follow.json`:
 
 ```json
@@ -117,45 +118,6 @@ default, keeps the A4 food seekers. `center` and `follow` bots run on the world
 thread without bot workers or packets, so leave out `bots.threads` and
 `bots.latency`. They need a world without circular spawning: Battledome hosts
 keep `forager` bots.
-Follow hosts with a nonzero bot count must also omit `maxTick`: their path
-history and strike deadlines require fixed-duration ticks. `center` and
-`forager` bots continue to support adaptive tick stretching.
-
-### What is and isn't guaranteed
-
-Follow bots avoid you by steering only. Nobody is immune, nothing passes
-through anything, and other players get no protection. Bots head straight for
-the nearest part of your body, including right behind your head, and die
-there.
-
-The planner targets two steady states at a fixed speed:
-
-- You keep one heading and never turn.
-- You keep one turn rate and never stop circling, from the tightest circle to
-  a gentle one.
-
-The host fits the most recent radian of turning, retaining at most 105 seconds
-of head positions. This includes very gentle turns whose quantized heading
-steps are more than three seconds apart. A straight heading is recognized
-after a hold longer than one wire heading step times the arena radius divided
-by your speed, plus two ticks. A fresh fit needs history from the current
-steady state; a change of owner starts that history again.
-
-Each approach is checked against the fitted path until a predicted impact or
-a reserved body lifetime. The lifetime reserves growth through 430 segments
-(or the bot's current size if larger), plus growth already pending. **430 is
-the score-table limit, not a growth cap.** Later food can exceed this reserve,
-and a predicted strike can be missed. Consequently, an unconditional promise
-that follow bots eventually cannot kill a steadily travelling owner is not
-established. Finite synthetic no-death tests are regression evidence, not a
-proof of that promise. New spawns are checked against the same model and reserve.
-
-A safety argument would also need all bodies laid before the fit settled to
-have disappeared. There is no fixed settle deadline while future growth is
-unbounded. Turning between states, zigzags, boosting or slowing down, owner
-growth that changes the travel, and arena-rim sliding are outside the model;
-the rollout does not apply the arena's boundary projection. A bot laid down
-for your old path can kill you after you change course.
 
 ## Run as a service
 

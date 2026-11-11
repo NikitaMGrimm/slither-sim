@@ -189,9 +189,6 @@ impl RawSimulator {
             // The newest key-bearing session replaces any earlier owner; an
             // ordinary life in the owner's slot ends ownership by its life.
             b.owner = Some((slot, b.slots[slot].life + 1));
-            if let Some(bots) = &mut b.in_world_bots {
-                bots.reset_owner();
-            }
         }
         b.profiles[slot] = appearance;
         let s = &mut b.slots[slot];

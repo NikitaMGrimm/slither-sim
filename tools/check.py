@@ -69,8 +69,6 @@ def commands(group):
             ["cargo", "test", "--all-targets", "--locked", "--no-default-features", "--features", "latency-rig"],
             ["cargo", "test", "--all-targets", "--locked", "--features", "latency-rig"],
             ["cargo", "test", "--locked", "--lib", "--features", "frame-bench", "frame_bench"],
-            # Long follow-bot scenarios, skipped by the unoptimized runs above.
-            ["cargo", "test", "--locked", "--profile", "scenarios", "--lib", "host_bots_"],
         ]
     if group == "tools":
         target = Path(os.environ.get("CARGO_TARGET_DIR", ROOT / "target"))

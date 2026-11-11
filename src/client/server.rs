@@ -272,14 +272,6 @@ impl HostConfig {
         if self.bots.behavior == BotBehavior::Follow && self.owner_key.is_none() {
             return Err("bots.behavior follow requires ownerKey".into());
         }
-        // Follow history and strike deadlines use fixed-duration ticks.
-        // Adaptive intervals would mix past and future timestep lengths.
-        if self.bots.count > 0
-            && self.bots.behavior == BotBehavior::Follow
-            && self.max_tick.is_some()
-        {
-            return Err("bots.behavior follow requires fixed ticks; omit maxTick".into());
-        }
         if self.bots.behavior != BotBehavior::Forager
             && (self.bots.threads.is_some() || self.bots.latency.is_some())
         {
@@ -4821,39 +4813,20 @@ mod tests {
     }
 
     #[test]
-    fn host_bots_follow_requires_fixed_ticks_only_when_active() {
-        let mut config: HostConfig = serde_json::from_str(
-            r#"{"ownerKey":"bananatest","bots":{"count":1,"behavior":"follow"}}"#,
-        )
-        .unwrap();
-        config.validate().unwrap();
+    fn host_bots_every_behavior_accepts_tick_stretching() {
+        let mut config: HostConfig =
+            serde_json::from_str(r#"{"ownerKey":"bananatest","maxTick":0.014,"bots":{"count":1}}"#)
+                .unwrap();
         config.bind.set_port(0);
-        let fixed = Host::bind(config.clone()).unwrap();
-        assert_eq!(fixed.max_tick, None);
-        assert_eq!(fixed.bots, 1);
-        drop(fixed);
-        for max in [config.simulation.world.dt, 0.014] {
-            config.max_tick = Some(max);
-            assert_eq!(
-                config.validate().unwrap_err(),
-                "bots.behavior follow requires fixed ticks; omit maxTick"
-            );
-            assert_eq!(
-                Host::bind(config.clone()).err().unwrap(),
-                "bots.behavior follow requires fixed ticks; omit maxTick"
-            );
-        }
-        for behavior in [BotBehavior::Center, BotBehavior::Forager] {
+        for behavior in [
+            BotBehavior::Forager,
+            BotBehavior::Center,
+            BotBehavior::Follow,
+        ] {
             config.bots.behavior = behavior;
             config.validate().unwrap();
-            drop(Host::bind(config.clone()).unwrap());
+            assert_eq!(Host::bind(config.clone()).unwrap().max_tick, Some(0.014));
         }
-        config.bots.behavior = BotBehavior::Follow;
-        config.bots.count = 0;
-        config.validate().unwrap();
-        let empty = Host::bind(config).unwrap();
-        assert_eq!(empty.bots, 0);
-        assert_eq!(empty.bot_threads, 0);
     }
 
     #[test]
