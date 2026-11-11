@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+### Breaking
+
+- `follow` bots now steer straight at the owner's head every tick. The planner
+  that kept them off the owner's path is gone: it made bots approach and veer
+  away. Follow bots can now kill the owner, no longer avoid spawning in the
+  owner's way, and work with `maxTick`. Configs need no change.
+
 ## [0.12.0](https://github.com/NikitaMGrimm/slither-sim/compare/v0.11.0...v0.12.0) - 2026-11-07
 
 ### Added
@@ -24,7 +31,7 @@
   whose nickname ends in `!` plus the new `ownerKey`; the host removes that
   marker at login. Follow bots steer around an owner who holds a steady heading
   or turn, but cannot guarantee the owner's safety
-  ([limits](https://github.com/NikitaMGrimm/slither-sim/blob/main/docs/hosting.md#what-is-and-isnt-guaranteed)),
+  ([limits](https://github.com/NikitaMGrimm/slither-sim/blob/v0.12.0/docs/hosting.md#what-is-and-isnt-guaranteed)),
   and they need fixed ticks (no `maxTick`). The default `forager` bots are
   unchanged.
 
