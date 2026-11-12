@@ -149,6 +149,13 @@ fill (`tests/menu_contrast.rs`). Pointer focus stays silent;
 selection uses a separate marker. A studio round trip restores the opener's
 focus modality and clears pointer feedback.
 
+Server picker buttons use the same pill palette, retaining their existing font,
+geometry and shadow. Disabled button and checkbox labels retain their text ink
+while their surfaces still dim; only the disabled multiplier is removed from
+text, so panel and section fades remain. Settled disabled text also meets 4.5:1
+in `menu_contrast.rs`; transition fades are not settled control states. Native
+menus currently have no combo boxes (quality and anti-aliasing use radio pills).
+
 Run `cargo run --manifest-path apps/wgpu-slice/Cargo.toml --example menu_specimens
 -- NEW_EXTERNAL_DIRECTORY --focus` from `client/`, with `CARGO_BUILD_JOBS=2`.
 `--polish` renders the login, Settings with its Graphics group (opened, hovered,
