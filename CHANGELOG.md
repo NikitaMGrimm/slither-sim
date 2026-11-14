@@ -2,27 +2,30 @@
 
 ## Unreleased
 
-### Added
-
-- Host bots can come in named groups with their own behavior and count
-  (`bots.groups`), for example foragers and follow bots in one world. The
-  `{"count", "behavior"}` shorthand stays the default.
-- `bots.capacity` reserves bot slots so groups can grow while the host runs,
-  and `bots.joinPerSecond` adds bots gradually, including at startup.
-- `slither-sim host` reads console commands on standard input: `bots`,
-  `bots set NAME COUNT [BEHAVIOR]`, `bots rate PER_SECOND|off` and `help`.
-  `--stats` lines end with the live `bots=` count.
-- `RunningHost::bots`, `set_bot_group`, `set_bot_join_rate` and the cloneable
-  `BotControl` change groups from Rust.
-- `bots.threads` and `bots.latency` are accepted with `center` and `follow`
-  bots; they apply to any foragers.
-
 ### Breaking
 
-- Rust `BotConfig` holds `groups: Vec<BotGroup>` plus `capacity` and
-  `join_per_second` instead of `count` and `behavior`; use
-  `BotConfig::new(behavior, count)` and `BotConfig::count()`. Host JSON is
-  unchanged.
+- Rust only: `BotConfig` replaces `count` and `behavior` with `groups`,
+  `capacity` and `join_per_second`. Use `BotConfig::new(behavior, count)` and
+  `BotConfig::count()`. Host JSON configs need no change.
+
+### Added
+
+- Hosts can run several bot groups, each with its own name, behavior and
+  count (`bots.groups`), such as foragers and follow bots in one world.
+  `bots.count` and `bots.behavior` still describe a single group.
+- `bots.capacity` reserves spare bot slots so groups can grow while the host
+  runs. `bots.joinPerSecond` adds bots gradually, including at startup;
+  respawns are never delayed.
+- `slither-sim host` takes commands on standard input while it runs: `bots`
+  lists the groups, `bots set NAME COUNT [BEHAVIOR]` adds, resizes or (with 0)
+  removes a group, and `bots rate PER_SECOND|off` sets the join rate. Rust
+  programs do the same through `RunningHost::bot_control`.
+- `--stats` lines end with `bots=`, the bots currently in a group.
+
+### Changed
+
+- `bots.threads` and `bots.latency` are accepted alongside `center` and
+  `follow` bots, since foragers can now be added later.
 
 ## [0.13.0](https://github.com/NikitaMGrimm/slither-sim/compare/v0.12.0...v0.13.0) - 2026-11-11
 

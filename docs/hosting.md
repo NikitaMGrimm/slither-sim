@@ -122,9 +122,9 @@ keep `forager` bots.
 
 ## Change bots while the host runs
 
-Bots can come in groups, each with its own name, behavior and count. This host
-reserves 200 bot slots, starts 100 foragers and 20 follow bots, and adds them
-two per second instead of all at once:
+Bots come in groups, each with its own name, behavior and count. This host
+starts 100 foragers and 20 follow bots, adds them two per second instead of all
+at once, and keeps 80 spare slots for groups added later:
 
 ```json
 {
@@ -151,16 +151,17 @@ bots rate PER_SECOND|off        limit how fast missing bots join
 help                            show this list
 ```
 
-`bots set chasers 40` resizes a group and `bots set center 30` creates a group
-of center bots. Groups keep their behavior; to change it, set the group to 0
-and add a new one. Removed bots leave without death food. All groups together
-may use at most `bots.capacity` slots; raising it needs a restart. The join
-rate only limits new bots; dead bots in a group respawn as usual.
+For example, `bots set chasers 40` resizes a group, `bots set center 30` adds
+30 center bots in a new group named `center`, and `bots set chasers 0` removes
+the chasers. Removed bots leave without death food. A group keeps its
+behavior; to change it, remove the group and add a new one. All groups
+together fit in `bots.capacity`, which only a restart can raise. The join rate
+limits new bots only; bots in a group respawn as usual.
 
-Replies go to standard output and logs to standard error. A service without
-input, such as the systemd unit below, simply has no console. Programs that
-embed the host use `RunningHost::bots`, `set_bot_group` and
-`set_bot_join_rate`.
+Replies go to standard output and logs to standard error. A host started
+without input, such as the systemd service below, has no console; run it in
+`tmux` or `screen` to keep one. Programs that embed the host use
+`RunningHost::bot_control`.
 
 ## Run as a service
 

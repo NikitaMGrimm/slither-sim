@@ -83,9 +83,8 @@ fn write_bots(status: &BotStatus, output: &mut impl Write) -> io::Result<()> {
         .map_or("off".to_owned(), |rate| format!("{rate}/s"));
     writeln!(
         output,
-        "capacity {} used, {} free; join rate {rate}",
-        status.capacity - status.free,
-        status.free
+        "capacity {}, {} free; join rate {rate}",
+        status.capacity, status.free
     )
 }
 
@@ -760,10 +759,7 @@ mod tests {
             text.contains("error: Unknown command: bogus; type help"),
             "{text}"
         );
-        assert!(
-            text.contains("capacity 3 used, 0 free; join rate 4/s"),
-            "{text}"
-        );
+        assert!(text.contains("capacity 3, 0 free; join rate 4/s"), "{text}");
         assert!(text.ends_with(&format!("{CONSOLE_HELP}\n")), "{text}");
         assert!(!host.is_finished());
         host.stop().unwrap();
