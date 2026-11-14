@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## [0.14.0](https://github.com/NikitaMGrimm/slither-sim/compare/v0.13.0...v0.14.0) - 2026-11-14
+
 ### Breaking
 
 - Rust only: `BotConfig` replaces `count` and `behavior` with `groups`,
