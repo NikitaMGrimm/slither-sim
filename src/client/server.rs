@@ -220,9 +220,16 @@ impl BotConfig {
         }
     }
 
-    /// Bots wanted at startup, over all groups.
+    /// Bots wanted at startup, over all groups; saturates at `usize::MAX`,
+    /// which validation refuses.
     pub fn count(&self) -> usize {
-        self.groups.iter().map(|group| group.count).sum()
+        self.checked_count().unwrap_or(usize::MAX)
+    }
+
+    fn checked_count(&self) -> Option<usize> {
+        self.groups
+            .iter()
+            .try_fold(0_usize, |total, group| total.checked_add(group.count))
     }
 
     /// Reserved bot slots: `capacity`, or the starting count.
@@ -247,15 +254,30 @@ impl Default for BotConfig {
     rename_all = "camelCase"
 )]
 struct RawBotConfig {
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "explicit_bot_setting"
+    )]
     count: Option<usize>,
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "explicit_bot_setting"
+    )]
     behavior: Option<BotBehavior>,
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "explicit_bot_setting"
+    )]
     groups: Option<Vec<RawBotGroup>>,
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "explicit_bot_setting"
+    )]
     capacity: Option<usize>,
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "explicit_bot_setting"
+    )]
     join_per_second: Option<f64>,
     #[serde(
         skip_serializing_if = "Option::is_none",
@@ -272,14 +294,22 @@ struct RawBotConfig {
 #[derive(Serialize, Deserialize)]
 #[serde(rename = "BotGroup", deny_unknown_fields, rename_all = "camelCase")]
 struct RawBotGroup {
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "explicit_bot_setting"
+    )]
     name: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "explicit_bot_setting"
+    )]
     behavior: Option<BotBehavior>,
     count: usize,
 }
 
-/// Omission selects the forager defaults; an explicit null is not a setting.
+/// Omission selects the default; an explicit null is not a setting.
 fn explicit_bot_setting<'de, D: serde::Deserializer<'de>, T: Deserialize<'de>>(
     deserializer: D,
 ) -> Result<Option<T>, D::Error> {
@@ -376,7 +406,10 @@ impl HostConfig {
         if self.frame_bench && !self.bind.ip().is_loopback() {
             return Err("--frame-bench requires a loopback bind".into());
         }
-        let starting = self.bots.count();
+        let starting = self
+            .bots
+            .checked_count()
+            .ok_or("bots.groups counts must add up to at most usize::MAX")?;
         let capacity = self.bots.slots();
         if capacity < starting {
             return Err(format!(
@@ -889,9 +922,9 @@ impl Host {
             let bots = Bots {
                 first: self.max_clients + worker,
                 max_clients: self.max_clients,
-                seats: (0..slots).map(|_| None).collect(),
+                seats: Vec::new(),
+                positions: vec![NO_SEAT; slots],
                 generations: vec![0; slots],
-                active: 0,
                 policy: ForagerBot::new(),
                 stride: self.bot_threads,
                 deliveries: receiver,
@@ -2490,13 +2523,16 @@ struct Bots {
     first: usize,
     /// Bot slots follow the socket slots; this picks seat profiles.
     max_clients: usize,
-    /// A seat per started slot. Idle slots hold no client state, so a host
-    /// with many world-thread bots keeps few worker allocations.
-    seats: Vec<Option<Seat>>,
+    /// Started seats only, in slot order, so the loop runs them in the same
+    /// order as before and never visits idle slots: a host with many
+    /// world-thread bots keeps no client state or scan cost for them.
+    seats: Vec<Seat>,
+    /// Index into `seats` per worker slot index, or `NO_SEAT`. Rewritten
+    /// only when a seat starts or stops.
+    positions: Vec<u32>,
     /// The last session generation per slot, kept across stops so that a
     /// restarted seat's sessions stay distinct from earlier ones.
     generations: Vec<u64>,
-    active: usize,
     policy: ForagerBot,
     stride: usize,
     deliveries: Receiver<Vec<Delivery>>,
@@ -2507,6 +2543,8 @@ struct Bots {
     /// Seconds between one bot's decisions.
     interval: f64,
 }
+
+const NO_SEAT: u32 = u32::MAX;
 
 /// How long a worker without seats waits for a start before checking stop.
 const IDLE_WORKER_WAIT: Duration = Duration::from_millis(100);
@@ -2537,7 +2575,7 @@ struct Seat {
 impl Bots {
     fn run(&mut self) -> Result<(), String> {
         while !self.shared.stopped() {
-            if self.active == 0 {
+            if self.seats.is_empty() {
                 match self.deliveries.recv_timeout(IDLE_WORKER_WAIT) {
                     Ok(batch) => self.deliver_batch(batch)?,
                     Err(mpsc::RecvTimeoutError::Timeout) => continue,
@@ -2550,7 +2588,7 @@ impl Bots {
             }
             let now = self.shared.clock.wall(Instant::now());
             let mut next = f64::INFINITY;
-            for seat in self.seats.iter_mut().flatten() {
+            for seat in &mut self.seats {
                 seat.run(
                     now,
                     &self.commands,
@@ -2561,7 +2599,7 @@ impl Bots {
                 )?;
                 next = next.min(seat.next_event());
             }
-            if self.active > 0 {
+            if !self.seats.is_empty() {
                 self.shared.clock.sleep_until(next, MAX_IDLE);
             }
         }
@@ -2585,15 +2623,22 @@ impl Bots {
                 seat.generation = self.generations[index];
                 seat.decide_at += now;
                 seat.join(now, &self.commands, &self.latency, &mut self.random)?;
-                if self.seats[index].replace(seat).is_none() {
-                    self.active += 1;
+                match self.positions[index] {
+                    NO_SEAT => {
+                        let at = self.seats.partition_point(|other| other.slot < slot);
+                        self.seats.insert(at, seat);
+                        self.reindex(at);
+                    }
+                    at => self.seats[at as usize] = seat,
                 }
                 return Ok(());
             }
             Delivery::Stop { .. } => {
-                if let Some(seat) = self.seats[index].take() {
+                let at = std::mem::replace(&mut self.positions[index], NO_SEAT);
+                if at != NO_SEAT {
+                    let seat = self.seats.remove(at as usize);
                     self.generations[index] = seat.generation;
-                    self.active -= 1;
+                    self.reindex(at as usize);
                 }
                 // A closed channel means the simulation ended and the host is stopping.
                 let _ = self.commands.send(Command::Release { slot });
@@ -2601,8 +2646,9 @@ impl Bots {
             }
             Delivery::Frames { .. } | Delivery::Closed { .. } => {}
         }
-        let Some(seat) = self.seats[index]
-            .as_mut()
+        let Some(seat) = self
+            .seats
+            .get_mut(self.positions[index] as usize)
             .filter(|seat| seat.generation == generation)
         else {
             return Ok(());
@@ -2623,6 +2669,13 @@ impl Bots {
             Delivery::Start { .. } | Delivery::Stop { .. } => {}
         }
         Ok(())
+    }
+
+    /// Point the positions of seats `from..` at their current indices.
+    fn reindex(&mut self, from: usize) {
+        for (at, seat) in self.seats.iter().enumerate().skip(from) {
+            self.positions[(seat.slot - self.first) / self.stride] = at as u32;
+        }
     }
 }
 
@@ -4435,9 +4488,9 @@ mod tests {
         let mut bots = Bots {
             first: 4,
             max_clients: 4,
-            seats: vec![Some(seat)],
+            seats: vec![seat],
+            positions: vec![0],
             generations: vec![0],
-            active: 1,
             policy: ForagerBot::new(),
             stride: 1,
             deliveries,
@@ -4453,10 +4506,10 @@ mod tests {
             frames: vec![(1., vec![0, 0, b'p']); count],
         };
         bots.deliver(frames(MAX_QUEUED_FRAMES)).unwrap();
-        let seat = |bots: &Bots| bots.seats[0].as_ref().unwrap().frames.len();
+        let seat = |bots: &Bots| bots.seats[0].frames.len();
         assert_eq!(seat(&bots), MAX_QUEUED_FRAMES);
         bots.deliver(frames(1)).unwrap();
-        assert!(bots.seats[0].as_ref().unwrap().closed && seat(&bots) == 0);
+        assert!(bots.seats[0].closed && seat(&bots) == 0);
         assert!(received.try_iter().any(|command| matches!(
             command,
             Command::Disconnect {
@@ -4470,14 +4523,14 @@ mod tests {
         // Stop drops the seat and answers with a release; a restarted seat
         // joins at once with a newer generation, and old frames miss it.
         bots.deliver(Delivery::Stop { slot: 4 }).unwrap();
-        assert!(bots.seats[0].is_none() && bots.active == 0);
+        assert!(bots.seats.is_empty() && bots.positions == [NO_SEAT]);
         assert!(matches!(
             received.try_iter().last(),
             Some(Command::Release { slot: 4 })
         ));
         bots.deliver(frames(1)).unwrap();
         bots.deliver(Delivery::Start { slot: 4 }).unwrap();
-        assert_eq!(bots.active, 1);
+        assert_eq!((bots.seats.len(), bots.positions[0]), (1, 0));
         assert!(matches!(
             received.try_recv().unwrap(),
             Command::Connect {
@@ -4488,6 +4541,62 @@ mod tests {
         ));
         bots.deliver(frames(1)).unwrap();
         assert_eq!(seat(&bots), 0);
+    }
+
+    #[test]
+    fn worker_seats_stay_in_slot_order_across_starts_and_stops() {
+        let (commands, received) = mpsc::channel();
+        let (_route, deliveries) = mpsc::channel();
+        // Worker 1 of 2 behind 3 socket slots owns slots 4, 6, 8 and 10.
+        let mut bots = Bots {
+            first: 4,
+            max_clients: 3,
+            seats: Vec::new(),
+            positions: vec![NO_SEAT; 4],
+            generations: vec![0; 4],
+            policy: ForagerBot::new(),
+            stride: 2,
+            deliveries,
+            commands,
+            shared: shared(0.007, 0),
+            latency: LatencyConfig::default(),
+            random: Random::new(1),
+            interval: 0.042,
+        };
+        let slots = |bots: &Bots| bots.seats.iter().map(|seat| seat.slot).collect::<Vec<_>>();
+        for slot in [8, 4, 10] {
+            bots.deliver(Delivery::Start { slot }).unwrap();
+        }
+        assert_eq!(slots(&bots), [4, 8, 10]);
+        assert_eq!(bots.positions, [0, NO_SEAT, 1, 2]);
+        bots.deliver(Delivery::Stop { slot: 8 }).unwrap();
+        bots.deliver(Delivery::Start { slot: 6 }).unwrap();
+        assert_eq!(slots(&bots), [4, 6, 10]);
+        assert_eq!(bots.positions, [0, 1, NO_SEAT, 2]);
+        // Frames reach the seat that owns their slot and generation only.
+        bots.deliver(Delivery::Frames {
+            slot: 10,
+            generation: 1,
+            frames: vec![(1., vec![0, 0, b'p'])],
+        })
+        .unwrap();
+        bots.deliver(Delivery::Frames {
+            slot: 8,
+            generation: 1,
+            frames: vec![(1., vec![0, 0, b'p'])],
+        })
+        .unwrap();
+        let queued: Vec<_> = bots.seats.iter().map(|seat| seat.frames.len()).collect();
+        assert_eq!(queued, [0, 0, 1]);
+        bots.deliver(Delivery::Start { slot: 8 }).unwrap();
+        assert_eq!(bots.seats[2].generation, 2, "restarts continue generations");
+        assert_eq!(
+            received
+                .try_iter()
+                .filter(|command| matches!(command, Command::Release { slot: 8 }))
+                .count(),
+            1
+        );
     }
 
     #[test]
@@ -5460,6 +5569,18 @@ mod tests {
             (r#"{"groups":[],"behavior":"center"}"#, "cannot be combined"),
             (r#"{"groups":[{"name":"x"}]}"#, "count"),
             (r#"{"groups":[{"count":1,"speed":2}]}"#, "unknown field"),
+            // Explicit null is never a setting, as for threads and latency.
+            (r#"{"count":null}"#, "null"),
+            (r#"{"behavior":null}"#, "expected value"),
+            (r#"{"groups":null}"#, "null"),
+            (r#"{"groups":[],"count":null}"#, "null"),
+            (r#"{"capacity":null}"#, "null"),
+            (r#"{"joinPerSecond":null}"#, "null"),
+            (r#"{"groups":[{"name":null,"count":1}]}"#, "null"),
+            (
+                r#"{"groups":[{"behavior":null,"count":1}]}"#,
+                "expected value",
+            ),
         ] {
             let message = parse(json).unwrap_err().to_string();
             assert!(message.contains(error), "{json}: {message}");
@@ -5470,6 +5591,10 @@ mod tests {
                 "printable ASCII",
             ),
             (r#"{"groups":[{"name":"","count":1}]}"#, "printable ASCII"),
+            (
+                r#"{"groups":[{"count":18446744073709551615},{"behavior":"center","count":1}]}"#,
+                "must add up to at most",
+            ),
             (
                 r#"{"groups":[{"name":"x","count":1},{"name":"x","behavior":"center","count":1}]}"#,
                 "duplicate name x",

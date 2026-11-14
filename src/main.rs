@@ -61,11 +61,20 @@ fn parse_console(line: &str) -> Result<Option<ConsoleCommand>, String> {
 }
 
 fn write_bots(status: &BotStatus, output: &mut impl Write) -> io::Result<()> {
-    writeln!(output, "group      behavior  target  in game  alive")?;
+    let width = status
+        .groups
+        .iter()
+        .map(|group| group.name.len())
+        .fold("group".len(), usize::max);
+    writeln!(
+        output,
+        "{:<width$} behavior  target  in game  alive",
+        "group"
+    )?;
     for group in &status.groups {
         writeln!(
             output,
-            "{:<10} {:<9} {:>6} {:>8} {:>6}",
+            "{:<width$} {:<9} {:>6} {:>8} {:>6}",
             group.name, group.behavior, group.target, group.assigned, group.alive
         )?;
     }
@@ -722,11 +731,27 @@ mod tests {
             ..Default::default()
         };
         let host = Host::bind(config).unwrap().start().unwrap();
-        let input = "bots set center 2\nbots set center 1 forager\nbogus\nbots rate 4\nhelp\n";
+        let input = "bots set center 2\nbots set center 1 forager\nbogus\nbots rate 4\n\
+                     bots set a_much_longer_name 1 center\nhelp\n";
         let mut output = Vec::new();
         run_console(host.bot_control(), input.as_bytes(), &mut output);
         let text = String::from_utf8(output).unwrap();
-        assert!(text.contains("center     center         2"), "{text}");
+        // The name column fits the longest name, at least the header.
+        assert!(
+            text.contains("group  behavior  target  in game  alive\ncenter center         2"),
+            "{text}"
+        );
+        assert!(
+            text.contains(
+                "group              behavior  target  in game  alive\n\
+                 center             center         2"
+            ),
+            "{text}"
+        );
+        assert!(
+            text.contains("a_much_longer_name center         1"),
+            "{text}"
+        );
         assert!(
             text.contains("error: Bot group center plays center"),
             "{text}"
@@ -736,7 +761,7 @@ mod tests {
             "{text}"
         );
         assert!(
-            text.contains("capacity 2 used, 1 free; join rate 4/s"),
+            text.contains("capacity 3 used, 0 free; join rate 4/s"),
             "{text}"
         );
         assert!(text.ends_with(&format!("{CONSOLE_HELP}\n")), "{text}");

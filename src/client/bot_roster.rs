@@ -227,10 +227,11 @@ impl Roster {
             .filter(|group| group.name != name)
             .map(|group| group.target)
             .sum();
-        if others + count > self.capacity() {
+        // Other targets never exceed capacity, so this cannot overflow.
+        if count > self.capacity() - others {
             return Err(format!(
                 "Bot groups would want {} bots, above bots.capacity {}; raising it needs a restart",
-                others + count,
+                others.saturating_add(count),
                 self.capacity()
             ));
         }
@@ -508,6 +509,10 @@ mod tests {
     #[test]
     fn group_changes_follow_the_rules() {
         let mut roster = roster(&[BotGroup::new(Forager, 2)], 4, None);
+        let error = roster
+            .set_group("extra", Some(Center), usize::MAX)
+            .unwrap_err();
+        assert!(error.contains("bots.capacity 4"), "{error}");
         let error = roster.set_group("forager", None, 5).unwrap_err();
         assert!(
             error.contains("bots.capacity 4") && error.contains("restart"),
