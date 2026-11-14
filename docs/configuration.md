@@ -50,16 +50,19 @@ both delays.
 | `players.max` | `4` | Reserved socket slots; at least 1. |
 | `players.latency` | Zero added delay | Server-side link delay added to socket connections; both processing fields must be zero. |
 | `ownerKey` | `null` | Optional host key: 1–23 printable Latin-1 characters without whitespace. Keys under 6 characters warn. Debug output redacts it; see [owner key](#owner-key). |
-| `bots.count` | `4` | Background bot slots; players + bots must be at most 65,535. |
+| `bots.count` | `4` | Shorthand for one group of this many bots, named after `bots.behavior`. |
 | `bots.behavior` | `"forager"` | `forager`: A4 food seekers on worker threads. `center`: steer to the arena center. `follow`: steer at the owner's head every tick, with no avoidance, so bots can kill the owner; needs `ownerKey` and acts as `center` while no owner is alive. `center` and `follow` need a world without circular spawning, so not Battledome. |
-| `bots.threads` | `2` | Forager worker threads, apart from simulation and sockets; at least 1 when `bots.count > 0`. At most `bots.count` start. Setting it with `center` or `follow` is an error. |
-| `bots.latency` | Zero added delay | Forager link and processing delay. Setting it (even `{}`) with `center` or `follow` is an error. |
+| `bots.groups` | One group from `count` and `behavior` | Instead of `count` and `behavior` (not both): a list of `{"name", "behavior", "count"}`. `count` is required; `behavior` defaults to `forager` and `name` to the behavior. Names are unique, 1–24 printable ASCII characters without spaces. |
+| `bots.capacity` | Sum of group counts | Reserved bot slots; at least the sum of counts. Groups can grow up to it [while the host runs](hosting.md#change-bots-while-the-host-runs). Players + capacity must be at most 65,535. Idle slots do not enlarge the arena. |
+| `bots.joinPerSecond` | `null` (all at once) | Positive rate at which missing bots join, for all groups together. With it, a host starts without bots and ramps up. Respawns are never delayed. |
+| `bots.threads` | `2` | Forager worker threads, apart from simulation and sockets; at least 1 when `bots.capacity > 0`. At most `bots.capacity` start. |
+| `bots.latency` | Zero added delay | Forager link and processing delay. |
 | `simulation` | Defaults below | Host derives `agents` and `controlledSlot`; `recordWire` must be false and `latency` must stay at its default. |
 
 See [hosting](raw-server.md) for TLS, connection limits and supported messages.
 
-The host applies [population sizing](#population-sizing) to `bots.count` at
-startup; reserved, disconnected player seats do not enlarge it. An official host with no
+The host applies [population sizing](#population-sizing) to the starting bot
+count; reserved player seats and idle bot slots do not enlarge it. An official host with no
 bots starts at radius 670. Connected players then contribute to live occupancy.
 
 ### Owner key
@@ -76,8 +79,8 @@ recordings or logs.
 
 The newest playing session that presented the key is the only owner; an
 earlier owner session becomes an ordinary player. After the owner dies or
-disconnects there is no owner until a session presents the key again. With
-`forager` or `center` bots the key only removes the marker.
+disconnects there is no owner until a session presents the key again. Without
+`follow` bots the key only removes the marker.
 
 ### World-thread bots
 

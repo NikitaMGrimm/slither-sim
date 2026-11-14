@@ -12,7 +12,7 @@
 use slither_sim::{
     Config,
     client::{
-        BotConfig, Host, HostConfig, LatencyConfig, PlayerConfig, SimulationConfig,
+        BotBehavior, BotConfig, Host, HostConfig, LatencyConfig, PlayerConfig, SimulationConfig,
         network::login_packet,
     },
 };
@@ -134,10 +134,9 @@ fn run(options: Options) -> Result<(), String> {
             latency: LatencyConfig::fixed(options.round_trip),
         },
         bots: BotConfig {
-            count: options.bots,
             threads: Some(options.bot_threads),
             latency: Some(LatencyConfig::fixed(options.round_trip)),
-            ..Default::default()
+            ..BotConfig::new(BotBehavior::Forager, options.bots)
         },
         simulation: SimulationConfig {
             world,
@@ -486,10 +485,7 @@ pub fn benchmark(
             max: clients,
             latency: LatencyConfig::fixed(0.),
         },
-        bots: BotConfig {
-            count: 0,
-            ..Default::default()
-        },
+        bots: BotConfig::new(BotBehavior::Forager, 0),
         simulation: SimulationConfig {
             world,
             ..Default::default()

@@ -924,7 +924,7 @@ fn host_config_files_accept_a_preset() {
         serde_json::from_str(r#"{"players":{"max":2},"bots":{"count":6,"threads":2},"simulation":{"world":{"preset":"battledome"}}}"#).unwrap();
     host.validate().unwrap();
     assert_eq!(host.players.max, 2);
-    assert_eq!(host.bots.count, 6);
+    assert_eq!(host.bots.count(), 6);
     assert_eq!(
         serde_json::to_value(&host.simulation.world).unwrap(),
         serde_json::to_value(Config::battledome()).unwrap()

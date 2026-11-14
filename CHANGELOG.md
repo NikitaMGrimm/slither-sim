@@ -2,6 +2,31 @@
 
 ## Unreleased
 
+### Breaking
+
+- Rust only: `BotConfig` replaces `count` and `behavior` with `groups`,
+  `capacity` and `join_per_second`. Use `BotConfig::new(behavior, count)` and
+  `BotConfig::count()`. Host JSON configs need no change.
+
+### Added
+
+- Hosts can run several bot groups, each with its own name, behavior and
+  count (`bots.groups`), such as foragers and follow bots in one world.
+  `bots.count` and `bots.behavior` still describe a single group.
+- `bots.capacity` reserves spare bot slots so groups can grow while the host
+  runs. `bots.joinPerSecond` adds bots gradually, including at startup;
+  respawns are never delayed.
+- `slither-sim host --console` takes commands on standard input while it runs:
+  `bots` lists the groups, `bots set NAME COUNT [BEHAVIOR]` adds, resizes or
+  (with 0) removes a group, and `bots rate PER_SECOND|off` sets the join rate.
+  Rust programs do the same through `RunningHost::bot_control`.
+- `--stats` lines end with `bots=`, the bots currently in a group.
+
+### Changed
+
+- `bots.threads` and `bots.latency` are accepted alongside `center` and
+  `follow` bots, since foragers can now be added later.
+
 ## [0.13.0](https://github.com/NikitaMGrimm/slither-sim/compare/v0.12.0...v0.13.0) - 2026-11-11
 
 ### Breaking

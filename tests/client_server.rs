@@ -4,7 +4,7 @@
 use slither_sim::{
     Action,
     client::{
-        Backend, BotBehavior, BotConfig, ClientFrame, ClientStatus, Host, HostConfig,
+        Backend, BotBehavior, BotConfig, BotStatus, ClientFrame, ClientStatus, Host, HostConfig,
         LatencyConfig, NetworkBackend, NetworkConfig, OwnerKey, PlayerConfig, RunningHost,
         SimulationConfig, challenge::solve_challenge, network::Handshake, network::login_packet,
     },
@@ -64,10 +64,7 @@ fn config(max_clients: usize, bots: usize) -> HostConfig {
             max: max_clients,
             ..Default::default()
         },
-        bots: BotConfig {
-            count: bots,
-            ..Default::default()
-        },
+        bots: BotConfig::new(BotBehavior::Forager, bots),
         simulation,
     }
 }
@@ -139,13 +136,22 @@ fn until(
     what: &str,
     done: impl Fn(&ClientFrame) -> bool,
 ) -> ClientFrame {
+    until_within(backend, what, WAIT, done)
+}
+
+fn until_within(
+    backend: &mut NetworkBackend,
+    what: &str,
+    limit: Duration,
+    done: impl Fn(&ClientFrame) -> bool,
+) -> ClientFrame {
     let start = Instant::now();
     loop {
         let frame = backend.next_frame().unwrap();
         if done(&frame) {
             return frame;
         }
-        assert!(start.elapsed() < WAIT, "timed out waiting for {what}");
+        assert!(start.elapsed() < limit, "timed out waiting for {what}");
     }
 }
 
@@ -372,7 +378,7 @@ fn bot_threads_steer_their_snakes() {
 fn world_thread_bots_play_for_a_socket_owner() {
     let mut config = config(1, 4);
     config.owner_key = Some(OwnerKey::from("bananatest".to_owned()));
-    config.bots.behavior = BotBehavior::Follow;
+    config.bots.groups = vec![slither_sim::client::BotGroup::new(BotBehavior::Follow, 4)];
     let host = Running::start(config);
     // The owner's own socket sees all four bots, driven without bot clients:
     // each one turns away from its random spawn heading at some point.
@@ -398,6 +404,130 @@ fn world_thread_bots_play_for_a_socket_owner() {
     }
     owner.disconnect();
     assert!(host.finish() > 0);
+}
+
+/// Generous bound for eventual bot changes on a slow or loaded runner.
+const BOT_WAIT: Duration = Duration::from_secs(30);
+
+/// Poll the host's bot status until `done`, for at most `BOT_WAIT`.
+fn until_bots(
+    host: &RunningHost,
+    what: &str,
+    mut done: impl FnMut(&BotStatus) -> bool,
+) -> BotStatus {
+    let start = Instant::now();
+    loop {
+        let status = host.bots().unwrap();
+        if done(&status) {
+            return status;
+        }
+        assert!(
+            start.elapsed() < BOT_WAIT,
+            "timed out waiting for {what}: {status:?}"
+        );
+        std::thread::sleep(Duration::from_millis(10));
+    }
+}
+
+/// Target and assigned bots per group, in order. Assignment is exact once
+/// the simulation applies a change; how many bots are alive at one moment
+/// depends on collisions, so tests only require some to be.
+fn groups(status: &BotStatus) -> Vec<(&str, usize, usize)> {
+    status
+        .groups
+        .iter()
+        .map(|group| (group.name.as_str(), group.target, group.assigned))
+        .collect()
+}
+
+fn every_group_plays(status: &BotStatus) -> bool {
+    status.groups.iter().all(|group| group.alive > 0)
+}
+
+#[test]
+fn live_bot_groups_grow_shrink_and_leave_the_world() {
+    let mut config = config(1, 2);
+    config.bots.capacity = Some(6);
+    let host = Running::start(config);
+    let bots = &host.host;
+    until_bots(bots, "starting foragers", |s| {
+        groups(s) == [("forager", 2, 2)] && every_group_plays(s)
+    });
+    bots.set_bot_group("center", None, 3).unwrap();
+    bots.set_bot_group("forager", None, 3).unwrap();
+    let status = until_bots(bots, "grown groups", |s| {
+        groups(s) == [("forager", 3, 3), ("center", 3, 3)] && every_group_plays(s)
+    });
+    assert_eq!((status.capacity, status.free), (6, 0));
+    let error = bots
+        .set_bot_group("extra", Some(BotBehavior::Center), 1)
+        .unwrap_err();
+    assert!(error.contains("bots.capacity 6"), "{error}");
+    let error = bots
+        .set_bot_group("center", Some(BotBehavior::Forager), 1)
+        .unwrap_err();
+    assert!(error.contains("set it to 0"), "{error}");
+    let error = bots.set_bot_group("follow", None, 0).unwrap_err();
+    assert!(error.contains("No bot group"), "{error}");
+    assert!(
+        bots.set_bot_group("follow", None, 1)
+            .unwrap_err()
+            .contains("ownerKey")
+    );
+
+    // Removed bots vanish from the shared world.
+    bots.set_bot_group("forager", None, 1).unwrap();
+    bots.set_bot_group("center", None, 0).unwrap();
+    // Removal is applied before the request returns.
+    assert_eq!(groups(&bots.bots().unwrap()), [("forager", 1, 1)]);
+    assert_eq!(bots.assigned_bots(), 1);
+    // Removed snakes are retired at once, so the watcher never sees more
+    // than the remaining bot; that bot may be between lives.
+    let mut watcher = network(host.url(), "Watcher", Handshake::Direct);
+    until_within(&mut watcher, "the remaining bot", BOT_WAIT, |f| {
+        let seen = f.observation.as_ref().map_or(0, |o| o.opponents.len());
+        assert!(seen <= 1, "{seen} bots after removal");
+        seen == 1
+    });
+    // Released forager slots take world-thread bots, and the last forager
+    // can come back as a forager.
+    bots.set_bot_group("forager", None, 0).unwrap();
+    bots.set_bot_group("center", None, 5).unwrap();
+    bots.set_bot_group("forager", None, 1).unwrap();
+    until_bots(bots, "regrouped bots", |s| {
+        groups(s) == [("center", 5, 5), ("forager", 1, 1)] && every_group_plays(s)
+    });
+    until_within(&mut watcher, "regrouped bots in the world", BOT_WAIT, |f| {
+        let seen = f.observation.as_ref().map_or(0, |o| o.opponents.len());
+        assert!(seen <= 6, "{seen} bots for 6 slots");
+        seen > 1
+    });
+    watcher.disconnect();
+    let control = bots.bot_control();
+    assert!(host.finish() > 0);
+    assert_eq!(control.bots().unwrap_err(), "The host stopped");
+}
+
+#[test]
+fn a_join_rate_ramps_bots_in() {
+    let mut config = config(1, 0);
+    config.bots = serde_json::from_str(
+        r#"{"groups":[{"behavior":"center","count":3},{"behavior":"forager","count":3}],"joinPerSecond":5}"#,
+    )
+    .unwrap();
+    let started = Instant::now();
+    let host = Running::start(config);
+    let status = until_bots(&host.host, "the full ramp", |s| s.assigned() == 6);
+    // One bot joins at once and five more at 5 per second of world time,
+    // which never runs ahead of the wall clock. Intermediate counts are
+    // covered by the roster's unit tests.
+    assert!(started.elapsed() >= Duration::from_millis(900));
+    assert_eq!(groups(&status), [("center", 3, 3), ("forager", 3, 3)]);
+    assert_eq!(status.join_per_second, Some(5.));
+    host.host.set_bot_join_rate(None).unwrap();
+    assert!(host.host.set_bot_join_rate(Some(-1.)).is_err());
+    assert_eq!(host.host.bots().unwrap().join_per_second, None);
+    host.finish();
 }
 
 #[test]
@@ -1285,7 +1415,7 @@ fn configuration_is_bounded_and_documents_derived_fields() {
     let default = HostConfig::default();
     assert_eq!(default.bind, "127.0.0.1:8766".parse().unwrap());
     assert_eq!(default.players.max, 4);
-    assert_eq!(default.bots.count, 4);
+    assert_eq!(default.bots.count(), 4);
     assert_eq!(default.bots.threads, None);
     assert_eq!(default.players.latency, LatencyConfig::default());
     assert_eq!(default.bots.latency, None);
@@ -1306,7 +1436,7 @@ fn configuration_is_bounded_and_documents_derived_fields() {
     let mut threadless = config(1, 2);
     threadless.bots.threads = Some(0);
     assert!(threadless.validate().unwrap_err().contains("bots.threads"));
-    threadless.bots.count = 0;
+    threadless.bots.groups.clear();
     threadless.validate().unwrap();
     let parsed: HostConfig =
         serde_json::from_str(r#"{"bind":"0.0.0.0:9000","players":{"max":3},"bots":{"count":0}}"#)

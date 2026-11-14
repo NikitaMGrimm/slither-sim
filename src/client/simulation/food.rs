@@ -1171,10 +1171,10 @@ mod tests {
                         backend.world.step(&actions).unwrap();
                         backend.tick += 1;
                     }
-                    for slot in 0..3 {
+                    for (slot, state) in backend.slots.iter_mut().take(3).enumerate() {
                         let choice = (tick / 7 + slot) % 5;
-                        backend.slots[slot].connection.setup = choice != 0;
-                        backend.slots[slot].connection.food_interest = match choice {
+                        state.connection.setup = choice != 0;
+                        state.connection.food_interest = match choice {
                             0 | 1 => first.clone(),
                             2 | 3 => second.clone(),
                             _ => empty.clone(),

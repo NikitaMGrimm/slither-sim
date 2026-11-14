@@ -4,13 +4,128 @@ use std::time::{Duration, Instant};
 
 #[cfg(feature = "latency-rig")]
 use slither_sim::client::latency_truth;
-use slither_sim::client::{Host, HostConfig, RunningHost};
+use slither_sim::client::{BotBehavior, BotControl, BotStatus, Host, HostConfig, RunningHost};
 
-const HOST_USAGE: &str = "Usage: slither-sim host [--bind IP:PORT] [--config FILE] [--stats SECONDS]\n\n\
+const HOST_USAGE: &str = "Usage: slither-sim host [--bind IP:PORT] [--config FILE] [--stats SECONDS] [--console]\n\n\
     Binary protocol-19 WebSocket server at /slither. Defaults bind loopback.\n\
     FILE is a HostConfig JSON object with players and bots sections; --bind overrides bind.\n\
     --stats prints tick rate, deferred ticks, load, population and admission rejections every SECONDS.\n\
+    --console reads commands from standard input that change bots while the host runs; type help.\n\
     See docs/raw-server.md for limits and VPS configuration.";
+
+const CONSOLE_HELP: &str = "bots                            list bot groups\n\
+    bots set NAME COUNT [BEHAVIOR]  create or resize a group; 0 removes it\n\
+    bots rate PER_SECOND|off        limit how fast missing bots join\n\
+    help                            show this list\n\
+    Behaviors: forager, center, follow. A new group named after a behavior uses it.";
+
+#[derive(Debug, PartialEq)]
+enum ConsoleCommand {
+    Help,
+    Bots,
+    SetGroup {
+        name: String,
+        count: usize,
+        behavior: Option<BotBehavior>,
+    },
+    Rate(Option<f64>),
+}
+
+/// One console line; `None` for a blank line.
+fn parse_console(line: &str) -> Result<Option<ConsoleCommand>, String> {
+    let words: Vec<_> = line.split_whitespace().collect();
+    Ok(Some(match words.as_slice() {
+        [] => return Ok(None),
+        ["help"] => ConsoleCommand::Help,
+        ["bots"] => ConsoleCommand::Bots,
+        ["bots", "set", name, count, behavior @ ..] if behavior.len() <= 1 => {
+            ConsoleCommand::SetGroup {
+                name: (*name).into(),
+                count: count
+                    .parse()
+                    .map_err(|_| format!("COUNT must be a whole number, not {count}"))?,
+                behavior: behavior.first().map(|name| name.parse()).transpose()?,
+            }
+        }
+        ["bots", "rate", "off"] => ConsoleCommand::Rate(None),
+        ["bots", "rate", rate] => ConsoleCommand::Rate(Some(
+            rate.parse()
+                .ok()
+                .filter(|rate: &f64| rate.is_finite() && *rate > 0.)
+                .ok_or_else(|| {
+                    format!("PER_SECOND must be a positive number or off, not {rate}")
+                })?,
+        )),
+        _ => return Err(format!("Unknown command: {}; type help", line.trim())),
+    }))
+}
+
+fn write_bots(status: &BotStatus, output: &mut impl Write) -> io::Result<()> {
+    let width = status
+        .groups
+        .iter()
+        .map(|group| group.name.len())
+        .fold("group".len(), usize::max);
+    writeln!(
+        output,
+        "{:<width$} behavior  target  in game  alive",
+        "group"
+    )?;
+    for group in &status.groups {
+        writeln!(
+            output,
+            "{:<width$} {:<9} {:>6} {:>8} {:>6}",
+            group.name, group.behavior, group.target, group.assigned, group.alive
+        )?;
+    }
+    let rate = status
+        .join_per_second
+        .map_or("off".to_owned(), |rate| format!("{rate}/s"));
+    writeln!(
+        output,
+        "capacity {}, {} free; join rate {rate}",
+        status.capacity, status.free
+    )
+}
+
+/// Run one console line against the host and print the reply.
+fn console_line(bots: &BotControl, line: &str, output: &mut impl Write) -> io::Result<()> {
+    let reply = match parse_console(line) {
+        Ok(None) => return Ok(()),
+        Ok(Some(ConsoleCommand::Help)) => return writeln!(output, "{CONSOLE_HELP}"),
+        Ok(Some(ConsoleCommand::Bots)) => bots.bots(),
+        Ok(Some(ConsoleCommand::SetGroup {
+            name,
+            count,
+            behavior,
+        })) => bots
+            .set_bot_group(&name, behavior, count)
+            .and_then(|()| bots.bots()),
+        Ok(Some(ConsoleCommand::Rate(rate))) => {
+            bots.set_bot_join_rate(rate).and_then(|()| bots.bots())
+        }
+        Err(error) => Err(error),
+    };
+    match reply {
+        Ok(status) => write_bots(&status, output),
+        Err(error) => writeln!(output, "error: {error}"),
+    }
+}
+
+/// Read console lines until end of input, which leaves the host running.
+fn run_console(bots: BotControl, input: impl io::BufRead, output: &mut impl Write) {
+    for line in input.lines() {
+        let Ok(line) = line else {
+            return;
+        };
+        if console_line(&bots, &line, output)
+            .and_then(|()| output.flush())
+            .is_err()
+        {
+            return;
+        }
+    }
+}
 
 fn command_exit(result: Result<(), impl std::fmt::Display>) -> ExitCode {
     match result {
@@ -25,6 +140,9 @@ fn command_exit(result: Result<(), impl std::fmt::Display>) -> ExitCode {
 struct HostOptions {
     config: HostConfig,
     stats_interval: Option<Duration>,
+    /// Opt-in: a background job that reads its terminal gets SIGTTIN, which
+    /// stops the whole host, so `slither-sim host &` must not read stdin.
+    console: bool,
     #[cfg(feature = "latency-rig")]
     latency: Option<LatencyOptions>,
 }
@@ -50,6 +168,7 @@ fn parse_host_args(args: &[&str]) -> Result<Option<HostOptions>, String> {
     let mut bind = None;
     let mut file = None;
     let mut stats_interval = None;
+    let mut console = false;
     #[cfg(feature = "latency-rig")]
     let mut latency_path = None;
     #[cfg(feature = "latency-rig")]
@@ -87,6 +206,12 @@ fn parse_host_args(args: &[&str]) -> Result<Option<HostOptions>, String> {
                     return Err(error.into());
                 }
                 stats_interval = Some(interval);
+            }
+            "--console" => {
+                if console {
+                    return Err("Repeated --console".into());
+                }
+                console = true;
             }
             #[cfg(feature = "latency-rig")]
             "--latency-truth" => {
@@ -135,7 +260,7 @@ fn parse_host_args(args: &[&str]) -> Result<Option<HostOptions>, String> {
                 config.bind,
                 seconds,
                 config.simulation.world.dt,
-                config.players.max + config.bots.count,
+                config.players.max + config.bots.slots(),
             )?;
             Some(LatencyOptions {
                 path: path.into(),
@@ -150,6 +275,7 @@ fn parse_host_args(args: &[&str]) -> Result<Option<HostOptions>, String> {
     Ok(Some(HostOptions {
         config,
         stats_interval,
+        console,
         #[cfg(feature = "latency-rig")]
         latency,
     }))
@@ -179,18 +305,21 @@ impl HostStats {
         previous: &Self,
         players: usize,
         bot_slots: usize,
+        bots: usize,
         output: &mut impl Write,
     ) -> io::Result<()> {
         let elapsed = self.at.duration_since(previous.at).as_secs_f64();
+        // Readers parse these fields; add new ones only at the end.
         writeln!(
             output,
-            "stats: ticks/s={:.2} deferred_ticks={} lost_seconds={:.6} simulation_load={:.1}% players={} bot_slots={}",
+            "stats: ticks/s={:.2} deferred_ticks={} lost_seconds={:.6} simulation_load={:.1}% players={} bot_slots={} bots={}",
             (self.ticks - previous.ticks) as f64 / elapsed,
             self.deferred - previous.deferred,
             self.lost_seconds - previous.lost_seconds,
             100. * (self.simulation_seconds - previous.simulation_seconds) / elapsed,
             players,
             bot_slots,
+            bots,
         )
     }
 }
@@ -214,7 +343,13 @@ fn report_host_stats(
         }
         if previous.at.elapsed() >= interval {
             let current = HostStats::sample(host);
-            current.write_since(&previous, host.players(), bot_slots, output)?;
+            current.write_since(
+                &previous,
+                host.players(),
+                bot_slots,
+                host.assigned_bots(),
+                output,
+            )?;
             for ((phase, reason), count) in host.admission_rejections() {
                 writeln!(
                     output,
@@ -242,7 +377,7 @@ fn host(args: &[&str]) -> ExitCode {
     for warning in options.config.warnings() {
         eprintln!("warning: {warning}");
     }
-    let bot_slots = options.config.bots.count;
+    let bot_slots = options.config.bots.slots();
     let result = Host::bind(options.config).and_then(|host| {
         #[cfg(feature = "latency-rig")]
         let host = if let Some(latency) = options.latency {
@@ -251,14 +386,20 @@ fn host(args: &[&str]) -> ExitCode {
             host
         };
         eprintln!("Listening on ws://{}/slither", host.local_addr()?);
+        let running = host.start()?;
+        if options.console {
+            let bots = running.bot_control();
+            // Detached: a console blocked on input must not keep the process alive.
+            std::thread::Builder::new()
+                .name("slither-console".into())
+                .spawn(move || run_console(bots, io::stdin().lock(), &mut io::stdout()))
+                .map_err(|e| e.to_string())?;
+        }
         if let Some(interval) = options.stats_interval {
-            let running = host.start()?;
             // Stats are diagnostics: if stderr breaks, stop reporting but keep serving.
             let _ = report_host_stats(&running, interval, bot_slots, &mut io::stderr());
-            running.wait()
-        } else {
-            host.run()
         }
+        running.wait()
     });
     command_exit(result)
 }
@@ -416,10 +557,10 @@ mod tests {
             let path = truth_path();
             let config = HostConfig {
                 bind: "127.0.0.1:0".parse().unwrap(),
-                bots: slither_sim::client::BotConfig {
-                    count: 0,
-                    ..Default::default()
-                },
+                bots: slither_sim::client::BotConfig::new(
+                    slither_sim::client::BotBehavior::Forager,
+                    0,
+                ),
                 simulation: slither_sim::client::SimulationConfig {
                     world: slither_sim::Config::sandbox(),
                     ..Default::default()
@@ -457,6 +598,12 @@ mod tests {
     fn host_stats_are_opt_in_and_accept_fractional_seconds() {
         let defaults = parse_host_args(&[]).unwrap().unwrap();
         assert!(defaults.stats_interval.is_none());
+        assert!(!defaults.console);
+        assert!(parse_host_args(&["--console"]).unwrap().unwrap().console);
+        assert_eq!(
+            parse_host_args(&["--console", "--console"]).err().unwrap(),
+            "Repeated --console"
+        );
         let options = parse_host_args(&["--stats", "0.25", "--bind", "127.0.0.1:0"])
             .unwrap()
             .unwrap();
@@ -500,10 +647,12 @@ mod tests {
             simulation_seconds: 5.824,
         };
         let mut output = Vec::new();
-        current.write_since(&previous, 40, 4, &mut output).unwrap();
+        current
+            .write_since(&previous, 40, 4, 3, &mut output)
+            .unwrap();
         assert_eq!(
             String::from_utf8(output).unwrap(),
-            "stats: ticks/s=100.00 deferred_ticks=3 lost_seconds=0.025000 simulation_load=41.2% players=40 bot_slots=4\n"
+            "stats: ticks/s=100.00 deferred_ticks=3 lost_seconds=0.025000 simulation_load=41.2% players=40 bot_slots=4 bots=3\n"
         );
     }
 
@@ -511,10 +660,7 @@ mod tests {
     fn host_stats_report_a_running_loopback_host_and_propagate_output_errors() {
         let config = HostConfig {
             bind: "127.0.0.1:0".parse().unwrap(),
-            bots: slither_sim::client::BotConfig {
-                count: 0,
-                ..Default::default()
-            },
+            bots: slither_sim::client::BotConfig::new(slither_sim::client::BotBehavior::Forager, 0),
             simulation: slither_sim::client::SimulationConfig {
                 world: slither_sim::Config::sandbox(),
                 ..Default::default()
@@ -540,7 +686,101 @@ mod tests {
         assert!(lines.len() >= 2, "{text}");
         for line in &lines[..2] {
             assert!(line.starts_with("stats: ticks/s="), "{line}");
-            assert!(line.ends_with("players=0 bot_slots=0"), "{line}");
+            assert!(line.ends_with("players=0 bot_slots=0 bots=0"), "{line}");
         }
+    }
+
+    #[test]
+    fn console_commands_parse_and_reject_unknown_input() {
+        use ConsoleCommand::*;
+        for (line, command) in [
+            ("help", Help),
+            ("  bots ", Bots),
+            (
+                "bots set follow 20",
+                SetGroup {
+                    name: "follow".into(),
+                    count: 20,
+                    behavior: None,
+                },
+            ),
+            (
+                "bots set chasers 3 center",
+                SetGroup {
+                    name: "chasers".into(),
+                    count: 3,
+                    behavior: Some(BotBehavior::Center),
+                },
+            ),
+            ("bots rate 2.5", Rate(Some(2.5))),
+            ("bots rate off", Rate(None)),
+        ] {
+            assert_eq!(parse_console(line).unwrap(), Some(command), "{line}");
+        }
+        assert_eq!(parse_console("   ").unwrap(), None);
+        for (line, error) in [
+            ("bot", "type help"),
+            ("bots set x", "type help"),
+            ("bots set x 1 center extra", "type help"),
+            ("bots set x -1", "COUNT"),
+            ("bots set x many", "COUNT"),
+            ("bots set x 1 sprinter", "Unknown bot behavior"),
+            ("bots rate 0", "PER_SECOND"),
+            ("bots rate NaN", "PER_SECOND"),
+            ("bots rate", "type help"),
+        ] {
+            let message = parse_console(line).unwrap_err();
+            assert!(message.contains(error), "{line}: {message}");
+        }
+    }
+
+    #[test]
+    fn console_changes_bots_and_ends_quietly_at_end_of_input() {
+        let config = HostConfig {
+            bind: "127.0.0.1:0".parse().unwrap(),
+            bots: slither_sim::client::BotConfig {
+                capacity: Some(3),
+                ..slither_sim::client::BotConfig::new(BotBehavior::Center, 1)
+            },
+            simulation: slither_sim::client::SimulationConfig {
+                world: slither_sim::Config::sandbox(),
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+        let host = Host::bind(config).unwrap().start().unwrap();
+        let input = "bots set center 2\nbots set center 1 forager\nbogus\nbots rate 4\n\
+                     bots set a_much_longer_name 1 center\nhelp\n";
+        let mut output = Vec::new();
+        run_console(host.bot_control(), input.as_bytes(), &mut output);
+        let text = String::from_utf8(output).unwrap();
+        // The name column fits the longest name, at least the header.
+        assert!(
+            text.contains("group  behavior  target  in game  alive\ncenter center         2"),
+            "{text}"
+        );
+        assert!(
+            text.contains(
+                "group              behavior  target  in game  alive\n\
+                 center             center         2"
+            ),
+            "{text}"
+        );
+        assert!(
+            text.contains("a_much_longer_name center         1"),
+            "{text}"
+        );
+        assert!(
+            text.contains("error: Bot group center plays center"),
+            "{text}"
+        );
+        assert!(
+            text.contains("error: Unknown command: bogus; type help"),
+            "{text}"
+        );
+        assert!(text.contains("capacity 3, 0 free; join rate 4/s"), "{text}");
+        assert!(text.ends_with(&format!("{CONSOLE_HELP}\n")), "{text}");
+        assert!(!host.is_finished());
+        host.stop().unwrap();
     }
 }
