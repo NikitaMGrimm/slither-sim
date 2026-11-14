@@ -6,11 +6,11 @@ use std::time::{Duration, Instant};
 use slither_sim::client::latency_truth;
 use slither_sim::client::{BotBehavior, BotControl, BotStatus, Host, HostConfig, RunningHost};
 
-const HOST_USAGE: &str = "Usage: slither-sim host [--bind IP:PORT] [--config FILE] [--stats SECONDS]\n\n\
+const HOST_USAGE: &str = "Usage: slither-sim host [--bind IP:PORT] [--config FILE] [--stats SECONDS] [--console]\n\n\
     Binary protocol-19 WebSocket server at /slither. Defaults bind loopback.\n\
     FILE is a HostConfig JSON object with players and bots sections; --bind overrides bind.\n\
     --stats prints tick rate, deferred ticks, load, population and admission rejections every SECONDS.\n\
-    Standard input takes console commands that change bots while the host runs; type help.\n\
+    --console reads commands from standard input that change bots while the host runs; type help.\n\
     See docs/raw-server.md for limits and VPS configuration.";
 
 const CONSOLE_HELP: &str = "bots                            list bot groups\n\
@@ -140,6 +140,9 @@ fn command_exit(result: Result<(), impl std::fmt::Display>) -> ExitCode {
 struct HostOptions {
     config: HostConfig,
     stats_interval: Option<Duration>,
+    /// Opt-in: a background job that reads its terminal gets SIGTTIN, which
+    /// stops the whole host, so `slither-sim host &` must not read stdin.
+    console: bool,
     #[cfg(feature = "latency-rig")]
     latency: Option<LatencyOptions>,
 }
@@ -165,6 +168,7 @@ fn parse_host_args(args: &[&str]) -> Result<Option<HostOptions>, String> {
     let mut bind = None;
     let mut file = None;
     let mut stats_interval = None;
+    let mut console = false;
     #[cfg(feature = "latency-rig")]
     let mut latency_path = None;
     #[cfg(feature = "latency-rig")]
@@ -202,6 +206,12 @@ fn parse_host_args(args: &[&str]) -> Result<Option<HostOptions>, String> {
                     return Err(error.into());
                 }
                 stats_interval = Some(interval);
+            }
+            "--console" => {
+                if console {
+                    return Err("Repeated --console".into());
+                }
+                console = true;
             }
             #[cfg(feature = "latency-rig")]
             "--latency-truth" => {
@@ -265,6 +275,7 @@ fn parse_host_args(args: &[&str]) -> Result<Option<HostOptions>, String> {
     Ok(Some(HostOptions {
         config,
         stats_interval,
+        console,
         #[cfg(feature = "latency-rig")]
         latency,
     }))
@@ -376,12 +387,14 @@ fn host(args: &[&str]) -> ExitCode {
         };
         eprintln!("Listening on ws://{}/slither", host.local_addr()?);
         let running = host.start()?;
-        let bots = running.bot_control();
-        // Detached: a console blocked on input must not keep the process alive.
-        std::thread::Builder::new()
-            .name("slither-console".into())
-            .spawn(move || run_console(bots, io::stdin().lock(), &mut io::stdout()))
-            .map_err(|e| e.to_string())?;
+        if options.console {
+            let bots = running.bot_control();
+            // Detached: a console blocked on input must not keep the process alive.
+            std::thread::Builder::new()
+                .name("slither-console".into())
+                .spawn(move || run_console(bots, io::stdin().lock(), &mut io::stdout()))
+                .map_err(|e| e.to_string())?;
+        }
         if let Some(interval) = options.stats_interval {
             // Stats are diagnostics: if stderr breaks, stop reporting but keep serving.
             let _ = report_host_stats(&running, interval, bot_slots, &mut io::stderr());
@@ -585,6 +598,12 @@ mod tests {
     fn host_stats_are_opt_in_and_accept_fractional_seconds() {
         let defaults = parse_host_args(&[]).unwrap().unwrap();
         assert!(defaults.stats_interval.is_none());
+        assert!(!defaults.console);
+        assert!(parse_host_args(&["--console"]).unwrap().unwrap().console);
+        assert_eq!(
+            parse_host_args(&["--console", "--console"]).err().unwrap(),
+            "Repeated --console"
+        );
         let options = parse_host_args(&["--stats", "0.25", "--bind", "127.0.0.1:0"])
             .unwrap()
             .unwrap();

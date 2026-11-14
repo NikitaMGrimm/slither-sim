@@ -16,10 +16,10 @@
 - `bots.capacity` reserves spare bot slots so groups can grow while the host
   runs. `bots.joinPerSecond` adds bots gradually, including at startup;
   respawns are never delayed.
-- `slither-sim host` takes commands on standard input while it runs: `bots`
-  lists the groups, `bots set NAME COUNT [BEHAVIOR]` adds, resizes or (with 0)
-  removes a group, and `bots rate PER_SECOND|off` sets the join rate. Rust
-  programs do the same through `RunningHost::bot_control`.
+- `slither-sim host --console` takes commands on standard input while it runs:
+  `bots` lists the groups, `bots set NAME COUNT [BEHAVIOR]` adds, resizes or
+  (with 0) removes a group, and `bots rate PER_SECOND|off` sets the join rate.
+  Rust programs do the same through `RunningHost::bot_control`.
 - `--stats` lines end with `bots=`, the bots currently in a group.
 
 ### Changed

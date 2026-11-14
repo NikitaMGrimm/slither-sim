@@ -142,7 +142,9 @@ at once, and keeps 80 spare slots for groups added later:
 }
 ```
 
-While it runs, type commands into the `host` process:
+Start it with `--console`, for example
+`slither-sim host --config arena.json --console`, and type commands while it
+runs:
 
 ```text
 bots                            list bot groups
@@ -158,10 +160,10 @@ behavior; to change it, remove the group and add a new one. All groups
 together fit in `bots.capacity`, which only a restart can raise. The join rate
 limits new bots only; bots in a group respawn as usual.
 
-Replies go to standard output and logs to standard error. A host started
-without input, such as the systemd service below, has no console; run it in
-`tmux` or `screen` to keep one. Programs that embed the host use
-`RunningHost::bot_control`.
+Replies go to standard output and logs to standard error. Keep a console host
+in the foreground: on Linux and macOS, a background job (`&`) that reads the
+terminal is stopped. On a server, run it inside `tmux` or `screen`. Programs
+that embed the host use `RunningHost::bot_control`.
 
 ## Run as a service
 
