@@ -106,7 +106,7 @@ pub struct SimulatorBackend {
     /// Slot and life of the newest admitted session that presented the
     /// host's `ownerKey`. An older owner session is not restored.
     owner: Option<(usize, u64)>,
-    /// World-thread `center`/`follow` bot slots; `None` on forager hosts.
+    /// World-thread `center`/`follow` bot slots; `None` outside hosts.
     in_world_bots: Option<InWorldBots>,
     #[cfg(feature = "frame-bench")]
     frame_bench: bool,
@@ -654,12 +654,17 @@ impl SimulatorBackend {
         Ok(())
     }
 
-    /// Respawn and steer world-thread bot slots. Forager hosts return at
+    /// Respawn and steer world-thread bot slots. Hosts without them return at
     /// once: no owner sampling, scans or allocations on their path.
     fn drive_in_world_bots(&mut self) -> Result<(), String> {
-        let Some(bots) = self.in_world_bots.take() else {
+        if self
+            .in_world_bots
+            .as_ref()
+            .is_none_or(InWorldBots::is_empty)
+        {
             return Ok(());
-        };
+        }
+        let bots = self.in_world_bots.take().unwrap();
         let driven = self.drive_with(&bots);
         self.in_world_bots = Some(bots);
         driven
@@ -667,7 +672,7 @@ impl SimulatorBackend {
 
     fn drive_with(&mut self, bots: &InWorldBots) -> Result<(), String> {
         let owner = self.owner_slot();
-        for slot in bots.slots() {
+        for (slot, behavior) in bots.slots() {
             if !self.world.snakes()[slot].alive {
                 if !bots.decides(slot, self.tick) {
                     continue;
@@ -696,7 +701,7 @@ impl SimulatorBackend {
                     Err(reason) => return Err(reason),
                 }
             }
-            if let Some(heading) = bots.heading(&self.world, slot, self.tick, owner) {
+            if let Some(heading) = bots.heading(&self.world, slot, behavior, self.tick, owner) {
                 self.slots[slot].control = Action {
                     heading,
                     boost: false,

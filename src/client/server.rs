@@ -23,7 +23,9 @@
 //! challenge; selectors 11/12 choose protocol 13, selector 31 uses a short login
 //! with protocol-19 output.
 use super::{
-    Bot, BotBehavior, ClientState, ClientStatus, ForagerBot, OwnerKey, SimulationConfig, challenge,
+    Bot, BotBehavior, ClientState, ClientStatus, ForagerBot, OwnerKey, SimulationConfig,
+    bot_roster::{self, BotGroup, BotStatus, Change, Roster, Rules},
+    challenge,
     latency::{LatencyConfig, Link, Random},
     protocol,
     simulation::{
@@ -114,7 +116,7 @@ const CHALLENGE_LITERAL: (&[u8; 5], &[u8; 22]) = (b"Slith", b"erSimLocalHostChal
 /// Real-time host configuration.
 ///
 /// `simulation.agents` and `simulation.controlledSlot` are derived: the world
-/// has `players.max` socket slots followed by `bots.count` background seekers, and no
+/// has `players.max` socket slots followed by the reserved bot slots, and no
 /// in-process controlled slot. Values given for those two fields are replaced.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(default, deny_unknown_fields, rename_all = "camelCase")]
@@ -180,30 +182,102 @@ impl Default for PlayerConfig {
     }
 }
 
-/// Built-in bot slots, workers, and modeled link and processing delay.
+/// Built-in bot groups, reserved slots, workers, and modeled link and
+/// processing delay.
+///
+/// JSON takes either the shorthand `{"count": 4, "behavior": "forager"}`, one
+/// group named after its behavior, or `{"groups": [...]}`.
 #[derive(Clone, Debug, Serialize, Deserialize)]
-#[serde(default, deny_unknown_fields, rename_all = "camelCase")]
+#[serde(try_from = "RawBotConfig", into = "RawBotConfig")]
 pub struct BotConfig {
-    pub count: usize,
-    pub behavior: BotBehavior,
+    /// Starting groups, in order; names are unique.
+    pub groups: Vec<BotGroup>,
+    /// Bot slots reserved at startup; `None` reserves the starting count.
+    /// Groups can grow at run time only into these slots.
+    pub capacity: Option<usize>,
+    /// How fast missing bots join, for all groups together; `None` adds
+    /// them at once. Respawns are never delayed.
+    pub join_per_second: Option<f64>,
     /// Forager workers apart from the simulation and socket threads;
-    /// `None` starts `DEFAULT_BOT_THREADS`. Only forager hosts accept it.
-    #[serde(
-        skip_serializing_if = "Option::is_none",
-        deserialize_with = "explicit_bot_setting"
-    )]
+    /// `None` starts `DEFAULT_BOT_THREADS`.
     pub threads: Option<usize>,
-    /// Forager link and processing delay; `None` adds none. Only forager
-    /// hosts accept it.
-    #[serde(
-        skip_serializing_if = "Option::is_none",
-        deserialize_with = "explicit_bot_setting"
-    )]
+    /// Forager link and processing delay; `None` adds none.
     pub latency: Option<LatencyConfig>,
 }
 
 /// Forager worker threads when `bots.threads` is omitted.
 const DEFAULT_BOT_THREADS: usize = 2;
+
+impl BotConfig {
+    /// One group of `count` bots named after `behavior`.
+    pub fn new(behavior: BotBehavior, count: usize) -> Self {
+        Self {
+            groups: vec![BotGroup::new(behavior, count)],
+            capacity: None,
+            join_per_second: None,
+            threads: None,
+            latency: None,
+        }
+    }
+
+    /// Bots wanted at startup, over all groups.
+    pub fn count(&self) -> usize {
+        self.groups.iter().map(|group| group.count).sum()
+    }
+
+    /// Reserved bot slots: `capacity`, or the starting count.
+    pub fn slots(&self) -> usize {
+        self.capacity.unwrap_or_else(|| self.count())
+    }
+}
+
+impl Default for BotConfig {
+    fn default() -> Self {
+        Self::new(BotBehavior::Forager, 4)
+    }
+}
+
+/// The JSON form of [`BotConfig`]. Named after it, so type errors name the
+/// public type.
+#[derive(Default, Serialize, Deserialize)]
+#[serde(
+    rename = "BotConfig",
+    default,
+    deny_unknown_fields,
+    rename_all = "camelCase"
+)]
+struct RawBotConfig {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    count: Option<usize>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    behavior: Option<BotBehavior>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    groups: Option<Vec<RawBotGroup>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    capacity: Option<usize>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    join_per_second: Option<f64>,
+    #[serde(
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "explicit_bot_setting"
+    )]
+    threads: Option<usize>,
+    #[serde(
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "explicit_bot_setting"
+    )]
+    latency: Option<LatencyConfig>,
+}
+
+#[derive(Serialize, Deserialize)]
+#[serde(rename = "BotGroup", deny_unknown_fields, rename_all = "camelCase")]
+struct RawBotGroup {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    name: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    behavior: Option<BotBehavior>,
+    count: usize,
+}
 
 /// Omission selects the forager defaults; an explicit null is not a setting.
 fn explicit_bot_setting<'de, D: serde::Deserializer<'de>, T: Deserialize<'de>>(
@@ -212,14 +286,70 @@ fn explicit_bot_setting<'de, D: serde::Deserializer<'de>, T: Deserialize<'de>>(
     T::deserialize(deserializer).map(Some)
 }
 
-impl Default for BotConfig {
-    fn default() -> Self {
-        Self {
-            count: 4,
-            behavior: BotBehavior::Forager,
-            threads: None,
-            latency: None,
+impl TryFrom<RawBotConfig> for BotConfig {
+    type Error = String;
+
+    fn try_from(raw: RawBotConfig) -> Result<Self, String> {
+        let groups = match raw.groups {
+            Some(_) if raw.count.is_some() || raw.behavior.is_some() => {
+                return Err(
+                    "bots.groups cannot be combined with bots.count or bots.behavior".into(),
+                );
+            }
+            Some(groups) => groups
+                .into_iter()
+                .map(|group| {
+                    let behavior = group.behavior.unwrap_or_default();
+                    BotGroup {
+                        name: group.name.unwrap_or_else(|| behavior.name().into()),
+                        behavior,
+                        count: group.count,
+                    }
+                })
+                .collect(),
+            None => vec![BotGroup::new(
+                raw.behavior.unwrap_or_default(),
+                raw.count.unwrap_or(4),
+            )],
+        };
+        Ok(Self {
+            groups,
+            capacity: raw.capacity,
+            join_per_second: raw.join_per_second,
+            threads: raw.threads,
+            latency: raw.latency,
+        })
+    }
+}
+
+impl From<BotConfig> for RawBotConfig {
+    fn from(config: BotConfig) -> Self {
+        let mut raw = Self {
+            capacity: config.capacity,
+            join_per_second: config.join_per_second,
+            threads: config.threads,
+            latency: config.latency,
+            ..Default::default()
+        };
+        match config.groups.as_slice() {
+            [group] if group.name == group.behavior.name() => {
+                raw.count = Some(group.count);
+                raw.behavior = Some(group.behavior);
+            }
+            groups => {
+                raw.groups = Some(
+                    groups
+                        .iter()
+                        .map(|group| RawBotGroup {
+                            name: Some(group.name.clone()),
+                            behavior: Some(group.behavior),
+                            count: group.count,
+                        })
+                        .collect(),
+                );
+            }
         }
+        raw
     }
 }
 
@@ -246,11 +376,18 @@ impl HostConfig {
         if self.frame_bench && !self.bind.ip().is_loopback() {
             return Err("--frame-bench requires a loopback bind".into());
         }
+        let starting = self.bots.count();
+        let capacity = self.bots.slots();
+        if capacity < starting {
+            return Err(format!(
+                "bots.capacity {capacity} is below the {starting} starting bots"
+            ));
+        }
         let agents = self
             .players
             .max
-            .checked_add(self.bots.count)
-            .ok_or("players.max + bots.count must fit in usize")?;
+            .checked_add(capacity)
+            .ok_or("players.max + bots.capacity must fit in usize")?;
         if self.players.max == 0 {
             return Err("Host needs 1 or more players.max".into());
         }
@@ -269,15 +406,18 @@ impl HostConfig {
         if let Some(key) = &self.owner_key {
             key.validate()?;
         }
-        if self.bots.behavior == BotBehavior::Follow && self.owner_key.is_none() {
-            return Err("bots.behavior follow requires ownerKey".into());
+        for (index, group) in self.bots.groups.iter().enumerate() {
+            bot_roster::check_name(&group.name).map_err(|e| format!("bots.groups: {e}"))?;
+            if self.bots.groups[..index]
+                .iter()
+                .any(|other| other.name == group.name)
+            {
+                return Err(format!("bots.groups: duplicate name {}", group.name));
+            }
         }
-        if self.bots.behavior != BotBehavior::Forager
-            && (self.bots.threads.is_some() || self.bots.latency.is_some())
-        {
-            return Err("bots.threads and bots.latency apply only to forager behavior".into());
-        }
-        if self.bots.count > 0 && self.bots.threads == Some(0) {
+        bot_roster::check_rate(self.bots.join_per_second)
+            .map_err(|e| format!("bots.joinPerSecond: {e}"))?;
+        if capacity > 0 && self.bots.threads == Some(0) {
             return Err("Bots need 1 or more bots.threads".into());
         }
         if self.simulation.record_wire {
@@ -307,15 +447,12 @@ impl HostConfig {
             latency: self.bots.latency.clone().unwrap_or_default(),
             ..self.simulation.clone()
         };
-        config.world.size_for_population(self.bots.count);
-        config.validate_for_population(self.bots.count)?;
-        // Circular worlds queue every join for socket priority and growth
-        // holds; world-thread respawns would bypass that admission queue.
-        if self.bots.behavior != BotBehavior::Forager
-            && self.bots.count > 0
-            && config.world.spawn_radius.is_some()
-        {
-            return Err("bots.behavior center and follow need a world without circular spawning, such as official; Battledome hosts use forager bots".into());
+        // Idle reserved slots never enlarge the arena: size for starting bots.
+        config.world.size_for_population(starting);
+        config.validate_for_population(starting)?;
+        let rules = self.bot_rules(&config);
+        for group in &self.bots.groups {
+            rules.check(&group.name, group.behavior, group.count)?;
         }
         if let Some(max) = self.max_tick {
             if !max.is_finite() || max < config.world.dt {
@@ -323,9 +460,16 @@ impl HostConfig {
             }
             let mut bounds = config.clone();
             bounds.world.dt = max;
-            bounds.validate_for_population(self.bots.count)?;
+            bounds.validate_for_population(starting)?;
         }
         Ok(config)
+    }
+
+    fn bot_rules(&self, config: &SimulationConfig) -> Rules {
+        Rules {
+            owner_key: self.owner_key.is_some(),
+            circular: config.world.spawn_radius.is_some(),
+        }
     }
 }
 
@@ -377,6 +521,8 @@ struct Shared {
     /// Nanoseconds the simulation thread spent running ticks.
     busy: AtomicU64,
     players: AtomicUsize,
+    /// Bots in a group, alive or not.
+    bots: AtomicUsize,
     admission_rejections: Mutex<BTreeMap<(&'static str, String), u64>>,
     /// Commands per socket slot sent to the simulation and not yet consumed.
     pending: Vec<AtomicUsize>,
@@ -463,6 +609,11 @@ enum Command {
         slot: usize,
         generation: u64,
     },
+    /// A bot worker answers `Delivery::Stop` and sends nothing more for the
+    /// slot until it is started again.
+    Release {
+        slot: usize,
+    },
 }
 
 impl Command {
@@ -471,7 +622,8 @@ impl Command {
             Command::Connect { slot, .. }
             | Command::Message { slot, .. }
             | Command::Victory { slot, .. }
-            | Command::Disconnect { slot, .. } => *slot,
+            | Command::Disconnect { slot, .. }
+            | Command::Release { slot } => *slot,
         }
     }
 }
@@ -490,9 +642,14 @@ enum Delivery {
         generation: u64,
         reason: String,
     },
+    /// Bot workers only: play this slot with a new seat.
+    Start { slot: usize },
+    /// Bot workers only: drop this slot's seat and answer `Command::Release`.
+    Stop { slot: usize },
 }
 
 impl Delivery {
+    /// Start and stop belong to no session; they report generation 0.
     fn session(&self) -> (usize, u64) {
         match self {
             Self::Frames {
@@ -501,7 +658,70 @@ impl Delivery {
             | Self::Closed {
                 slot, generation, ..
             } => (*slot, *generation),
+            Self::Start { slot } | Self::Stop { slot } => (*slot, 0),
         }
+    }
+}
+
+/// Bot group requests to the simulation thread, answered on `reply`.
+enum Control {
+    Status {
+        reply: Sender<BotStatus>,
+    },
+    SetGroup {
+        name: String,
+        behavior: Option<BotBehavior>,
+        count: usize,
+        reply: Sender<Result<(), String>>,
+    },
+    SetRate {
+        rate: Option<f64>,
+        reply: Sender<Result<(), String>>,
+    },
+}
+
+/// Changes a running host's bot groups from any thread. Requests are answered
+/// by the simulation thread within a tick; they fail once the host stopped.
+#[derive(Clone)]
+pub struct BotControl {
+    controls: Sender<Control>,
+}
+
+impl BotControl {
+    fn ask<T>(&self, control: impl FnOnce(Sender<T>) -> Control) -> Result<T, String> {
+        let (reply, answer) = mpsc::channel();
+        self.controls
+            .send(control(reply))
+            .map_err(|_| "The host stopped".to_owned())?;
+        answer.recv().map_err(|_| "The host stopped".to_owned())
+    }
+
+    /// Groups, their targets and current bots, capacity and join rate.
+    pub fn bots(&self) -> Result<BotStatus, String> {
+        self.ask(|reply| Control::Status { reply })
+    }
+
+    /// Create, resize or, with `count` 0, remove a group. A new group needs a
+    /// `behavior` unless its name is a behavior name. An existing group keeps
+    /// its behavior. All targets together must fit `bots.capacity`.
+    pub fn set_bot_group(
+        &self,
+        name: &str,
+        behavior: Option<BotBehavior>,
+        count: usize,
+    ) -> Result<(), String> {
+        self.ask(|reply| Control::SetGroup {
+            name: name.into(),
+            behavior,
+            count,
+            reply,
+        })?
+    }
+
+    /// Limit how fast missing bots join, in bots per second; `None` adds them
+    /// at once.
+    pub fn set_bot_join_rate(&self, rate: Option<f64>) -> Result<(), String> {
+        self.ask(|reply| Control::SetRate { rate, reply })?
     }
 }
 
@@ -514,7 +734,9 @@ pub struct Host {
     listener: TcpListener,
     world: RawSimulator,
     max_clients: usize,
+    /// Reserved bot slots.
     bots: usize,
+    roster: Roster,
     bot_threads: usize,
     seed: u32,
     latency: LatencyConfig,
@@ -533,17 +755,20 @@ impl Host {
         let simulation = config.world_config()?;
         let latency = simulation.latency.clone();
         let decision_seconds = simulation.decision_ticks as f64 * simulation.world.dt;
-        // Every host slot starts absent. Forager workers later connect like
-        // sockets; world-thread policies leave their bot connections closed.
-        let mut world = RawSimulator::new(
-            config.seed,
-            simulation,
-            config.players.max + config.bots.count,
-        )?;
+        let capacity = config.bots.slots();
+        let roster = Roster::new(
+            &config.bots.groups,
+            capacity,
+            config.bots.join_per_second,
+            config.bot_rules(&simulation),
+        );
+        // Every host slot starts absent. The simulation thread assigns bot
+        // slots to groups: forager workers then connect like sockets, while
+        // world-thread behaviors leave their bot connections closed.
+        let mut world = RawSimulator::new(config.seed, simulation, config.players.max + capacity)?;
         world.set_player_latency(config.players.max, config.players.latency);
-        if config.bots.behavior != BotBehavior::Forager && config.bots.count > 0 {
-            let profiles = (0..config.bots.count).map(bot_appearance).collect();
-            world.set_in_world_bots(config.players.max, config.bots.behavior, profiles);
+        if capacity > 0 {
+            world.reserve_in_world_bots(config.players.max);
         }
         #[cfg(feature = "frame-bench")]
         world.set_frame_bench(config.frame_bench);
@@ -557,16 +782,15 @@ impl Host {
             listener,
             world,
             max_clients: config.players.max,
-            bots: config.bots.count,
-            bot_threads: if config.bots.behavior == BotBehavior::Forager {
-                config
-                    .bots
-                    .threads
-                    .unwrap_or(DEFAULT_BOT_THREADS)
-                    .min(config.bots.count)
-            } else {
-                0
-            },
+            bots: capacity,
+            roster,
+            // Foragers may be added at run time, so workers start whenever
+            // slots are reserved, even if no group starts as foragers.
+            bot_threads: config
+                .bots
+                .threads
+                .unwrap_or(DEFAULT_BOT_THREADS)
+                .min(capacity),
             seed: config.seed,
             latency,
             decision_seconds,
@@ -626,12 +850,15 @@ impl Host {
             ticks: AtomicU64::new(0),
             busy: AtomicU64::new(0),
             players: AtomicUsize::new(0),
+            bots: AtomicUsize::new(0),
             admission_rejections: Mutex::new(BTreeMap::new()),
             pending: (0..self.max_clients).map(|_| AtomicUsize::new(0)).collect(),
             failure: Mutex::new(None),
         });
+        let (controls, control_inbox) = mpsc::channel();
         let mut running = RunningHost {
             address,
+            control: BotControl { controls },
             shared: shared.clone(),
             threads: Vec::new(),
             #[cfg(feature = "latency-rig")]
@@ -656,12 +883,15 @@ impl Host {
         for worker in 0..self.bot_threads {
             let (sender, receiver) = mpsc::channel();
             routes.push(sender);
-            let seats = (self.max_clients + worker..self.max_clients + self.bots)
+            let slots = (self.max_clients + worker..self.max_clients + self.bots)
                 .step_by(self.bot_threads)
-                .map(|slot| Seat::new(slot, slot - self.max_clients, self.decision_seconds))
-                .collect();
+                .len();
             let bots = Bots {
-                seats,
+                first: self.max_clients + worker,
+                max_clients: self.max_clients,
+                seats: (0..slots).map(|_| None).collect(),
+                generations: vec![0; slots],
+                active: 0,
                 policy: ForagerBot::new(),
                 stride: self.bot_threads,
                 deliveries: receiver,
@@ -702,6 +932,10 @@ impl Host {
             routes,
             max_clients: self.max_clients,
             generations: vec![0; agents],
+            bots: HostBots {
+                roster: self.roster,
+                controls: control_inbox,
+            },
             waiting: VecDeque::new(),
             next_spawn_tick: 0,
             next_spawn_at: 0.,
@@ -795,6 +1029,7 @@ impl Drop for HostPool {
 /// A serving host. Dropping it stops and joins its threads.
 pub struct RunningHost {
     address: SocketAddr,
+    control: BotControl,
     shared: Arc<Shared>,
     threads: Vec<JoinHandle<Result<(), String>>>,
     #[cfg(feature = "latency-rig")]
@@ -830,6 +1065,36 @@ impl RunningHost {
     /// Connected socket players in the shared world.
     pub fn players(&self) -> usize {
         self.shared.players.load(Ordering::Relaxed)
+    }
+
+    /// Bots in a group, alive or not, as of the last tick.
+    pub fn assigned_bots(&self) -> usize {
+        self.shared.bots.load(Ordering::Relaxed)
+    }
+
+    /// A handle that changes bot groups from other threads.
+    pub fn bot_control(&self) -> BotControl {
+        self.control.clone()
+    }
+
+    /// See [`BotControl::bots`].
+    pub fn bots(&self) -> Result<BotStatus, String> {
+        self.control.bots()
+    }
+
+    /// See [`BotControl::set_bot_group`].
+    pub fn set_bot_group(
+        &self,
+        name: &str,
+        behavior: Option<BotBehavior>,
+        count: usize,
+    ) -> Result<(), String> {
+        self.control.set_bot_group(name, behavior, count)
+    }
+
+    /// See [`BotControl::set_bot_join_rate`].
+    pub fn set_bot_join_rate(&self, rate: Option<f64>) -> Result<(), String> {
+        self.control.set_bot_join_rate(rate)
     }
 
     /// Cumulative server-initiated admission rejections by phase and reason.
@@ -925,6 +1190,7 @@ struct Simulation {
     max_clients: usize,
     /// Current session per slot; zero while closed.
     generations: Vec<u64>,
+    bots: HostBots,
     waiting: VecDeque<PendingJoin>,
     next_spawn_tick: u64,
     next_spawn_at: f64,
@@ -935,6 +1201,36 @@ struct Simulation {
     shared: Arc<Shared>,
     ticks: u64,
     deferred: u64,
+}
+
+/// Bot groups and the requests that change them.
+struct HostBots {
+    roster: Roster,
+    controls: Receiver<Control>,
+}
+
+#[cfg(test)]
+impl HostBots {
+    /// `count` foragers that join at once; their control sender is dropped.
+    fn foragers(count: usize) -> Self {
+        Self {
+            roster: Roster::new(
+                &[BotGroup::new(BotBehavior::Forager, count)],
+                count,
+                None,
+                Rules::default(),
+            ),
+            controls: mpsc::channel().1,
+        }
+    }
+
+    /// Foragers already holding their slots, for fixtures whose bot workers
+    /// are simulated by queued commands.
+    fn seated(count: usize) -> Self {
+        let mut bots = Self::foragers(count);
+        bots.roster.reconcile(0.);
+        bots
+    }
 }
 
 struct PendingJoin {
@@ -1085,10 +1381,82 @@ impl Simulation {
     }
 
     fn apply_commands(&mut self) -> Result<(), String> {
+        while let Ok(control) = self.bots.controls.try_recv() {
+            self.control(control)?;
+        }
+        self.reconcile_bots()?;
         while let Ok(command) = self.commands.try_recv() {
             self.apply(command)?;
         }
         self.admit_waiting()?;
+        Ok(())
+    }
+
+    /// Answer a bot group request. A dropped reply means the caller gave up.
+    fn control(&mut self, control: Control) -> Result<(), String> {
+        match control {
+            Control::Status { reply } => {
+                let first = self.max_clients;
+                let status = self.bots.roster.status(|bot| self.world.alive(first + bot));
+                let _ = reply.send(status);
+            }
+            Control::SetGroup {
+                name,
+                behavior,
+                count,
+                reply,
+            } => {
+                let result = self.bots.roster.set_group(&name, behavior, count);
+                // Apply at once, so a removed group's name is free for the
+                // next request and status reflects the change.
+                self.reconcile_bots()?;
+                let _ = reply.send(result);
+            }
+            Control::SetRate { rate, reply } => {
+                let _ = reply.send(self.bots.roster.set_rate(rate));
+            }
+        }
+        Ok(())
+    }
+
+    /// Carry out the roster's slot changes for this tick.
+    fn reconcile_bots(&mut self) -> Result<(), String> {
+        for change in self.bots.roster.reconcile(self.world.time()) {
+            match change {
+                Change::Assign { bot, behavior } => {
+                    let slot = self.max_clients + bot;
+                    if behavior == BotBehavior::Forager {
+                        let route = self.route(slot);
+                        self.batches[route].push(Delivery::Start { slot });
+                    } else {
+                        self.world
+                            .assign_in_world_bot(slot, behavior, bot_appearance(bot));
+                    }
+                }
+                Change::Unassign { bot, behavior } => {
+                    let slot = self.max_clients + bot;
+                    if behavior == BotBehavior::Forager {
+                        // The worker may still send commands for this slot
+                        // until it reads Stop. Those, and any Connect, are
+                        // ignored: the slot's generation is now 0 and Connect
+                        // needs a forager assignment. Commands from one worker
+                        // arrive in send order, so after its Release nothing
+                        // more comes and only then may the roster reuse the
+                        // slot.
+                        self.waiting.retain(|join| join.slot != slot);
+                        self.generations[slot] = 0;
+                        self.world.disconnect(slot)?;
+                        let route = self.route(slot);
+                        self.batches[route].push(Delivery::Stop { slot });
+                    } else {
+                        self.world.release_in_world_bot(slot)?;
+                    }
+                }
+            }
+        }
+        self.shared
+            .bots
+            .store(self.bots.roster.assigned(), Ordering::Relaxed);
         Ok(())
     }
 
@@ -1187,6 +1555,14 @@ impl Simulation {
         let slot = command.slot();
         if slot < self.max_clients {
             self.shared.pending[slot].fetch_sub(1, Ordering::Relaxed);
+        } else if let Command::Release { .. } = command {
+            self.bots.roster.release(slot - self.max_clients);
+            return Ok(());
+        } else if matches!(command, Command::Connect { .. })
+            && self.bots.roster.behavior(slot - self.max_clients) != Some(BotBehavior::Forager)
+        {
+            // A worker that has not yet read Stop for a removed forager.
+            return Ok(());
         }
         match command {
             Command::Connect {
@@ -1258,7 +1634,10 @@ impl Simulation {
                 self.generations[slot] = 0;
                 self.world.disconnect(slot)?;
             }
-            Command::Message { .. } | Command::Victory { .. } | Command::Disconnect { .. } => {}
+            Command::Message { .. }
+            | Command::Victory { .. }
+            | Command::Disconnect { .. }
+            | Command::Release { .. } => {}
         }
         Ok(())
     }
@@ -1698,6 +2077,8 @@ impl Gateway {
                 }
             }
             Delivery::Closed { reason, .. } => open.reject(&mut self.gate, now, &reason),
+            // Only bot workers receive seat lifecycle messages.
+            Delivery::Start { .. } | Delivery::Stop { .. } => {}
         }
     }
 
@@ -2105,8 +2486,17 @@ impl<S: io::Read + io::Write> Open<S> {
 
 /// One bot thread: received-frame clients sharing stateless policy scratch.
 struct Bots {
-    /// Every `stride`th slot from the first seat's.
-    seats: Vec<Seat>,
+    /// Every `stride`th slot from `first` belongs to this worker.
+    first: usize,
+    /// Bot slots follow the socket slots; this picks seat profiles.
+    max_clients: usize,
+    /// A seat per started slot. Idle slots hold no client state, so a host
+    /// with many world-thread bots keeps few worker allocations.
+    seats: Vec<Option<Seat>>,
+    /// The last session generation per slot, kept across stops so that a
+    /// restarted seat's sessions stay distinct from earlier ones.
+    generations: Vec<u64>,
+    active: usize,
     policy: ForagerBot,
     stride: usize,
     deliveries: Receiver<Vec<Delivery>>,
@@ -2117,6 +2507,9 @@ struct Bots {
     /// Seconds between one bot's decisions.
     interval: f64,
 }
+
+/// How long a worker without seats waits for a start before checking stop.
+const IDLE_WORKER_WAIT: Duration = Duration::from_millis(100);
 
 /// A background client that decides from delivered frames every interval, sends
 /// after processing, pings on the client's cadence and rejoins after death,
@@ -2143,20 +2536,21 @@ struct Seat {
 
 impl Bots {
     fn run(&mut self) -> Result<(), String> {
-        let start = self.shared.clock.wall(Instant::now());
-        for seat in &mut self.seats {
-            seat.decide_at += start;
-            seat.join(start, &self.commands, &self.latency, &mut self.random)?;
-        }
         while !self.shared.stopped() {
-            while let Ok(batch) = self.deliveries.try_recv() {
-                for delivery in batch {
-                    self.deliver(delivery);
+            if self.active == 0 {
+                match self.deliveries.recv_timeout(IDLE_WORKER_WAIT) {
+                    Ok(batch) => self.deliver_batch(batch)?,
+                    Err(mpsc::RecvTimeoutError::Timeout) => continue,
+                    // The simulation ended, so the host is stopping.
+                    Err(mpsc::RecvTimeoutError::Disconnected) => break,
                 }
+            }
+            while let Ok(batch) = self.deliveries.try_recv() {
+                self.deliver_batch(batch)?;
             }
             let now = self.shared.clock.wall(Instant::now());
             let mut next = f64::INFINITY;
-            for seat in &mut self.seats {
+            for seat in self.seats.iter_mut().flatten() {
                 seat.run(
                     now,
                     &self.commands,
@@ -2167,20 +2561,51 @@ impl Bots {
                 )?;
                 next = next.min(seat.next_event());
             }
-            self.shared.clock.sleep_until(next, MAX_IDLE);
+            if self.active > 0 {
+                self.shared.clock.sleep_until(next, MAX_IDLE);
+            }
         }
         Ok(())
     }
 
-    fn deliver(&mut self, delivery: Delivery) {
+    fn deliver_batch(&mut self, batch: Vec<Delivery>) -> Result<(), String> {
+        for delivery in batch {
+            self.deliver(delivery)?;
+        }
+        Ok(())
+    }
+
+    fn deliver(&mut self, delivery: Delivery) -> Result<(), String> {
         let (slot, generation) = delivery.session();
-        let first = self.seats[0].slot;
-        let Some(seat) = self
-            .seats
-            .get_mut((slot - first) / self.stride)
+        let index = (slot - self.first) / self.stride;
+        match delivery {
+            Delivery::Start { .. } => {
+                let now = self.shared.clock.wall(Instant::now());
+                let mut seat = Seat::new(slot, slot - self.max_clients, self.interval);
+                seat.generation = self.generations[index];
+                seat.decide_at += now;
+                seat.join(now, &self.commands, &self.latency, &mut self.random)?;
+                if self.seats[index].replace(seat).is_none() {
+                    self.active += 1;
+                }
+                return Ok(());
+            }
+            Delivery::Stop { .. } => {
+                if let Some(seat) = self.seats[index].take() {
+                    self.generations[index] = seat.generation;
+                    self.active -= 1;
+                }
+                // A closed channel means the simulation ended and the host is stopping.
+                let _ = self.commands.send(Command::Release { slot });
+                return Ok(());
+            }
+            Delivery::Frames { .. } | Delivery::Closed { .. } => {}
+        }
+        let Some(seat) = self.seats[index]
+            .as_mut()
             .filter(|seat| seat.generation == generation)
         else {
-            return;
+            return Ok(());
         };
         match delivery {
             Delivery::Frames { .. } if seat.closed => {}
@@ -2195,12 +2620,14 @@ impl Bots {
                 }
             }
             Delivery::Closed { .. } => seat.close(self.shared.clock.wall(Instant::now())),
+            Delivery::Start { .. } | Delivery::Stop { .. } => {}
         }
+        Ok(())
     }
 }
 
 impl Seat {
-    /// `decide_at` is relative to the start until the thread runs.
+    /// `decide_at` is relative to the start until the seat is started.
     fn new(slot: usize, bot: usize, interval: f64) -> Self {
         Self {
             slot,
@@ -2956,10 +3383,7 @@ mod tests {
                     max: 1,
                     ..Default::default()
                 },
-                bots: BotConfig {
-                    count: 0,
-                    ..Default::default()
-                },
+                bots: BotConfig::new(BotBehavior::Forager, 0),
                 ..Default::default()
             };
             config.simulation.world = crate::Config::sandbox();
@@ -3032,8 +3456,8 @@ mod tests {
     fn a_default_host_admits_every_seat() {
         let host = HostConfig::default();
         let config = host.world_config().unwrap();
-        let seats = host.players.max + host.bots.count;
-        let official = crate::Config::official(host.bots.count);
+        let seats = host.players.max + host.bots.count();
+        let official = crate::Config::official(host.bots.count());
         assert_eq!(config.world.radius, official.radius);
         // Startup sizing scales the floored one-seat food target by area.
         assert!(official.food_count - config.world.food_count < seats);
@@ -3060,12 +3484,11 @@ mod tests {
                     latency: LatencyConfig::fixed(rtts[0]),
                 },
                 bots: BotConfig {
-                    count: 1,
                     latency: Some(LatencyConfig {
                         processing_seconds: [0.03, 0.03],
                         ..LatencyConfig::fixed(rtts[1])
                     }),
-                    ..Default::default()
+                    ..BotConfig::new(BotBehavior::Forager, 1)
                 },
                 simulation: SimulationConfig {
                     world: crate::Config::sandbox(),
@@ -3222,6 +3645,7 @@ mod tests {
             ticks: AtomicU64::new(0),
             busy: AtomicU64::new(0),
             players: AtomicUsize::new(0),
+            bots: AtomicUsize::new(0),
             admission_rejections: Mutex::new(BTreeMap::new()),
             pending: (0..sockets).map(|_| AtomicUsize::new(0)).collect(),
             failure: Mutex::new(None),
@@ -3316,6 +3740,7 @@ mod tests {
             batches: vec![Vec::new()],
             max_clients: 1,
             generations: vec![0],
+            bots: HostBots::foragers(0),
             waiting: VecDeque::new(),
             next_spawn_tick: 0,
             next_spawn_at: 0.,
@@ -3419,7 +3844,7 @@ mod tests {
                 .flatten()
                 .filter_map(|delivery| match delivery {
                     Delivery::Frames { frames, .. } => Some(frames),
-                    Delivery::Closed { .. } => None,
+                    _ => None,
                 })
                 .flatten()
                 .find(|(_, bytes)| protocol::split_frame(bytes).unwrap().contains(&&b"p"[..]));
@@ -3534,6 +3959,7 @@ mod tests {
             batches: vec![Vec::new(), Vec::new()],
             max_clients: 1,
             generations: vec![0, 0],
+            bots: HostBots::foragers(1),
             waiting: VecDeque::new(),
             next_spawn_tick: 0,
             next_spawn_at: 0.,
@@ -3643,6 +4069,7 @@ mod tests {
             2,
         )
         .unwrap();
+        simulation.bots = HostBots::seated(1);
         simulation.ticks = 0;
         simulation.generations = vec![0; 2];
         simulation.next_spawn_tick = 0;
@@ -3892,6 +4319,7 @@ mod tests {
             3,
         )
         .unwrap();
+        simulation.bots = HostBots::seated(2);
         assert!(
             simulation
                 .world
@@ -3960,6 +4388,7 @@ mod tests {
             2,
         )
         .unwrap();
+        simulation.bots = HostBots::seated(1);
         assert!(
             simulation
                 .world
@@ -4004,7 +4433,11 @@ mod tests {
         let mut seat = Seat::new(4, 0, 0.042);
         seat.join(0.1, &commands, &latency, &mut random).unwrap();
         let mut bots = Bots {
-            seats: vec![seat],
+            first: 4,
+            max_clients: 4,
+            seats: vec![Some(seat)],
+            generations: vec![0],
+            active: 1,
             policy: ForagerBot::new(),
             stride: 1,
             deliveries,
@@ -4019,10 +4452,11 @@ mod tests {
             generation: 1,
             frames: vec![(1., vec![0, 0, b'p']); count],
         };
-        bots.deliver(frames(MAX_QUEUED_FRAMES));
-        assert_eq!(bots.seats[0].frames.len(), MAX_QUEUED_FRAMES);
-        bots.deliver(frames(1));
-        assert!(bots.seats[0].closed && bots.seats[0].frames.is_empty());
+        bots.deliver(frames(MAX_QUEUED_FRAMES)).unwrap();
+        let seat = |bots: &Bots| bots.seats[0].as_ref().unwrap().frames.len();
+        assert_eq!(seat(&bots), MAX_QUEUED_FRAMES);
+        bots.deliver(frames(1)).unwrap();
+        assert!(bots.seats[0].as_ref().unwrap().closed && seat(&bots) == 0);
         assert!(received.try_iter().any(|command| matches!(
             command,
             Command::Disconnect {
@@ -4030,8 +4464,30 @@ mod tests {
                 generation: 1
             }
         )));
-        bots.deliver(frames(1));
-        assert!(bots.seats[0].frames.is_empty());
+        bots.deliver(frames(1)).unwrap();
+        assert_eq!(seat(&bots), 0);
+
+        // Stop drops the seat and answers with a release; a restarted seat
+        // joins at once with a newer generation, and old frames miss it.
+        bots.deliver(Delivery::Stop { slot: 4 }).unwrap();
+        assert!(bots.seats[0].is_none() && bots.active == 0);
+        assert!(matches!(
+            received.try_iter().last(),
+            Some(Command::Release { slot: 4 })
+        ));
+        bots.deliver(frames(1)).unwrap();
+        bots.deliver(Delivery::Start { slot: 4 }).unwrap();
+        assert_eq!(bots.active, 1);
+        assert!(matches!(
+            received.try_recv().unwrap(),
+            Command::Connect {
+                slot: 4,
+                generation: 2,
+                ..
+            }
+        ));
+        bots.deliver(frames(1)).unwrap();
+        assert_eq!(seat(&bots), 0);
     }
 
     #[test]
@@ -4120,6 +4576,7 @@ mod tests {
             batches: vec![Vec::new()],
             max_clients: 1,
             generations: vec![0],
+            bots: HostBots::foragers(0),
             waiting: VecDeque::new(),
             next_spawn_tick: 0,
             next_spawn_at: 0.,
@@ -4562,17 +5019,14 @@ mod tests {
                 max: usize::MAX,
                 ..Default::default()
             },
-            bots: BotConfig {
-                count: 1,
-                ..Default::default()
-            },
+            bots: BotConfig::new(BotBehavior::Forager, 1),
             ..HostConfig::default()
         };
         assert!(
             config
                 .validate()
                 .unwrap_err()
-                .contains("players.max + bots.count")
+                .contains("players.max + bots.capacity")
         );
     }
 
@@ -4708,6 +5162,7 @@ mod tests {
             ..Default::default()
         };
         simulation.world = RawSimulator::new(7, config, 2).unwrap();
+        simulation.bots = HostBots::seated(1);
         simulation.generations = vec![0; 2];
         let queue = |simulation: &mut Simulation, slot, generation| {
             let command = Command::Connect {
@@ -4823,7 +5278,7 @@ mod tests {
             BotBehavior::Center,
             BotBehavior::Follow,
         ] {
-            config.bots.behavior = behavior;
+            config.bots.groups = vec![BotGroup::new(behavior, 1)];
             config.validate().unwrap();
             assert_eq!(Host::bind(config.clone()).unwrap().max_tick, Some(0.014));
         }
@@ -4831,15 +5286,14 @@ mod tests {
 
     #[test]
     fn host_bots_config_validation_roundtrip_and_redaction() {
+        // Foragers can join later, so world-thread groups take forager settings.
         for behavior in ["center", "follow"] {
             for field in [r#""threads":2"#, r#""latency":{}"#] {
                 let json = format!(
                     r#"{{"ownerKey":"bananatest","bots":{{"behavior":"{behavior}",{field}}}}}"#
                 );
                 let config: HostConfig = serde_json::from_str(&json).unwrap();
-                let error = config.validate().unwrap_err();
-                assert!(error.contains("apply only to forager"));
-                assert!(!error.contains("bananatest"));
+                config.validate().unwrap();
             }
         }
         for field in ["threads", "latency"] {
@@ -4882,10 +5336,7 @@ mod tests {
         ] {
             let config = HostConfig {
                 owner_key: Some(OwnerKey::from("bananatest".to_owned())),
-                bots: BotConfig {
-                    behavior,
-                    ..Default::default()
-                },
+                bots: BotConfig::new(behavior, 4),
                 ..Default::default()
             };
             config.validate().unwrap();
@@ -4922,7 +5373,7 @@ mod tests {
         )
         .unwrap();
         assert!(dome.validate().unwrap_err().contains("circular spawning"));
-        dome.bots.behavior = BotBehavior::Forager;
+        dome.bots = BotConfig::default();
         dome.validate().unwrap();
         let mut ordinary = HostConfig::default();
         let baseline = ordinary.world_config().unwrap();
@@ -4932,5 +5383,112 @@ mod tests {
             serde_json::to_value(ordinary.world_config().unwrap()).unwrap(),
             serde_json::to_value(baseline).unwrap()
         );
+    }
+
+    #[test]
+    fn bot_groups_config_forms_and_limits() {
+        let parse = |bots: &str| {
+            serde_json::from_str::<HostConfig>(&format!(
+                r#"{{"ownerKey":"bananatest","bots":{bots}}}"#
+            ))
+        };
+        // The shorthand stays the default and is one group named after its behavior.
+        for (json, behavior, count) in [
+            ("{}", BotBehavior::Forager, 4),
+            (r#"{"count":100}"#, BotBehavior::Forager, 100),
+            (r#"{"behavior":"center"}"#, BotBehavior::Center, 4),
+            (r#"{"count":2,"behavior":"follow"}"#, BotBehavior::Follow, 2),
+        ] {
+            let config = parse(json).unwrap();
+            assert_eq!(
+                config.bots.groups,
+                [BotGroup::new(behavior, count)],
+                "{json}"
+            );
+            assert_eq!(config.bots.slots(), count);
+            config.validate().unwrap();
+            let copy: serde_json::Value =
+                serde_json::from_str(&serde_json::to_string(&config.bots).unwrap()).unwrap();
+            assert_eq!(copy["count"], count);
+            assert!(copy.get("groups").is_none());
+        }
+        let config = parse(
+            r#"{"groups":[{"behavior":"forager","count":100},{"name":"chasers","behavior":"follow","count":20},{"count":1}],
+                "capacity":150,"joinPerSecond":2.5,"threads":3}"#,
+        )
+        .unwrap();
+        assert_eq!(
+            config.bots.groups,
+            [
+                BotGroup::new(BotBehavior::Forager, 100),
+                BotGroup {
+                    name: "chasers".into(),
+                    behavior: BotBehavior::Follow,
+                    count: 20
+                },
+                BotGroup::new(BotBehavior::Forager, 1),
+            ]
+        );
+        // Duplicate default names are refused.
+        assert!(
+            config
+                .validate()
+                .unwrap_err()
+                .contains("duplicate name forager")
+        );
+        let mut config = config;
+        config.bots.groups.pop();
+        config.validate().unwrap();
+        assert_eq!((config.bots.count(), config.bots.slots()), (120, 150));
+        assert_eq!(config.bots.join_per_second, Some(2.5));
+        // Startup sizes the world for starting bots; capacity only reserves slots.
+        let world = config.world_config().unwrap();
+        assert_eq!(world.agents, config.players.max + 150);
+        let mut starting = config.clone();
+        starting.bots.capacity = None;
+        assert_eq!(
+            starting.world_config().unwrap().world.radius,
+            world.world.radius
+        );
+        let json = serde_json::to_string(&config.bots).unwrap();
+        let copy: BotConfig = serde_json::from_str(&json).unwrap();
+        assert_eq!(copy.groups, config.bots.groups);
+        assert_eq!(serde_json::to_string(&copy).unwrap(), json);
+
+        for (json, error) in [
+            (r#"{"groups":[],"count":1}"#, "cannot be combined"),
+            (r#"{"groups":[],"behavior":"center"}"#, "cannot be combined"),
+            (r#"{"groups":[{"name":"x"}]}"#, "count"),
+            (r#"{"groups":[{"count":1,"speed":2}]}"#, "unknown field"),
+        ] {
+            let message = parse(json).unwrap_err().to_string();
+            assert!(message.contains(error), "{json}: {message}");
+        }
+        for (json, error) in [
+            (
+                r#"{"groups":[{"name":"a b","count":1}]}"#,
+                "printable ASCII",
+            ),
+            (r#"{"groups":[{"name":"","count":1}]}"#, "printable ASCII"),
+            (
+                r#"{"groups":[{"name":"x","count":1},{"name":"x","behavior":"center","count":1}]}"#,
+                "duplicate name x",
+            ),
+            (
+                r#"{"count":5,"capacity":4}"#,
+                "bots.capacity 4 is below the 5",
+            ),
+            (r#"{"joinPerSecond":0}"#, "bots.joinPerSecond"),
+            (r#"{"joinPerSecond":-1}"#, "bots.joinPerSecond"),
+            (r#"{"capacity":3,"count":0,"threads":0}"#, "bots.threads"),
+        ] {
+            let message = parse(json).unwrap().validate().unwrap_err();
+            assert!(message.contains(error), "{json}: {message}");
+        }
+        // Empty groups with spare capacity still start forager workers.
+        let mut idle = parse(r#"{"groups":[],"capacity":3}"#).unwrap();
+        idle.bind.set_port(0);
+        let host = Host::bind(idle).unwrap();
+        assert_eq!((host.bots, host.bot_threads), (3, 2));
     }
 }

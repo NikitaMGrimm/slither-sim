@@ -8,9 +8,9 @@
 //! simulation/host_bot_tests.rs.
 use crate::{Point, Simulator};
 use serde::{Deserialize, Serialize};
-use std::ops::Range;
+use std::{collections::BTreeMap, fmt, str::FromStr};
 
-/// What the host's bot slots do.
+/// What a host bot slot does.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub enum BotBehavior {
@@ -24,26 +24,78 @@ pub enum BotBehavior {
     Follow,
 }
 
+impl BotBehavior {
+    pub const ALL: [Self; 3] = [Self::Forager, Self::Center, Self::Follow];
+
+    /// The configuration and console name.
+    pub fn name(self) -> &'static str {
+        match self {
+            Self::Forager => "forager",
+            Self::Center => "center",
+            Self::Follow => "follow",
+        }
+    }
+}
+
+impl fmt::Display for BotBehavior {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.pad(self.name())
+    }
+}
+
+impl FromStr for BotBehavior {
+    type Err = String;
+
+    fn from_str(name: &str) -> Result<Self, String> {
+        Self::ALL
+            .into_iter()
+            .find(|behavior| behavior.name() == name)
+            .ok_or_else(|| format!("Unknown bot behavior {name}; use forager, center or follow"))
+    }
+}
+
 /// Center bots re-aim and dead bots respawn on staggered six-tick decisions.
 const DECISION_TICKS: u64 = 6;
 
+/// The world-thread behavior of each assigned bot slot. Slots are kept in
+/// ascending order, so driving them is deterministic.
 pub(super) struct InWorldBots {
-    slots: Range<usize>,
-    behavior: BotBehavior,
+    /// The first bot slot; decisions stagger from it.
+    first: usize,
+    behaviors: BTreeMap<usize, BotBehavior>,
 }
 
 impl InWorldBots {
-    pub(super) fn new(slots: Range<usize>, behavior: BotBehavior) -> Self {
-        Self { slots, behavior }
+    pub(super) fn new(first: usize) -> Self {
+        Self {
+            first,
+            behaviors: BTreeMap::new(),
+        }
     }
 
-    pub(super) fn slots(&self) -> Range<usize> {
-        self.slots.clone()
+    pub(super) fn assign(&mut self, slot: usize, behavior: BotBehavior) {
+        debug_assert!(slot >= self.first && behavior != BotBehavior::Forager);
+        self.behaviors.insert(slot, behavior);
+    }
+
+    pub(super) fn unassign(&mut self, slot: usize) -> bool {
+        self.behaviors.remove(&slot).is_some()
+    }
+
+    pub(super) fn is_empty(&self) -> bool {
+        self.behaviors.is_empty()
+    }
+
+    /// Assigned slots and their behaviors in ascending slot order.
+    pub(super) fn slots(&self) -> impl Iterator<Item = (usize, BotBehavior)> + '_ {
+        self.behaviors
+            .iter()
+            .map(|(&slot, &behavior)| (slot, behavior))
     }
 
     /// Staggered decision ticks for aiming and respawning.
     pub(super) fn decides(&self, slot: usize, tick: u64) -> bool {
-        (tick + (slot - self.slots.start) as u64).is_multiple_of(DECISION_TICKS)
+        (tick + (slot - self.first) as u64).is_multiple_of(DECISION_TICKS)
     }
 
     /// The wanted heading for a living bot this tick, or `None` to keep the
@@ -52,11 +104,12 @@ impl InWorldBots {
         &self,
         world: &Simulator,
         slot: usize,
+        behavior: BotBehavior,
         tick: u64,
         owner: Option<usize>,
     ) -> Option<f64> {
         let head = world.snakes()[slot].head;
-        if self.behavior == BotBehavior::Follow
+        if behavior == BotBehavior::Follow
             && let Some(owner) = owner
         {
             return Some(toward(head, world.snakes()[owner].head));

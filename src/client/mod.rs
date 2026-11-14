@@ -6,6 +6,7 @@ use crate::{Action, Observation};
 use serde::{Deserialize, Serialize};
 use std::time::Instant;
 
+mod bot_roster;
 pub mod challenge;
 mod encode;
 mod encode13;
@@ -29,6 +30,7 @@ pub mod simulation;
 pub mod transport;
 mod visibility;
 
+pub use bot_roster::{BotGroup, BotGroupStatus, BotStatus};
 pub use host_bots::BotBehavior;
 pub use hud::{
     ClientHud, DailyRecord, KillReport, Leaderboard, LeaderboardEntry, MinimapTeams,
@@ -43,7 +45,7 @@ pub use received::{
     CategoryKnowledge, ReceivedField, ReceivedHistory, ReceivedMetadata, ReceivedSnake,
     ReceivedTracker,
 };
-pub use server::{BotConfig, Host, HostConfig, PlayerConfig, RunningHost};
+pub use server::{BotConfig, BotControl, Host, HostConfig, PlayerConfig, RunningHost};
 pub use simulation::{DeliveryProfile, SimulationConfig, SimulatorBackend};
 
 mod rules_packet;

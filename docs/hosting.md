@@ -79,7 +79,8 @@ Battledome with 80 player seats:
 }
 ```
 
-Set `bots.count` to keep the world populated when nobody is online. Bots take
+Set `bots.count` to keep the world populated when nobody is online, or
+[change bots while the host runs](#change-bots-while-the-host-runs). Bots take
 their own seats, not player seats, and use CPU even with no players connected.
 The official arena grows and shrinks with occupied seats; see
 [population sizing](configuration.md#population-sizing) and
@@ -115,9 +116,51 @@ config file holds it in plain text.
 The newest playing session that used the key is the owner. While no owner is
 alive, follow bots head for the arena center like `center` bots. `forager`, the
 default, keeps the A4 food seekers. `center` and `follow` bots run on the world
-thread without bot workers or packets, so leave out `bots.threads` and
-`bots.latency`. They need a world without circular spawning: Battledome hosts
+thread without bot workers or packets; `bots.threads` and `bots.latency` only
+affect foragers. They need a world without circular spawning: Battledome hosts
 keep `forager` bots.
+
+## Change bots while the host runs
+
+Bots can come in groups, each with its own name, behavior and count. This host
+reserves 200 bot slots, starts 100 foragers and 20 follow bots, and adds them
+two per second instead of all at once:
+
+```json
+{
+  "bind": "127.0.0.1:8766",
+  "ownerKey": "bananatest",
+  "bots": {
+    "groups": [
+      { "behavior": "forager", "count": 100 },
+      { "name": "chasers", "behavior": "follow", "count": 20 }
+    ],
+    "capacity": 200,
+    "joinPerSecond": 2
+  },
+  "simulation": { "world": { "preset": "official" } }
+}
+```
+
+While it runs, type commands into the `host` process:
+
+```text
+bots                            list bot groups
+bots set NAME COUNT [BEHAVIOR]  create or resize a group; 0 removes it
+bots rate PER_SECOND|off        limit how fast missing bots join
+help                            show this list
+```
+
+`bots set chasers 40` resizes a group and `bots set center 30` creates a group
+of center bots. Groups keep their behavior; to change it, set the group to 0
+and add a new one. Removed bots leave without death food. All groups together
+may use at most `bots.capacity` slots; raising it needs a restart. The join
+rate only limits new bots; dead bots in a group respawn as usual.
+
+Replies go to standard output and logs to standard error. A service without
+input, such as the systemd unit below, simply has no console. Programs that
+embed the host use `RunningHost::bots`, `set_bot_group` and
+`set_bot_join_rate`.
 
 ## Run as a service
 
@@ -156,7 +199,7 @@ To see the tick rate and load, add `--stats 5` to the `host` command. Every five
 seconds the log gets a line like:
 
 ```text
-stats: ticks/s=142.86 deferred_ticks=0 lost_seconds=0.000000 simulation_load=41.2% players=40 bot_slots=0
+stats: ticks/s=142.86 deferred_ticks=0 lost_seconds=0.000000 simulation_load=41.2% players=40 bot_slots=0 bots=0
 ```
 
 - `ticks/s`: physics ticks run per second; 142.86 is full speed (one per 7 ms).
@@ -166,7 +209,8 @@ stats: ticks/s=142.86 deferred_ticks=0 lost_seconds=0.000000 simulation_load=41.
 - `simulation_load`: share of one core used by the game loop, not counting
   sockets and bots.
 - `players`: connected players, including those waiting to spawn.
-- `bot_slots`: configured background bots.
+- `bot_slots`: reserved bot slots (`bots.capacity`).
+- `bots`: bots currently in a group, alive or waiting to respawn.
 
 With `--stats`, failed admissions also produce cumulative counts, for example:
 

@@ -30,23 +30,58 @@ impl RawSimulator {
     pub(crate) fn set_view_pool(&mut self, pool: crate::client::server::HostPool) {
         self.backend.views = Some(super::broadcast::ViewWorkers::new(pool));
     }
-    /// Hand slots `first..` to world-thread `center`/`follow` bots with these
-    /// fixed profiles. Their connections stay closed for the whole host run.
+    /// Reserve slots `first..` for host bots. World-thread `center`/`follow`
+    /// bots play only in the slots later assigned to them; their connections
+    /// stay closed.
+    pub(crate) fn reserve_in_world_bots(&mut self, first: usize) {
+        self.backend.in_world_bots = Some(crate::client::host_bots::InWorldBots::new(first));
+    }
+
+    /// Hand a reserved bot slot to a world-thread behavior with this profile.
+    /// The bot spawns on its next staggered decision.
+    pub(crate) fn assign_in_world_bot(
+        &mut self,
+        slot: usize,
+        behavior: crate::client::BotBehavior,
+        profile: PlayerAppearance,
+    ) {
+        let b = &mut self.backend;
+        b.food_presentation
+            .register(slot, profile.skin, &profile.custom_skin);
+        b.profiles[slot] = profile;
+        b.in_world_bots
+            .as_mut()
+            .expect("bot slots are reserved")
+            .assign(slot, behavior);
+    }
+
+    /// Stop driving a world-thread bot and remove its snake without death food.
+    pub(crate) fn release_in_world_bot(&mut self, slot: usize) -> Result<(), String> {
+        if let Some(bots) = &mut self.backend.in_world_bots {
+            bots.unassign(slot);
+        }
+        self.disconnect(slot)
+    }
+
+    /// Whether `slot` has a living snake.
+    pub(crate) fn alive(&self, slot: usize) -> bool {
+        self.backend.world.snakes()[slot].alive
+    }
+
+    /// Hand slots `first..` to one world-thread behavior.
+    #[cfg(test)]
     pub(crate) fn set_in_world_bots(
         &mut self,
         first: usize,
         behavior: crate::client::BotBehavior,
         profiles: Vec<PlayerAppearance>,
     ) {
-        let b = &mut self.backend;
-        let slots = first..b.slots.len();
+        let slots = first..self.backend.slots.len();
         assert_eq!(profiles.len(), slots.len(), "one profile per bot slot");
-        for (slot, profile) in slots.clone().zip(profiles) {
-            b.food_presentation
-                .register(slot, profile.skin, &profile.custom_skin);
-            b.profiles[slot] = profile;
+        self.reserve_in_world_bots(first);
+        for (slot, profile) in slots.zip(profiles) {
+            self.assign_in_world_bot(slot, behavior, profile);
         }
-        b.in_world_bots = Some(crate::client::host_bots::InWorldBots::new(slots, behavior));
     }
     #[cfg(feature = "frame-bench")]
     pub(crate) fn set_frame_bench(&mut self, enabled: bool) {
