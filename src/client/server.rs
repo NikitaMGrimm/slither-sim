@@ -5585,16 +5585,17 @@ mod tests {
             let message = parse(json).unwrap_err().to_string();
             assert!(message.contains(error), "{json}: {message}");
         }
+        let overflow = format!(
+            r#"{{"groups":[{{"count":{}}},{{"behavior":"center","count":1}}]}}"#,
+            usize::MAX
+        );
         for (json, error) in [
             (
                 r#"{"groups":[{"name":"a b","count":1}]}"#,
                 "printable ASCII",
             ),
             (r#"{"groups":[{"name":"","count":1}]}"#, "printable ASCII"),
-            (
-                r#"{"groups":[{"count":18446744073709551615},{"behavior":"center","count":1}]}"#,
-                "must add up to at most",
-            ),
+            (overflow.as_str(), "must add up to at most"),
             (
                 r#"{"groups":[{"name":"x","count":1},{"name":"x","behavior":"center","count":1}]}"#,
                 "duplicate name x",
